@@ -14,10 +14,10 @@
 <style>
   :root {
     --ink:#1A1613; --paper:#FBFAF8; --card:#fff;
-    --line:#EDE7E0; --line-2:#E2DCD4; --wash:#F5F1EC;
-    --muted:#8A8078; --faint:#A39A90;
-    --brand:#E8590C; --brand-soft:#FFF0E4;
-    --ok:#0E9F6E; --bad:#D63939;
+    --line:#EDE7E0; --wash-2:#F0EBE4;
+    --muted:#8A8078;
+    --brand:#E8590C;
+    --ok:#0E9F6E;
   }
   * { box-sizing:border-box; }
   body {
@@ -36,8 +36,6 @@
   .pane--wide { max-width:1200px; }
   .scroll { flex:1; overflow:auto; }
 
-  .card { background:var(--card); border:1px solid var(--line); border-radius:20px; }
-  .field { margin-bottom:18px; }
   .field__label { font-size:12px; font-weight:700; color:var(--muted); margin-bottom:9px; }
   .input {
     width:100%; height:54px; border:1px solid var(--line); border-radius:16px;
@@ -78,32 +76,16 @@
   .tab {
     flex:1; height:38px; border-radius:12px; border:none;
     font-size:13px; font-weight:700; cursor:pointer;
-    background:#F0EBE4; color:var(--muted);
+    background:var(--wash-2); color:var(--muted);
   }
   .tab.is-on { background:var(--ink); color:#fff; }
 
-  @media (min-width: 960px) {
-    .task-body { grid-template-columns:minmax(0,1fr) 340px; }
-
-    /* 結算面板常駐右欄 */
-    .panel-settle { display:block; grid-column:2; grid-row:1; }
-
-    /* 結算退出頁籤列 */
-    .tab-settle { display:none; }
-
-    /* 若使用者在窄螢幕停在「結算」頁籤後放大視窗，
-       左欄會兩個 panel 都隱藏而留白 —— 此時退化為顯示支出。
-       選擇器特異性 (0,2,0) 高於 .panel/.tab 的 (0,1,0)，可覆蓋。*/
-    [data-tab="settle"] .panel-expenses { display:block; }
-    [data-tab="settle"] .tab-expenses { background:var(--ink); color:#fff; }
-  }
-
   .hdr {
     display:flex; align-items:center; gap:12px;
-    padding:12px 0; border-bottom:1px solid var(--line);
+    padding:12px 0;
     background:var(--card);
   }
-  .hdr__wrap { position:sticky; top:0; z-index:10; background:var(--card); }
+  .hdr__wrap { position:sticky; top:0; z-index:10; background:var(--card); border-bottom:1px solid var(--line); }
   .hdr__title { flex:1; min-width:0; }
   .hdr__brand, .hdr__me { display:none; }
 
@@ -114,6 +96,23 @@
   }
 
   @media (min-width: 960px) {
+    .task-body { grid-template-columns:minmax(0,1fr) 340px; }
+
+    /* 結算面板常駐右欄 */
+    .panel.panel-settle { display:block; grid-column:2; grid-row:1; }
+
+    /* 結算退出頁籤列 */
+    .tab-settle { display:none; }
+
+    /* 若使用者在窄螢幕停在「結算」頁籤後放大視窗，
+       左欄會兩個 panel 都隱藏而留白 —— 此時退化為顯示支出。
+       選擇器特異性 (0,2,0) 高於 .panel/.tab 的 (0,1,0)，可覆蓋。*/
+    [data-tab="settle"] .panel-expenses { display:block; }
+    [data-tab="settle"] .tab-expenses { background:var(--ink); color:#fff; }
+
+    .tabs { justify-content:flex-start; }
+    .tab { flex:none; min-width:120px; padding:0 22px; }
+
     .hdr__brand { display:flex; align-items:center; gap:9px; }
     .hdr__me { display:flex; align-items:center; gap:9px; }
 
@@ -128,8 +127,8 @@
 
       <!-- 1 登入 -->
       <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ true }}">
-        <div class="screen">
-          <div class="pane" style="flex:1; display:flex; flex-direction:column; padding-top:50px; padding-bottom:40px; background:linear-gradient(170deg,#FFF3E9 0%,#FBFAF8 55%); margin-top:-50px;">
+        <div class="screen" style="background:linear-gradient(170deg,#FFF3E9 0%,#FBFAF8 55%);">
+          <div class="pane" style="flex:1; display:flex; flex-direction:column; padding-bottom:40px;">
             <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:20px;">
               <div style="width:62px; height:62px; border-radius:22px; background:#E8590C; color:#fff; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:900;">分</div>
               <div style="font-size:40px; font-weight:900; line-height:1.12; letter-spacing:-.02em;">一趟旅行<br />一份帳單</div>
@@ -168,7 +167,7 @@
 
       <!-- 3 任務列表 -->
       <sc-if value="{{ isTasks }}" hint-placeholder-val="{{ false }}">
-        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+        <div class="screen">
           <div class="hdr__wrap">
             <div class="pane pane--wide">
               <div class="hdr">
@@ -614,10 +613,8 @@ class Component extends DCLogic {
     const perHead = splitNames.length ? Math.round(amtNum * rate / splitNames.length) : 0;
 
     return {
-      inviteLabel: s.copied ? "連結已複製" : "邀請成員",
       isLogin: s.screen==="login", isNickname: s.screen==="nickname", isTasks: s.screen==="tasks",
       isNewTask: s.screen==="newtask", isShare: s.screen==="share", isTask: s.screen==="task", isAdd: s.screen==="add",
-      onExpenses: s.tab==="expenses", onMembers: s.tab==="members", onSettle: s.tab==="settle",
       showAddBtn: s.tab === "expenses" || s.tab === "settle",
 
       nickname: s.nickname,
