@@ -61,6 +61,13 @@
   }
   .btn--settled { background:var(--ok); }
   .settle-btn { margin-top:4px; }
+
+  .task-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));
+    gap:14px;
+    align-items:start;
+  }
 </style>
 </helmet>
 
@@ -109,42 +116,48 @@
       <!-- 3 任務列表 -->
       <sc-if value="{{ isTasks }}" hint-placeholder-val="{{ false }}">
         <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-          <div style="padding:6px 26px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-            <div>
-              <div style="font-size:13px; color:#8A8078;">哈囉，{{ nickname }}</div>
-              <div style="font-size:28px; font-weight:900; letter-spacing:-.01em;">我的分帳</div>
-            </div>
-            <div style="width:42px; height:42px; border-radius:50%; background:#E8590C; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; flex:none;">{{ nickInitial }}</div>
-          </div>
-          <div style="flex:1; overflow:auto; padding:0 26px 24px; display:flex; flex-direction:column; gap:12px;">
-            <div onClick="{{ openTask }}" style="background:#fff; border:1px solid #EDE7E0; border-radius:24px; padding:20px; cursor:pointer;" style-hover="border-color:#E8590C;">
-              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
-                <div>
-                  <div style="font-size:18px; font-weight:700;">{{ taskName }}</div>
-                  <div style="font-size:12px; color:#8A8078; margin-top:5px;">4 位成員 · 5 筆支出 · 進行中</div>
-                </div>
-                <span style="font-size:10px; background:#FFF0E4; color:#E8590C; padding:5px 9px; border-radius:8px; font-weight:700; letter-spacing:.06em; flex:none;">管理者</span>
+          <div class="pane pane--wide">
+            <div style="padding:6px 0 18px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <div>
+                <div style="font-size:13px; color:#8A8078;">哈囉，{{ nickname }}</div>
+                <div style="font-size:28px; font-weight:900; letter-spacing:-.01em;">我的分帳</div>
               </div>
-              <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:18px; padding-top:16px; border-top:1px dashed #EDE7E0;">
-                <div>
-                  <div style="font-size:11px; color:#A39A90;">你目前應收</div>
-                  <div style="font-size:24px; font-weight:900; color:#0E9F6E; font-variant-numeric:tabular-nums; letter-spacing:-.01em;">+{{ myNetText }}</div>
-                </div>
-                <div style="display:flex;">
-                  <sc-for list="{{ members }}" as="m" hint-placeholder-count="4">
-                    <span style="{{ m.stack }}">{{ m.initial }}</span>
-                  </sc-for>
-                </div>
-              </div>
-            </div>
-            <div style="background:#fff; border:1px solid #EDE7E0; border-radius:24px; padding:20px; opacity:.55;">
-              <div style="font-size:18px; font-weight:700;">週五公司聚餐</div>
-              <div style="font-size:12px; color:#8A8078; margin-top:5px;">6 位成員 · 已結算 2026/06/12</div>
-              <div style="font-size:16px; font-weight:700; margin-top:14px; color:#8A8078;">已結清</div>
+              <div style="width:42px; height:42px; border-radius:50%; background:#E8590C; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; flex:none;">{{ nickInitial }}</div>
             </div>
           </div>
-          <div style="padding:0 26px 28px;">
-            <button onClick="{{ goNewTask }}" class="btn btn--primary">＋ 建立分帳任務</button>
+          <div class="scroll">
+            <div class="pane pane--wide task-grid">
+              <div onClick="{{ openTask }}" style="background:#fff; border:1px solid #EDE7E0; border-radius:24px; padding:20px; cursor:pointer;" style-hover="border-color:#E8590C;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                  <div>
+                    <div style="font-size:18px; font-weight:700;">{{ taskName }}</div>
+                    <div style="font-size:12px; color:#8A8078; margin-top:5px;">4 位成員 · 5 筆支出 · 進行中</div>
+                  </div>
+                  <span style="font-size:10px; background:#FFF0E4; color:#E8590C; padding:5px 9px; border-radius:8px; font-weight:700; letter-spacing:.06em; flex:none;">管理者</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:18px; padding-top:16px; border-top:1px dashed #EDE7E0;">
+                  <div>
+                    <div style="font-size:11px; color:#A39A90;">你目前應收</div>
+                    <div style="font-size:24px; font-weight:900; color:#0E9F6E; font-variant-numeric:tabular-nums; letter-spacing:-.01em;">+{{ myNetText }}</div>
+                  </div>
+                  <div style="display:flex;">
+                    <sc-for list="{{ members }}" as="m" hint-placeholder-count="4">
+                      <span style="{{ m.stack }}">{{ m.initial }}</span>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+              <div style="background:#fff; border:1px solid #EDE7E0; border-radius:24px; padding:20px; opacity:.55;">
+                <div style="font-size:18px; font-weight:700;">週五公司聚餐</div>
+                <div style="font-size:12px; color:#8A8078; margin-top:5px;">6 位成員 · 已結算 2026/06/12</div>
+                <div style="font-size:16px; font-weight:700; margin-top:14px; color:#8A8078;">已結清</div>
+              </div>
+            </div>
+          </div>
+          <div class="pane pane--wide">
+            <div style="padding:0 0 28px;">
+              <button onClick="{{ goNewTask }}" class="btn btn--primary">＋ 建立分帳任務</button>
+            </div>
           </div>
         </div>
       </sc-if>
