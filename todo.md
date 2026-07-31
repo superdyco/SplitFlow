@@ -75,4 +75,3 @@
 - 補 ESLint / Prettier。
 - 補基本單元測試或 Firebase emulator 測試。
 - 補 Firestore indexes 文件。
-- 清理未追蹤的 `docs/superpowers/...` 刪除狀態。
