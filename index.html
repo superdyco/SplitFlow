@@ -97,6 +97,29 @@
     [data-tab="settle"] .panel-expenses { display:block; }
     [data-tab="settle"] .tab-expenses { background:var(--ink); color:#fff; }
   }
+
+  .hdr {
+    display:flex; align-items:center; gap:12px;
+    padding:12px 0; border-bottom:1px solid var(--line);
+    background:var(--card);
+  }
+  .hdr__wrap { position:sticky; top:0; z-index:10; background:var(--card); }
+  .hdr__title { flex:1; min-width:0; }
+  .hdr__brand, .hdr__me { display:none; }
+
+  .actionbar {
+    position:sticky; bottom:0;
+    padding:14px 0 22px;
+    background:linear-gradient(to top, var(--paper) 72%, rgba(251,250,248,0));
+  }
+
+  @media (min-width: 960px) {
+    .hdr__brand { display:flex; align-items:center; gap:9px; }
+    .hdr__me { display:flex; align-items:center; gap:9px; }
+
+    .actionbar { position:static; display:flex; justify-content:flex-end; background:none; }
+    .actionbar .btn--primary { width:auto; min-width:210px; padding:0 28px; }
+  }
 </style>
 </helmet>
 
@@ -145,13 +168,21 @@
       <!-- 3 任務列表 -->
       <sc-if value="{{ isTasks }}" hint-placeholder-val="{{ false }}">
         <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-          <div class="pane pane--wide">
-            <div style="padding:6px 0 18px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-              <div>
-                <div style="font-size:13px; color:#8A8078;">哈囉，{{ nickname }}</div>
-                <div style="font-size:28px; font-weight:900; letter-spacing:-.01em;">我的分帳</div>
+          <div class="hdr__wrap">
+            <div class="pane pane--wide">
+              <div class="hdr">
+                <span class="hdr__brand">
+                  <span style="width:28px; height:28px; border-radius:10px; background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900;">分</span>
+                  <span style="font-size:14px; font-weight:900;">分帳系統</span>
+                </span>
+                <div class="hdr__title">
+                  <div style="font-size:13px; color:#8A8078;">哈囉，{{ nickname }}</div>
+                  <div style="font-size:28px; font-weight:900; letter-spacing:-.01em;">我的分帳</div>
+                </div>
+                <span class="hdr__me">
+                  <span style="{{ meAvatar }}">{{ nickInitial }}</span>
+                </span>
               </div>
-              <div style="width:42px; height:42px; border-radius:50%; background:#E8590C; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; flex:none;">{{ nickInitial }}</div>
             </div>
           </div>
           <div class="scroll">
@@ -183,8 +214,8 @@
               </div>
             </div>
           </div>
-          <div class="pane pane--wide">
-            <div style="padding:0 0 28px;">
+          <div class="actionbar">
+            <div class="pane pane--wide">
               <button onClick="{{ goNewTask }}" class="btn btn--primary">＋ 建立分帳任務</button>
             </div>
           </div>
@@ -194,12 +225,23 @@
       <!-- 4 建立任務 -->
       <sc-if value="{{ isNewTask }}" hint-placeholder-val="{{ false }}">
         <div class="screen">
-          <div class="pane" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-            <div style="padding:2px 0 14px; display:flex; align-items:center; gap:14px;">
-              <button onClick="{{ goTasks }}" class="btn btn--back">←</button>
-              <div style="font-size:18px; font-weight:700;">建立分帳任務</div>
+          <div class="hdr__wrap">
+            <div class="pane">
+              <div class="hdr">
+                <span class="hdr__brand">
+                  <span style="width:28px; height:28px; border-radius:10px; background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900;">分</span>
+                  <span style="font-size:14px; font-weight:900;">分帳系統</span>
+                </span>
+                <button onClick="{{ goTasks }}" class="btn btn--back">←</button>
+                <div class="hdr__title" style="font-size:18px; font-weight:700;">建立分帳任務</div>
+                <span class="hdr__me">
+                  <span style="{{ meAvatar }}">{{ nickInitial }}</span>
+                </span>
+              </div>
             </div>
-            <div style="flex:1; overflow:auto; padding:6px 0 24px; display:flex; flex-direction:column; gap:18px;">
+          </div>
+          <div class="scroll">
+            <div class="pane" style="padding-top:6px; padding-bottom:24px; display:flex; flex-direction:column; gap:18px;">
               <div>
                 <div class="field__label">任務名稱</div>
                 <input value="{{ taskName }}" onChange="{{ onTaskName }}" placeholder="例如：曼谷 × 胡志明 8 日" class="input" />
@@ -218,7 +260,9 @@
                 <input value="2026/08/09 – 08/16" class="input" />
               </div>
             </div>
-            <div style="padding:0 0 28px;">
+          </div>
+          <div class="actionbar">
+            <div class="pane">
               <button onClick="{{ createTask }}" class="btn btn--primary">建立並取得邀請連結</button>
             </div>
           </div>
@@ -228,6 +272,21 @@
       <!-- 5 分享 -->
       <sc-if value="{{ isShare }}" hint-placeholder-val="{{ false }}">
         <div class="screen">
+          <div class="hdr__wrap">
+            <div class="pane">
+              <div class="hdr">
+                <span class="hdr__brand">
+                  <span style="width:28px; height:28px; border-radius:10px; background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900;">分</span>
+                  <span style="font-size:14px; font-weight:900;">分帳系統</span>
+                </span>
+                <button onClick="{{ goTasks }}" class="btn btn--back">←</button>
+                <div class="hdr__title" style="font-size:18px; font-weight:700;">邀請成員</div>
+                <span class="hdr__me">
+                  <span style="{{ meAvatar }}">{{ nickInitial }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
           <div class="pane" style="flex:1; display:flex; flex-direction:column; padding-top:16px; padding-bottom:30px;">
             <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; gap:16px;">
               <div style="width:68px; height:68px; border-radius:24px; background:#0E9F6E; color:#fff; display:flex; align-items:center; justify-content:center; font-size:32px;">✓</div>
@@ -246,14 +305,23 @@
       <!-- 6 任務內頁 -->
       <sc-if value="{{ isTask }}" hint-placeholder-val="{{ false }}">
         <div class="screen" data-tab="{{ tab }}">
-          <div class="pane pane--wide">
-            <div style="padding:2px 0 12px; display:flex; align-items:center; gap:12px;">
-              <button onClick="{{ goTasks }}" class="btn btn--back">←</button>
-              <div style="flex:1; min-width:0;">
-                <div style="font-size:17px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ taskName }}</div>
-                <div style="font-size:11px; color:#A39A90; margin-top:2px;">總支出 NT$ {{ totalText }} · 4 人</div>
+          <div class="hdr__wrap">
+            <div class="pane pane--wide">
+              <div class="hdr">
+                <span class="hdr__brand">
+                  <span style="width:28px; height:28px; border-radius:10px; background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900;">分</span>
+                  <span style="font-size:14px; font-weight:900;">分帳系統</span>
+                </span>
+                <button onClick="{{ goTasks }}" class="btn btn--back">←</button>
+                <div class="hdr__title">
+                  <div style="font-size:17px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ taskName }}</div>
+                  <div style="font-size:11px; color:#A39A90; margin-top:2px;">總支出 NT$ {{ totalText }} · 4 人</div>
+                </div>
+                <button onClick="{{ goShare }}" class="btn btn--back">↗</button>
+                <span class="hdr__me">
+                  <span style="{{ meAvatar }}">{{ nickInitial }}</span>
+                </span>
               </div>
-              <button onClick="{{ goShare }}" class="btn btn--back">↗</button>
             </div>
           </div>
 
@@ -355,9 +423,11 @@
             </div>
           </div>
 
-          <sc-if value="{{ onExpenses }}" hint-placeholder-val="{{ true }}">
-            <div style="padding:0 22px 26px;">
-              <button onClick="{{ goAdd }}" class="btn btn--primary">＋ 新增支出</button>
+          <sc-if value="{{ showAddBtn }}" hint-placeholder-val="{{ true }}">
+            <div class="actionbar">
+              <div class="pane pane--wide">
+                <button onClick="{{ goAdd }}" class="btn btn--primary">＋ 新增支出</button>
+              </div>
             </div>
           </sc-if>
         </div>
@@ -366,12 +436,23 @@
       <!-- 7 新增支出 -->
       <sc-if value="{{ isAdd }}" hint-placeholder-val="{{ false }}">
         <div class="screen">
-          <div class="pane" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-            <div style="padding:2px 0 12px; display:flex; align-items:center; gap:12px;">
-              <button onClick="{{ openTask }}" class="btn btn--back">←</button>
-              <div style="font-size:18px; font-weight:700;">新增支出</div>
+          <div class="hdr__wrap">
+            <div class="pane">
+              <div class="hdr">
+                <span class="hdr__brand">
+                  <span style="width:28px; height:28px; border-radius:10px; background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900;">分</span>
+                  <span style="font-size:14px; font-weight:900;">分帳系統</span>
+                </span>
+                <button onClick="{{ openTask }}" class="btn btn--back">←</button>
+                <div class="hdr__title" style="font-size:18px; font-weight:700;">新增支出</div>
+                <span class="hdr__me">
+                  <span style="{{ meAvatar }}">{{ nickInitial }}</span>
+                </span>
+              </div>
             </div>
-            <div style="flex:1; overflow:auto; padding:6px 0 20px; display:flex; flex-direction:column; gap:14px;">
+          </div>
+          <div class="scroll">
+            <div class="pane" style="padding-top:6px; padding-bottom:20px; display:flex; flex-direction:column; gap:14px;">
 
               <div style="background:#fff; border:1px solid #EDE7E0; border-radius:22px; padding:18px;">
                 <div class="field__label">金額</div>
@@ -439,7 +520,9 @@
                 </div>
               </div>
             </div>
-            <div style="padding:0 0 26px;">
+          </div>
+          <div class="actionbar">
+            <div class="pane">
               <button onClick="{{ saveExpense }}" class="btn btn--primary">儲存支出</button>
             </div>
           </div>
@@ -491,7 +574,7 @@ class Component extends DCLogic {
   };
 
   go = (screen) => () => this.setState({ screen, copied:false });
-  avatar = (name, size) => `width:${size}px;height:${size}px;border-radius:50%;background:${AV[name]};color:#fff;display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.42)}px;font-weight:700;flex:none;`;
+  avatar = (name, size) => `width:${size}px;height:${size}px;border-radius:50%;background:${AV[name] || "#E8590C"};color:#fff;display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.42)}px;font-weight:700;flex:none;`;
 
   totals() {
     const paid = { Alex:0, Bella:0, Chris:0, Dora:0 };
@@ -534,9 +617,11 @@ class Component extends DCLogic {
       isLogin: s.screen==="login", isNickname: s.screen==="nickname", isTasks: s.screen==="tasks",
       isNewTask: s.screen==="newtask", isShare: s.screen==="share", isTask: s.screen==="task", isAdd: s.screen==="add",
       onExpenses: s.tab==="expenses", onMembers: s.tab==="members", onSettle: s.tab==="settle",
+      showAddBtn: s.tab === "expenses" || s.tab === "settle",
 
       nickname: s.nickname,
       nickInitial: (s.nickname || "?").charAt(0).toUpperCase(),
+      meAvatar: this.avatar(s.nickname, 30),
       onNick: e => this.setState({ nickname: e.target.value }),
       saveNick: this.go("tasks"),
       loginGoogle: this.go("nickname"), loginFb: this.go("nickname"),
