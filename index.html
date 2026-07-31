@@ -35,6 +35,31 @@
   .pane { width:100%; max-width:480px; margin:0 auto; padding:0 20px; }
   .pane--wide { max-width:1200px; }
   .scroll { flex:1; overflow:auto; }
+
+  .card { background:var(--card); border:1px solid var(--line); border-radius:20px; }
+  .field { margin-bottom:18px; }
+  .field__label { font-size:12px; font-weight:700; color:var(--muted); margin-bottom:9px; }
+  .input {
+    width:100%; height:54px; border:1px solid var(--line); border-radius:16px;
+    padding:0 16px; font-size:15px; font-weight:500;
+    background:var(--card); color:var(--ink);
+  }
+  .btn { border:none; cursor:pointer; font-weight:700; }
+  .btn--primary {
+    width:100%; height:56px; border-radius:18px;
+    background:var(--brand); color:#fff; font-size:16px;
+  }
+  .btn--ghost {
+    width:100%; height:46px; border-radius:14px;
+    border:1px solid var(--line); background:var(--card);
+    color:var(--ink); font-size:13px;
+  }
+  .btn--back {
+    width:38px; height:38px; border-radius:50%;
+    border:1px solid var(--line); background:var(--card);
+    font-size:16px; color:var(--ink); flex:none;
+  }
+  .btn--settled { background:var(--ok); }
 </style>
 </helmet>
 
@@ -42,37 +67,41 @@
 
       <!-- 1 登入 -->
       <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ true }}">
-        <div style="flex:1; display:flex; flex-direction:column; padding:0 30px 40px; background:linear-gradient(170deg,#FFF3E9 0%,#FBFAF8 55%); margin-top:-50px; padding-top:50px;">
-          <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:20px;">
-            <div style="width:62px; height:62px; border-radius:22px; background:#E8590C; color:#fff; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:900;">分</div>
-            <div style="font-size:40px; font-weight:900; line-height:1.12; letter-spacing:-.02em;">一趟旅行<br />一份帳單</div>
-            <div style="font-size:15px; color:#7A7069; line-height:1.75;">多幣別記帳、地圖標記，最後一鍵換算成新台幣結清。</div>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:11px;">
-            <button onClick="{{ loginGoogle }}" style="height:54px; border-radius:16px; border:1px solid #E2DCD4; background:#fff; color:#1A1613; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer;" style-hover="border-color:#1A1613;">
-              <span style="width:20px; height:20px; border-radius:50%; background:#E8590C; display:inline-block;"></span>使用 Google 帳號登入
-            </button>
-            <button onClick="{{ loginFb }}" style="height:54px; border-radius:16px; border:1px solid #E2DCD4; background:#fff; color:#1A1613; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer;" style-hover="border-color:#1A1613;">
-              <span style="width:20px; height:20px; border-radius:50%; background:#3F5EA8; display:inline-block;"></span>使用 Facebook 登入
-            </button>
-            <div style="font-size:11px; color:#A39A90; text-align:center; margin-top:6px; line-height:1.7;">登入即表示同意服務條款與隱私權政策</div>
+        <div class="screen">
+          <div class="pane" style="flex:1; display:flex; flex-direction:column; padding-top:50px; padding-bottom:40px; background:linear-gradient(170deg,#FFF3E9 0%,#FBFAF8 55%); margin-top:-50px;">
+            <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:20px;">
+              <div style="width:62px; height:62px; border-radius:22px; background:#E8590C; color:#fff; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:900;">分</div>
+              <div style="font-size:40px; font-weight:900; line-height:1.12; letter-spacing:-.02em;">一趟旅行<br />一份帳單</div>
+              <div style="font-size:15px; color:#7A7069; line-height:1.75;">多幣別記帳、地圖標記，最後一鍵換算成新台幣結清。</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:11px;">
+              <button onClick="{{ loginGoogle }}" style="height:54px; border-radius:16px; border:1px solid #E2DCD4; background:#fff; color:#1A1613; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer;" style-hover="border-color:#1A1613;">
+                <span style="width:20px; height:20px; border-radius:50%; background:#E8590C; display:inline-block;"></span>使用 Google 帳號登入
+              </button>
+              <button onClick="{{ loginFb }}" style="height:54px; border-radius:16px; border:1px solid #E2DCD4; background:#fff; color:#1A1613; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer;" style-hover="border-color:#1A1613;">
+                <span style="width:20px; height:20px; border-radius:50%; background:#3F5EA8; display:inline-block;"></span>使用 Facebook 登入
+              </button>
+              <div style="font-size:11px; color:#A39A90; text-align:center; margin-top:6px; line-height:1.7;">登入即表示同意服務條款與隱私權政策</div>
+            </div>
           </div>
         </div>
       </sc-if>
 
       <!-- 2 建立暱稱 -->
       <sc-if value="{{ isNickname }}" hint-placeholder-val="{{ false }}">
-        <div style="flex:1; display:flex; flex-direction:column; padding:20px 26px 34px;">
-          <div style="font-size:11px; letter-spacing:.16em; color:#A39A90;">FIRST TIME</div>
-          <div style="font-size:30px; font-weight:900; letter-spacing:-.01em; margin-top:10px;">取一個暱稱</div>
-          <div style="font-size:14px; color:#7A7069; line-height:1.75; margin-top:10px;">其他成員會在帳目與結算裡看到這個名字，之後可以修改。</div>
-          <div style="display:flex; align-items:center; gap:14px; margin-top:30px; padding:16px; background:#fff; border:1px solid #EDE7E0; border-radius:20px;">
-            <div style="width:54px; height:54px; border-radius:50%; background:#E8590C; color:#fff; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:700; flex:none;">{{ nickInitial }}</div>
-            <input value="{{ nickname }}" onChange="{{ onNick }}" placeholder="輸入暱稱" style="flex:1; border:none; font-size:21px; font-weight:700; background:transparent; padding:0; min-width:0;" />
+        <div class="screen">
+          <div class="pane" style="flex:1; display:flex; flex-direction:column; padding-top:20px; padding-bottom:34px;">
+            <div style="font-size:11px; letter-spacing:.16em; color:#A39A90;">FIRST TIME</div>
+            <div style="font-size:30px; font-weight:900; letter-spacing:-.01em; margin-top:10px;">取一個暱稱</div>
+            <div style="font-size:14px; color:#7A7069; line-height:1.75; margin-top:10px;">其他成員會在帳目與結算裡看到這個名字，之後可以修改。</div>
+            <div style="display:flex; align-items:center; gap:14px; margin-top:30px; padding:16px; background:#fff; border:1px solid #EDE7E0; border-radius:20px;">
+              <div style="width:54px; height:54px; border-radius:50%; background:#E8590C; color:#fff; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:700; flex:none;">{{ nickInitial }}</div>
+              <input value="{{ nickname }}" onChange="{{ onNick }}" placeholder="輸入暱稱" style="flex:1; border:none; font-size:21px; font-weight:700; background:transparent; padding:0; min-width:0;" />
+            </div>
+            <div style="font-size:12px; color:#A39A90; margin-top:12px;">已用 Google 登入 · alex.chen@gmail.com</div>
+            <div style="flex:1;"></div>
+            <button onClick="{{ saveNick }}" class="btn btn--primary">建立帳號</button>
           </div>
-          <div style="font-size:12px; color:#A39A90; margin-top:12px;">已用 Google 登入 · alex.chen@gmail.com</div>
-          <div style="flex:1;"></div>
-          <button onClick="{{ saveNick }}" style="{{ primaryBtn }}">建立帳號</button>
         </div>
       </sc-if>
 
@@ -114,56 +143,60 @@
             </div>
           </div>
           <div style="padding:0 26px 28px;">
-            <button onClick="{{ goNewTask }}" style="{{ primaryBtn }}">＋ 建立分帳任務</button>
+            <button onClick="{{ goNewTask }}" class="btn btn--primary">＋ 建立分帳任務</button>
           </div>
         </div>
       </sc-if>
 
       <!-- 4 建立任務 -->
       <sc-if value="{{ isNewTask }}" hint-placeholder-val="{{ false }}">
-        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-          <div style="padding:2px 24px 14px; display:flex; align-items:center; gap:14px;">
-            <button onClick="{{ goTasks }}" style="{{ backBtn }}">←</button>
-            <div style="font-size:18px; font-weight:700;">建立分帳任務</div>
-          </div>
-          <div style="flex:1; overflow:auto; padding:6px 24px 24px; display:flex; flex-direction:column; gap:18px;">
-            <div>
-              <div style="{{ labelStyle }}">任務名稱</div>
-              <input value="{{ taskName }}" onChange="{{ onTaskName }}" placeholder="例如：曼谷 × 胡志明 8 日" style="{{ inputStyle }}" />
+        <div class="screen">
+          <div class="pane" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+            <div style="padding:2px 24px 14px; display:flex; align-items:center; gap:14px;">
+              <button onClick="{{ goTasks }}" class="btn btn--back">←</button>
+              <div style="font-size:18px; font-weight:700;">建立分帳任務</div>
             </div>
-            <div>
-              <div style="{{ labelStyle }}">主要幣別</div>
-              <select value="{{ taskCurrency }}" onChange="{{ onTaskCurrency }}" style="{{ inputStyle }}">
-                <sc-for list="{{ currencies }}" as="c" hint-placeholder-count="9">
-                  <option value="{{ c.code }}">{{ c.label }}</option>
-                </sc-for>
-              </select>
-              <div style="font-size:11px; color:#A39A90; margin-top:8px; line-height:1.6;">每筆支出仍可單獨選幣別，結算一律換算為新台幣。</div>
+            <div style="flex:1; overflow:auto; padding:6px 24px 24px; display:flex; flex-direction:column; gap:18px;">
+              <div>
+                <div class="field__label">任務名稱</div>
+                <input value="{{ taskName }}" onChange="{{ onTaskName }}" placeholder="例如：曼谷 × 胡志明 8 日" class="input" />
+              </div>
+              <div>
+                <div class="field__label">主要幣別</div>
+                <select value="{{ taskCurrency }}" onChange="{{ onTaskCurrency }}" class="input">
+                  <sc-for list="{{ currencies }}" as="c" hint-placeholder-count="9">
+                    <option value="{{ c.code }}">{{ c.label }}</option>
+                  </sc-for>
+                </select>
+                <div style="font-size:11px; color:#A39A90; margin-top:8px; line-height:1.6;">每筆支出仍可單獨選幣別，結算一律換算為新台幣。</div>
+              </div>
+              <div>
+                <div class="field__label">日期</div>
+                <input value="2026/08/09 – 08/16" class="input" />
+              </div>
             </div>
-            <div>
-              <div style="{{ labelStyle }}">日期</div>
-              <input value="2026/08/09 – 08/16" style="{{ inputStyle }}" />
+            <div style="padding:0 24px 28px;">
+              <button onClick="{{ createTask }}" class="btn btn--primary">建立並取得邀請連結</button>
             </div>
-          </div>
-          <div style="padding:0 24px 28px;">
-            <button onClick="{{ createTask }}" style="{{ primaryBtn }}">建立並取得邀請連結</button>
           </div>
         </div>
       </sc-if>
 
       <!-- 5 分享 -->
       <sc-if value="{{ isShare }}" hint-placeholder-val="{{ false }}">
-        <div style="flex:1; display:flex; flex-direction:column; padding:16px 26px 30px;">
-          <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; gap:16px;">
-            <div style="width:68px; height:68px; border-radius:24px; background:#0E9F6E; color:#fff; display:flex; align-items:center; justify-content:center; font-size:32px;">✓</div>
-            <div style="font-size:26px; font-weight:900;">任務建立完成</div>
-            <div style="font-size:14px; color:#7A7069; line-height:1.75; max-width:260px;">把連結傳給同行的人，他們登入後就會自動加入這個分帳任務。</div>
-            <div style="width:100%; background:#fff; border:1px solid #EDE7E0; border-radius:18px; padding:14px 14px 14px 18px; display:flex; align-items:center; gap:10px; text-align:left; margin-top:6px;">
-              <div style="flex:1; min-width:0; font-size:13px; color:#7A7069; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">split.app/j/8QK2-M4TX</div>
-              <button onClick="{{ copyLink }}" style="border:none; background:#FFF0E4; color:#E8590C; font-size:12px; font-weight:700; padding:9px 13px; border-radius:11px; cursor:pointer; flex:none;">{{ copyLabel }}</button>
+        <div class="screen">
+          <div class="pane" style="flex:1; display:flex; flex-direction:column; padding-top:16px; padding-bottom:30px;">
+            <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; gap:16px;">
+              <div style="width:68px; height:68px; border-radius:24px; background:#0E9F6E; color:#fff; display:flex; align-items:center; justify-content:center; font-size:32px;">✓</div>
+              <div style="font-size:26px; font-weight:900;">任務建立完成</div>
+              <div style="font-size:14px; color:#7A7069; line-height:1.75; max-width:260px;">把連結傳給同行的人，他們登入後就會自動加入這個分帳任務。</div>
+              <div style="width:100%; background:#fff; border:1px solid #EDE7E0; border-radius:18px; padding:14px 14px 14px 18px; display:flex; align-items:center; gap:10px; text-align:left; margin-top:6px;">
+                <div style="flex:1; min-width:0; font-size:13px; color:#7A7069; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">split.app/j/8QK2-M4TX</div>
+                <button onClick="{{ copyLink }}" style="border:none; background:#FFF0E4; color:#E8590C; font-size:12px; font-weight:700; padding:9px 13px; border-radius:11px; cursor:pointer; flex:none;">{{ copyLabel }}</button>
+              </div>
             </div>
+            <button onClick="{{ openTask }}" class="btn btn--primary">進入任務</button>
           </div>
-          <button onClick="{{ openTask }}" style="{{ primaryBtn }}">進入任務</button>
         </div>
       </sc-if>
 
@@ -171,12 +204,12 @@
       <sc-if value="{{ isTask }}" hint-placeholder-val="{{ false }}">
         <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
           <div style="padding:2px 22px 12px; display:flex; align-items:center; gap:12px;">
-            <button onClick="{{ goTasks }}" style="{{ backBtn }}">←</button>
+            <button onClick="{{ goTasks }}" class="btn btn--back">←</button>
             <div style="flex:1; min-width:0;">
               <div style="font-size:17px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ taskName }}</div>
               <div style="font-size:11px; color:#A39A90; margin-top:2px;">總支出 NT$ {{ totalText }} · 4 人</div>
             </div>
-            <button onClick="{{ goShare }}" style="{{ backBtn }}">↗</button>
+            <button onClick="{{ goShare }}" class="btn btn--back">↗</button>
           </div>
 
           <div style="display:flex; gap:6px; padding:0 22px 14px;">
@@ -219,7 +252,7 @@
                     <button onClick="{{ m.toggle }}" style="{{ m.btnStyle }}">{{ m.btnLabel }}</button>
                   </div>
                 </sc-for>
-                <button onClick="{{ goShare }}" style="{{ ghostBtn }}">＋ 邀請更多成員</button>
+                <button onClick="{{ goShare }}" class="btn btn--ghost">＋ 邀請更多成員</button>
               </div>
             </sc-if>
 
@@ -266,7 +299,7 @@
                     </sc-for>
                   </div>
                 </div>
-                <button onClick="{{ doSettle }}" style="{{ settleBtnStyle }}">{{ settleLabel }}</button>
+                <button onClick="{{ doSettle }}" class="{{ settleBtnClass }}">{{ settleLabel }}</button>
                 <div style="font-size:11px; color:#A39A90; text-align:center; line-height:1.7; padding:0 10px;">{{ settleHint }}</div>
               </div>
             </sc-if>
@@ -274,7 +307,7 @@
 
           <sc-if value="{{ onExpenses }}" hint-placeholder-val="{{ true }}">
             <div style="padding:0 22px 26px;">
-              <button onClick="{{ goAdd }}" style="{{ primaryBtn }}">＋ 新增支出</button>
+              <button onClick="{{ goAdd }}" class="btn btn--primary">＋ 新增支出</button>
             </div>
           </sc-if>
         </div>
@@ -282,81 +315,83 @@
 
       <!-- 7 新增支出 -->
       <sc-if value="{{ isAdd }}" hint-placeholder-val="{{ false }}">
-        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-          <div style="padding:2px 22px 12px; display:flex; align-items:center; gap:12px;">
-            <button onClick="{{ openTask }}" style="{{ backBtn }}">←</button>
-            <div style="font-size:18px; font-weight:700;">新增支出</div>
-          </div>
-          <div style="flex:1; overflow:auto; padding:6px 22px 20px; display:flex; flex-direction:column; gap:14px;">
+        <div class="screen">
+          <div class="pane" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+            <div style="padding:2px 22px 12px; display:flex; align-items:center; gap:12px;">
+              <button onClick="{{ openTask }}" class="btn btn--back">←</button>
+              <div style="font-size:18px; font-weight:700;">新增支出</div>
+            </div>
+            <div style="flex:1; overflow:auto; padding:6px 22px 20px; display:flex; flex-direction:column; gap:14px;">
 
-            <div style="background:#fff; border:1px solid #EDE7E0; border-radius:22px; padding:18px;">
-              <div style="{{ labelStyle }}">金額</div>
-              <div style="display:flex; gap:10px; align-items:stretch;">
-                <select value="{{ formCurrency }}" onChange="{{ onFormCurrency }}" style="width:118px; flex:none; border:1px solid #EDE7E0; border-radius:16px; padding:0 10px; font-size:14px; font-weight:700; background:#FBFAF8;">
-                  <sc-for list="{{ currencies }}" as="c" hint-placeholder-count="9">
-                    <option value="{{ c.code }}">{{ c.short }}</option>
+              <div style="background:#fff; border:1px solid #EDE7E0; border-radius:22px; padding:18px;">
+                <div class="field__label">金額</div>
+                <div style="display:flex; gap:10px; align-items:stretch;">
+                  <select value="{{ formCurrency }}" onChange="{{ onFormCurrency }}" style="width:118px; flex:none; border:1px solid #EDE7E0; border-radius:16px; padding:0 10px; font-size:14px; font-weight:700; background:#FBFAF8;">
+                    <sc-for list="{{ currencies }}" as="c" hint-placeholder-count="9">
+                      <option value="{{ c.code }}">{{ c.short }}</option>
+                    </sc-for>
+                  </select>
+                  <input value="{{ formAmount }}" onChange="{{ onFormAmount }}" placeholder="0" style="flex:1; min-width:0; border:1px solid #EDE7E0; border-radius:16px; padding:14px 16px; font-size:26px; font-weight:900; text-align:right; font-variant-numeric:tabular-nums; background:#FBFAF8;" />
+                </div>
+                <div style="font-size:12px; color:#A39A90; margin-top:10px; text-align:right; font-variant-numeric:tabular-nums;">≈ NT$ {{ formTwd }}（1 {{ formCurrency }} = {{ formRate }}）</div>
+              </div>
+
+              <div>
+                <div class="field__label">分類</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <sc-for list="{{ catChips }}" as="c" hint-placeholder-count="6">
+                    <button onClick="{{ c.pick }}" style="{{ c.style }}">{{ c.name }}</button>
                   </sc-for>
-                </select>
-                <input value="{{ formAmount }}" onChange="{{ onFormAmount }}" placeholder="0" style="flex:1; min-width:0; border:1px solid #EDE7E0; border-radius:16px; padding:14px 16px; font-size:26px; font-weight:900; text-align:right; font-variant-numeric:tabular-nums; background:#FBFAF8;" />
-              </div>
-              <div style="font-size:12px; color:#A39A90; margin-top:10px; text-align:right; font-variant-numeric:tabular-nums;">≈ NT$ {{ formTwd }}（1 {{ formCurrency }} = {{ formRate }}）</div>
-            </div>
-
-            <div>
-              <div style="{{ labelStyle }}">分類</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <sc-for list="{{ catChips }}" as="c" hint-placeholder-count="6">
-                  <button onClick="{{ c.pick }}" style="{{ c.style }}">{{ c.name }}</button>
-                </sc-for>
-              </div>
-            </div>
-
-            <div>
-              <div style="{{ labelStyle }}">項目</div>
-              <input value="{{ formTitle }}" onChange="{{ onFormTitle }}" placeholder="例如：河濱夜市晚餐" style="{{ inputStyle }}" />
-            </div>
-
-            <div>
-              <div style="{{ labelStyle }}">地點</div>
-              <div style="border:1px solid #EDE7E0; border-radius:20px; overflow:hidden; background:#fff;">
-                <div style="height:126px; background-image:repeating-linear-gradient(135deg,#F0EBE4 0 10px,#F7F3EE 10px 20px); position:relative; display:flex; align-items:center; justify-content:center;">
-                  <span style="font-size:11px; color:#A39A90; letter-spacing:.06em;">Google Maps 定位預覽</span>
-                  <span style="position:absolute; left:50%; top:50%; width:14px; height:14px; margin:-7px 0 0 -7px; border-radius:50%; background:#E8590C; box-shadow:0 0 0 6px rgba(232,89,12,.18);"></span>
-                </div>
-                <div style="padding:14px 16px; display:flex; align-items:center; gap:12px;">
-                  <div style="flex:1; min-width:0;">
-                    <div style="font-size:14px; font-weight:700;">{{ formPlace }}</div>
-                    <div style="font-size:11px; color:#A39A90; margin-top:3px;">{{ formPlaceSub }}</div>
-                  </div>
-                  <button onClick="{{ cyclePlace }}" style="border:1px solid #EDE7E0; background:#FBFAF8; font-size:12px; font-weight:700; padding:9px 13px; border-radius:12px; cursor:pointer; flex:none;">更換地點</button>
                 </div>
               </div>
-            </div>
 
-            <div>
-              <div style="{{ labelStyle }}">誰先付</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <sc-for list="{{ payerChips }}" as="p" hint-placeholder-count="4">
-                  <button onClick="{{ p.pick }}" style="{{ p.style }}">{{ p.name }}</button>
-                </sc-for>
+              <div>
+                <div class="field__label">項目</div>
+                <input value="{{ formTitle }}" onChange="{{ onFormTitle }}" placeholder="例如：河濱夜市晚餐" class="input" />
               </div>
-            </div>
 
-            <div>
-              <div style="{{ labelStyle }}">分攤成員（{{ splitCount }} 人，每人 NT$ {{ perHead }}）</div>
-              <div style="background:#fff; border:1px solid #EDE7E0; border-radius:20px; padding:6px 16px;">
-                <sc-for list="{{ splitRows }}" as="s" hint-placeholder-count="4">
-                  <div onClick="{{ s.toggle }}" style="display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid #F5F1EC; cursor:pointer;">
-                    <span style="{{ s.avatar }}">{{ s.initial }}</span>
-                    <div style="flex:1; font-size:14px; font-weight:500;">{{ s.name }}</div>
-                    <span style="{{ s.check }}">✓</span>
+              <div>
+                <div class="field__label">地點</div>
+                <div style="border:1px solid #EDE7E0; border-radius:20px; overflow:hidden; background:#fff;">
+                  <div style="height:126px; background-image:repeating-linear-gradient(135deg,#F0EBE4 0 10px,#F7F3EE 10px 20px); position:relative; display:flex; align-items:center; justify-content:center;">
+                    <span style="font-size:11px; color:#A39A90; letter-spacing:.06em;">Google Maps 定位預覽</span>
+                    <span style="position:absolute; left:50%; top:50%; width:14px; height:14px; margin:-7px 0 0 -7px; border-radius:50%; background:#E8590C; box-shadow:0 0 0 6px rgba(232,89,12,.18);"></span>
                   </div>
-                </sc-for>
+                  <div style="padding:14px 16px; display:flex; align-items:center; gap:12px;">
+                    <div style="flex:1; min-width:0;">
+                      <div style="font-size:14px; font-weight:700;">{{ formPlace }}</div>
+                      <div style="font-size:11px; color:#A39A90; margin-top:3px;">{{ formPlaceSub }}</div>
+                    </div>
+                    <button onClick="{{ cyclePlace }}" style="border:1px solid #EDE7E0; background:#FBFAF8; font-size:12px; font-weight:700; padding:9px 13px; border-radius:12px; cursor:pointer; flex:none;">更換地點</button>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div class="field__label">誰先付</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <sc-for list="{{ payerChips }}" as="p" hint-placeholder-count="4">
+                    <button onClick="{{ p.pick }}" style="{{ p.style }}">{{ p.name }}</button>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div>
+                <div class="field__label">分攤成員（{{ splitCount }} 人，每人 NT$ {{ perHead }}）</div>
+                <div style="background:#fff; border:1px solid #EDE7E0; border-radius:20px; padding:6px 16px;">
+                  <sc-for list="{{ splitRows }}" as="s" hint-placeholder-count="4">
+                    <div onClick="{{ s.toggle }}" style="display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid #F5F1EC; cursor:pointer;">
+                      <span style="{{ s.avatar }}">{{ s.initial }}</span>
+                      <div style="flex:1; font-size:14px; font-weight:500;">{{ s.name }}</div>
+                      <span style="{{ s.check }}">✓</span>
+                    </div>
+                  </sc-for>
+                </div>
               </div>
             </div>
-          </div>
-          <div style="padding:0 22px 26px;">
-            <button onClick="{{ saveExpense }}" style="{{ primaryBtn }}">儲存支出</button>
+            <div style="padding:0 22px 26px;">
+              <button onClick="{{ saveExpense }}" class="btn btn--primary">儲存支出</button>
+            </div>
           </div>
         </div>
       </sc-if>
@@ -439,11 +474,6 @@ class Component extends DCLogic {
     const tx = this.transfers(net);
     const names = ["Alex","Bella","Chris","Dora"];
 
-    const primaryBtn = "width:100%;height:56px;border-radius:18px;border:none;background:#E8590C;color:#fff;font-size:16px;font-weight:700;cursor:pointer;";
-    const ghostBtn = "flex:1;width:100%;height:46px;border-radius:14px;border:1px solid #EDE7E0;background:#fff;color:#1A1613;font-size:13px;font-weight:700;cursor:pointer;";
-    const backBtn = "width:38px;height:38px;border-radius:50%;border:1px solid #EDE7E0;background:#fff;font-size:16px;color:#1A1613;cursor:pointer;flex:none;";
-    const inputStyle = "width:100%;box-sizing:border-box;height:54px;border:1px solid #EDE7E0;border-radius:16px;padding:0 16px;font-size:15px;font-weight:500;background:#fff;color:#1A1613;";
-    const labelStyle = "font-size:12px;font-weight:700;color:#8A8078;margin-bottom:9px;";
     const tab = (on) => `flex:1;height:38px;border-radius:12px;border:none;font-size:13px;font-weight:700;cursor:pointer;background:${on?"#1A1613":"#F0EBE4"};color:${on?"#fff":"#8A8078"};`;
 
     const rate = RATES[s.formCurrency];
@@ -453,7 +483,6 @@ class Component extends DCLogic {
 
     return {
       inviteLabel: s.copied ? "連結已複製" : "邀請成員",
-      primaryBtn, ghostBtn, backBtn, inputStyle, labelStyle,
       isLogin: s.screen==="login", isNickname: s.screen==="nickname", isTasks: s.screen==="tasks",
       isNewTask: s.screen==="newtask", isShare: s.screen==="share", isTask: s.screen==="task", isAdd: s.screen==="add",
       onExpenses: s.tab==="expenses", onMembers: s.tab==="members", onSettle: s.tab==="settle",
@@ -509,7 +538,7 @@ class Component extends DCLogic {
       usedRates: ["THB","USD","VND"].map(c => ({ code:c, rate: RATES[c] < 0.01 ? RATES[c].toFixed(5) : RATES[c].toFixed(2) })),
       doSettle: () => this.setState(st => ({ settled: !st.settled })),
       settleLabel: s.settled ? "已結算 · 通知已寄出" : "確認結算並鎖定帳目",
-      settleBtnStyle: `width:100%;height:56px;border-radius:18px;border:none;background:${s.settled?"#0E9F6E":"#E8590C"};color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:4px;`,
+      settleBtnClass: "btn btn--primary" + (s.settled ? " btn--settled" : ""),
       settleHint: s.settled ? "帳目已鎖定，成員僅能檢視。管理者可解除鎖定。" : "只有管理者看得到這顆按鈕。結算後帳目將被鎖定。",
 
       formCurrency: s.formCurrency,
