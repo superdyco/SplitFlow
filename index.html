@@ -68,6 +68,35 @@
     gap:14px;
     align-items:start;
   }
+
+  .task-body { display:grid; grid-template-columns:1fr; gap:14px; align-items:start; }
+
+  .panel { display:none; }
+  .panel.is-on { display:block; }
+
+  .tabs { display:flex; gap:6px; margin-bottom:14px; }
+  .tab {
+    flex:1; height:38px; border-radius:12px; border:none;
+    font-size:13px; font-weight:700; cursor:pointer;
+    background:#F0EBE4; color:var(--muted);
+  }
+  .tab.is-on { background:var(--ink); color:#fff; }
+
+  @media (min-width: 960px) {
+    .task-body { grid-template-columns:minmax(0,1fr) 340px; }
+
+    /* 結算面板常駐右欄 */
+    .panel-settle { display:block; grid-column:2; grid-row:1; }
+
+    /* 結算退出頁籤列 */
+    .tab-settle { display:none; }
+
+    /* 若使用者在窄螢幕停在「結算」頁籤後放大視窗，
+       左欄會兩個 panel 都隱藏而留白 —— 此時退化為顯示支出。
+       選擇器特異性 (0,2,0) 高於 .panel/.tab 的 (0,1,0)，可覆蓋。*/
+    [data-tab="settle"] .panel-expenses { display:block; }
+    [data-tab="settle"] .tab-expenses { background:var(--ink); color:#fff; }
+  }
 </style>
 </helmet>
 
@@ -216,107 +245,112 @@
 
       <!-- 6 任務內頁 -->
       <sc-if value="{{ isTask }}" hint-placeholder-val="{{ false }}">
-        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-          <div style="padding:2px 22px 12px; display:flex; align-items:center; gap:12px;">
-            <button onClick="{{ goTasks }}" class="btn btn--back">←</button>
-            <div style="flex:1; min-width:0;">
-              <div style="font-size:17px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ taskName }}</div>
-              <div style="font-size:11px; color:#A39A90; margin-top:2px;">總支出 NT$ {{ totalText }} · 4 人</div>
+        <div class="screen" data-tab="{{ tab }}">
+          <div class="pane pane--wide">
+            <div style="padding:2px 0 12px; display:flex; align-items:center; gap:12px;">
+              <button onClick="{{ goTasks }}" class="btn btn--back">←</button>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:17px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ taskName }}</div>
+                <div style="font-size:11px; color:#A39A90; margin-top:2px;">總支出 NT$ {{ totalText }} · 4 人</div>
+              </div>
+              <button onClick="{{ goShare }}" class="btn btn--back">↗</button>
             </div>
-            <button onClick="{{ goShare }}" class="btn btn--back">↗</button>
           </div>
 
-          <div style="display:flex; gap:6px; padding:0 22px 14px;">
-            <button onClick="{{ tabExpenses }}" style="{{ tabExpStyle }}">支出</button>
-            <button onClick="{{ tabMembers }}" style="{{ tabMemStyle }}">成員</button>
-            <button onClick="{{ tabSettle }}" style="{{ tabSetStyle }}">結算</button>
-          </div>
-
-          <div style="flex:1; overflow:auto; padding:0 22px 20px;">
-
-            <sc-if value="{{ onExpenses }}" hint-placeholder-val="{{ true }}">
-              <div style="display:flex; flex-direction:column; gap:10px;">
-                <sc-for list="{{ expenses }}" as="e" hint-placeholder-count="5">
-                  <div style="background:#fff; border:1px solid #EDE7E0; border-radius:20px; padding:15px 16px; display:flex; gap:13px; align-items:flex-start;">
-                    <div style="width:40px; height:40px; border-radius:14px; background:#F5F1EC; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#8A8078; flex:none;">{{ e.cat }}</div>
-                    <div style="flex:1; min-width:0;">
-                      <div style="font-size:15px; font-weight:700;">{{ e.title }}</div>
-                      <div style="font-size:11px; color:#8A8078; margin-top:4px;">{{ e.by }} 先付 · 均分 {{ e.n }} 人</div>
-                      <div style="font-size:11px; color:#A39A90; margin-top:5px; display:flex; align-items:center; gap:5px;"><span style="width:6px; height:6px; border-radius:50%; background:#E8590C; display:inline-block; flex:none;"></span>{{ e.place }}</div>
-                    </div>
-                    <div style="text-align:right; flex:none;">
-                      <div style="font-size:15px; font-weight:700; font-variant-numeric:tabular-nums;">{{ e.amountText }}</div>
-                      <div style="font-size:11px; color:#A39A90; margin-top:4px; font-variant-numeric:tabular-nums;">≈ NT$ {{ e.twdText }}</div>
-                    </div>
-                  </div>
-                </sc-for>
+          <div class="scroll">
+            <div class="pane pane--wide">
+              <div class="tabs">
+                <button onClick="{{ tabExpenses }}" class="{{ tabExpClass }}">支出</button>
+                <button onClick="{{ tabMembers }}" class="{{ tabMemClass }}">成員</button>
+                <button onClick="{{ tabSettle }}" class="{{ tabSetClass }}">結算</button>
               </div>
-            </sc-if>
 
-            <sc-if value="{{ onMembers }}" hint-placeholder-val="{{ false }}">
-              <div style="display:flex; flex-direction:column; gap:10px;">
-                <div style="font-size:11px; color:#A39A90; line-height:1.7; padding:0 2px 4px;">管理者可以編輯支出、移除成員並執行結算。點右側按鈕切換權限。</div>
-                <sc-for list="{{ members }}" as="m" hint-placeholder-count="4">
-                  <div style="background:#fff; border:1px solid #EDE7E0; border-radius:20px; padding:14px 14px 14px 16px; display:flex; gap:12px; align-items:center;">
-                    <span style="{{ m.avatar }}">{{ m.initial }}</span>
-                    <div style="flex:1; min-width:0;">
-                      <div style="font-size:15px; font-weight:700;">{{ m.name }}</div>
-                      <div style="font-size:11px; color:#A39A90; margin-top:3px;">{{ m.roleText }}</div>
-                    </div>
-                    <button onClick="{{ m.toggle }}" style="{{ m.btnStyle }}">{{ m.btnLabel }}</button>
-                  </div>
-                </sc-for>
-                <button onClick="{{ goShare }}" class="btn btn--ghost">＋ 邀請更多成員</button>
-              </div>
-            </sc-if>
-
-            <sc-if value="{{ onSettle }}" hint-placeholder-val="{{ false }}">
-              <div style="display:flex; flex-direction:column; gap:12px;">
-                <div style="background:#1A1613; color:#fff; border-radius:22px; padding:20px;">
-                  <div style="font-size:11px; color:#A39A90; letter-spacing:.14em;">TOTAL · TWD</div>
-                  <div style="font-size:34px; font-weight:900; margin-top:6px; font-variant-numeric:tabular-nums; letter-spacing:-.02em;">{{ totalText }}</div>
-                  <div style="font-size:11px; color:#A39A90; margin-top:10px; line-height:1.6;">匯率取自結算當下 · 2026/07/31 09:41</div>
-                </div>
-                <div style="background:#fff; border:1px solid #EDE7E0; border-radius:22px; padding:18px;">
-                  <div style="font-size:12px; font-weight:700; color:#8A8078; margin-bottom:12px;">每人收支</div>
-                  <div style="display:flex; flex-direction:column; gap:11px;">
-                    <sc-for list="{{ balances }}" as="b" hint-placeholder-count="4">
-                      <div style="display:flex; align-items:center; gap:11px;">
-                        <span style="{{ b.avatar }}">{{ b.initial }}</span>
-                        <div style="flex:1; font-size:14px; font-weight:500;">{{ b.name }}</div>
-                        <div style="font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; color:{{ b.color }};">{{ b.text }}</div>
+              <div class="task-body">
+                <div class="{{ panelExpClass }}">
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+                    <sc-for list="{{ expenses }}" as="e" hint-placeholder-count="5">
+                      <div style="background:#fff; border:1px solid #EDE7E0; border-radius:20px; padding:15px 16px; display:flex; gap:13px; align-items:flex-start;">
+                        <div style="width:40px; height:40px; border-radius:14px; background:#F5F1EC; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#8A8078; flex:none;">{{ e.cat }}</div>
+                        <div style="flex:1; min-width:0;">
+                          <div style="font-size:15px; font-weight:700;">{{ e.title }}</div>
+                          <div style="font-size:11px; color:#8A8078; margin-top:4px;">{{ e.by }} 先付 · 均分 {{ e.n }} 人</div>
+                          <div style="font-size:11px; color:#A39A90; margin-top:5px; display:flex; align-items:center; gap:5px;"><span style="width:6px; height:6px; border-radius:50%; background:#E8590C; display:inline-block; flex:none;"></span>{{ e.place }}</div>
+                        </div>
+                        <div style="text-align:right; flex:none;">
+                          <div style="font-size:15px; font-weight:700; font-variant-numeric:tabular-nums;">{{ e.amountText }}</div>
+                          <div style="font-size:11px; color:#A39A90; margin-top:4px; font-variant-numeric:tabular-nums;">≈ NT$ {{ e.twdText }}</div>
+                        </div>
                       </div>
                     </sc-for>
                   </div>
                 </div>
-                <div style="background:#fff; border:1px solid #EDE7E0; border-radius:22px; padding:18px;">
-                  <div style="font-size:12px; font-weight:700; color:#8A8078; margin-bottom:14px;">轉帳建議（最少 {{ transferCount }} 筆）</div>
-                  <div style="display:flex; flex-direction:column; gap:13px;">
-                    <sc-for list="{{ transfers }}" as="t" hint-placeholder-count="3">
-                      <div style="display:flex; align-items:center; gap:9px;">
-                        <div style="font-size:14px; font-weight:700;">{{ t.from }}</div>
-                        <div style="flex:1; height:1px; background:#EDE7E0;"></div>
-                        <div style="font-size:13px; font-weight:700; color:#E8590C; font-variant-numeric:tabular-nums;">NT$ {{ t.amount }}</div>
-                        <div style="flex:1; height:1px; background:#EDE7E0;"></div>
-                        <div style="font-size:14px; font-weight:700;">→ {{ t.to }}</div>
+
+                <div class="{{ panelMemClass }}">
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div style="font-size:11px; color:#A39A90; line-height:1.7; padding:0 2px 4px;">管理者可以編輯支出、移除成員並執行結算。點右側按鈕切換權限。</div>
+                    <sc-for list="{{ members }}" as="m" hint-placeholder-count="4">
+                      <div style="background:#fff; border:1px solid #EDE7E0; border-radius:20px; padding:14px 14px 14px 16px; display:flex; gap:12px; align-items:center;">
+                        <span style="{{ m.avatar }}">{{ m.initial }}</span>
+                        <div style="flex:1; min-width:0;">
+                          <div style="font-size:15px; font-weight:700;">{{ m.name }}</div>
+                          <div style="font-size:11px; color:#A39A90; margin-top:3px;">{{ m.roleText }}</div>
+                        </div>
+                        <button onClick="{{ m.toggle }}" style="{{ m.btnStyle }}">{{ m.btnLabel }}</button>
                       </div>
                     </sc-for>
+                    <button onClick="{{ goShare }}" class="btn btn--ghost">＋ 邀請更多成員</button>
                   </div>
                 </div>
-                <div style="background:#fff; border:1px solid #EDE7E0; border-radius:22px; padding:18px;">
-                  <div style="font-size:12px; font-weight:700; color:#8A8078; margin-bottom:11px;">使用匯率</div>
-                  <div style="display:flex; flex-direction:column; gap:8px;">
-                    <sc-for list="{{ usedRates }}" as="r" hint-placeholder-count="3">
-                      <div style="display:flex; justify-content:space-between; font-size:12px; color:#8A8078; font-variant-numeric:tabular-nums;">
-                        <span>1 {{ r.code }}</span><span>{{ r.rate }} TWD</span>
+
+                <div class="{{ panelSetClass }}">
+                  <div style="display:flex; flex-direction:column; gap:12px;">
+                    <div style="background:#1A1613; color:#fff; border-radius:22px; padding:20px;">
+                      <div style="font-size:11px; color:#A39A90; letter-spacing:.14em;">TOTAL · TWD</div>
+                      <div style="font-size:34px; font-weight:900; margin-top:6px; font-variant-numeric:tabular-nums; letter-spacing:-.02em;">{{ totalText }}</div>
+                      <div style="font-size:11px; color:#A39A90; margin-top:10px; line-height:1.6;">匯率取自結算當下 · 2026/07/31 09:41</div>
+                    </div>
+                    <div style="background:#fff; border:1px solid #EDE7E0; border-radius:22px; padding:18px;">
+                      <div style="font-size:12px; font-weight:700; color:#8A8078; margin-bottom:12px;">每人收支</div>
+                      <div style="display:flex; flex-direction:column; gap:11px;">
+                        <sc-for list="{{ balances }}" as="b" hint-placeholder-count="4">
+                          <div style="display:flex; align-items:center; gap:11px;">
+                            <span style="{{ b.avatar }}">{{ b.initial }}</span>
+                            <div style="flex:1; font-size:14px; font-weight:500;">{{ b.name }}</div>
+                            <div style="font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; color:{{ b.color }};">{{ b.text }}</div>
+                          </div>
+                        </sc-for>
                       </div>
-                    </sc-for>
+                    </div>
+                    <div style="background:#fff; border:1px solid #EDE7E0; border-radius:22px; padding:18px;">
+                      <div style="font-size:12px; font-weight:700; color:#8A8078; margin-bottom:14px;">轉帳建議（最少 {{ transferCount }} 筆）</div>
+                      <div style="display:flex; flex-direction:column; gap:13px;">
+                        <sc-for list="{{ transfers }}" as="t" hint-placeholder-count="3">
+                          <div style="display:flex; align-items:center; gap:9px;">
+                            <div style="font-size:14px; font-weight:700;">{{ t.from }}</div>
+                            <div style="flex:1; height:1px; background:#EDE7E0;"></div>
+                            <div style="font-size:13px; font-weight:700; color:#E8590C; font-variant-numeric:tabular-nums;">NT$ {{ t.amount }}</div>
+                            <div style="flex:1; height:1px; background:#EDE7E0;"></div>
+                            <div style="font-size:14px; font-weight:700;">→ {{ t.to }}</div>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </div>
+                    <div style="background:#fff; border:1px solid #EDE7E0; border-radius:22px; padding:18px;">
+                      <div style="font-size:12px; font-weight:700; color:#8A8078; margin-bottom:11px;">使用匯率</div>
+                      <div style="display:flex; flex-direction:column; gap:8px;">
+                        <sc-for list="{{ usedRates }}" as="r" hint-placeholder-count="3">
+                          <div style="display:flex; justify-content:space-between; font-size:12px; color:#8A8078; font-variant-numeric:tabular-nums;">
+                            <span>1 {{ r.code }}</span><span>{{ r.rate }} TWD</span>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </div>
+                    <button onClick="{{ doSettle }}" class="{{ settleBtnClass }}">{{ settleLabel }}</button>
+                    <div style="font-size:11px; color:#A39A90; text-align:center; line-height:1.7; padding:0 10px;">{{ settleHint }}</div>
                   </div>
                 </div>
-                <button onClick="{{ doSettle }}" class="{{ settleBtnClass }}">{{ settleLabel }}</button>
-                <div style="font-size:11px; color:#A39A90; text-align:center; line-height:1.7; padding:0 10px;">{{ settleHint }}</div>
               </div>
-            </sc-if>
+            </div>
           </div>
 
           <sc-if value="{{ onExpenses }}" hint-placeholder-val="{{ true }}">
@@ -488,8 +522,6 @@ class Component extends DCLogic {
     const tx = this.transfers(net);
     const names = ["Alex","Bella","Chris","Dora"];
 
-    const tab = (on) => `flex:1;height:38px;border-radius:12px;border:none;font-size:13px;font-weight:700;cursor:pointer;background:${on?"#1A1613":"#F0EBE4"};color:${on?"#fff":"#8A8078"};`;
-
     const rate = RATES[s.formCurrency];
     const amtNum = parseFloat(String(s.formAmount).replace(/,/g,"")) || 0;
     const splitNames = names.filter(n => s.split[n]);
@@ -521,7 +553,13 @@ class Component extends DCLogic {
       tabExpenses: () => this.setState({ tab:"expenses" }),
       tabMembers: () => this.setState({ tab:"members" }),
       tabSettle: () => this.setState({ tab:"settle" }),
-      tabExpStyle: tab(s.tab==="expenses"), tabMemStyle: tab(s.tab==="members"), tabSetStyle: tab(s.tab==="settle"),
+      tab: s.tab,
+      tabExpClass: "tab tab-expenses" + (s.tab === "expenses" ? " is-on" : ""),
+      tabMemClass: "tab tab-members"  + (s.tab === "members"  ? " is-on" : ""),
+      tabSetClass: "tab tab-settle"   + (s.tab === "settle"   ? " is-on" : ""),
+      panelExpClass: "panel panel-expenses" + (s.tab === "expenses" ? " is-on" : ""),
+      panelMemClass: "panel panel-members"  + (s.tab === "members"  ? " is-on" : ""),
+      panelSetClass: "panel panel-settle"   + (s.tab === "settle"   ? " is-on" : ""),
 
       totalText: fmt(Math.round(total)),
       myNetText: "NT$ " + fmt(Math.round(net.Alex)),
