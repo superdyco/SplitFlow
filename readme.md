@@ -107,7 +107,6 @@ Firestore rules 擋，但 Google API key 沒有對應的防線，外流等於直
   endDate: string | null,
   status: "active",
   inviteCode: string,
-  inviteActive: boolean,   // 停用邀請連結後為 false，舊任務沒有這個欄位時視為 true
   memberCount: number,
   expenseCount: number,
   createdAt: Timestamp,
@@ -288,14 +287,39 @@ npm run test:rules
 
 ## Firebase Console 需手動設定
 
-- Authentication 啟用 Google provider。
+- Authentication 啟用 Google 與 Facebook provider。
 - Authentication 的 Authorized domains 加入 `localhost` 與正式部署網域。
 - 建立 Firestore Database。
 - 若要部署 Hosting，建立專案並確認 `.firebaserc` 指到正確 project。
 
+### 登入供應商
+
+登入頁顯示哪些供應商由 `src/utils/authError.ts` 的 `ENABLED_PROVIDERS` 決定。
+
+| 供應商 | 狀態 | Firebase Console 以外還需要 |
+|---|---|---|
+| Google | 啟用中 | 不用，開啟即可 |
+| Facebook | 啟用中 | Meta for Developers 建 App，把 App ID 與密鑰填回 Console，並把 Firebase 的 OAuth redirect URI 填進 Facebook 的 Valid OAuth Redirect URIs |
+| Apple | **關閉** | Apple Developer Program（年費 US$99）才建得出 Services ID 與私密金鑰 |
+
+Apple 的程式碼路徑留著（`buildProvider` 的 apple 分支），之後有付費帳號時把 `"apple"`
+加回 `ENABLED_PROVIDERS` 就會出現在登入頁，其餘不用改。
+
+沒啟用的供應商按下去會顯示「還沒有在 Firebase Console 啟用」，不會是看不懂的錯誤碼。
+
+**同一個 email 用不同供應商登入會是兩個不同的帳號**，Firebase 預設一個 email 對一個帳號，
+第二種方式登入時會擋下來。程式碼會抓 `auth/account-exists-with-different-credential`
+並告訴使用者原本是用哪個供應商註冊的（若專案開了 Email enumeration protection，
+`fetchSignInMethodsForEmail` 會回空陣列，這時只給通用訊息，不亂猜）。
+個人設定頁也會顯示目前的登入方式。
+
+之後要開 Apple 時記得兩件事：使用者可以選「隱藏我的電子郵件」，這時拿到的是 privaterelay
+轉寄信箱；另外 Apple **只在第一次授權時回傳姓名**，之後登入都拿不到。暱稱本來就是在
+onboarding 讓使用者自己填，所以不受影響。
+
 ## 第一版已完成
 
-- Google 真實登入與登出。
+- Google 與 Facebook 登入與登出（Apple 的程式碼備妥，等付費開發者帳號）。
 - Router guard 等待 Firebase 初始化後判斷登入狀態。
 - 第一次登入建立暱稱並寫入 Firestore。
 - 個人設定頁可查看 email、修改暱稱、登出。
@@ -311,7 +335,7 @@ npm run test:rules
 - 新增、編輯、刪除支出，含分類、幣別、誰先付、分攤成員。
 - 支出頁籤讀取 Firestore 真實支出。
 - 結算頁籤從真實支出算出每人應收應付與最少轉帳筆數。
-- owner/admin 可升降成員角色、移除一般成員、停用或重新產生邀請連結。
+- owner/admin 可升降成員角色、移除一般成員。
 - 記帳當下抓即時匯率，外幣支出換算成主要幣別後合併結算。
 - 自訂金額分攤，每人可以填不同金額。
 - 記錄已付款並由收款人確認，已確認的付款會折抵結算餘額。
@@ -322,7 +346,6 @@ npm run test:rules
 ## 下一階段 TODO
 
 - Google Places nearby，依目前定位列出附近地點。
-- Facebook 登入。
 - 桌面版專用介面。
 
 ## 兩個帳號驗收

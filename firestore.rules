@@ -266,10 +266,8 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.active == true;
-      // owner/admin 可以停用邀請連結，其餘欄位一律不可改。
-      allow update: if isTaskAdmin(resource.data.taskId)
-        && request.resource.data.diff(resource.data).changedKeys().hasOnly(["active"]);
-      allow delete: if false;
+      // 邀請文件建立後就不會再變動，沒有停用或重新產生連結的功能。
+      allow update, delete: if false;
     }
   }
 }

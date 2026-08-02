@@ -17,7 +17,6 @@ export async function createTask(input: CreateTaskInput, owner: UserProfile): Pr
     endDate: input.endDate,
     status: "active" as const,
     inviteCode,
-    inviteActive: true,
     memberCount: 1,
     expenseCount: 0,
     createdAt: serverTimestamp(),

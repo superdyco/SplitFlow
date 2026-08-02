@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
-import { logout } from "@/services/authService";
+import { logout, providerLabel } from "@/services/authService";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { firebaseErrorMessage, required, textFieldError } from "@/utils/firestore";
@@ -21,6 +21,11 @@ const nicknameError = computed(() =>
   textFieldError(nickname.value, "暱稱", { max: 20, touched: touched.value })
 );
 const isDirty = computed(() => nickname.value.trim() !== (userStore.profile?.nickname || ""));
+/** 有三種登入方式，記得自己是用哪一個進來的很重要，換一個就是另一個帳號。 */
+const loginMethod = computed(() => {
+  const id = authStore.user?.providerData[0]?.providerId || userStore.profile?.provider;
+  return id ? providerLabel(id) : "";
+});
 const canSubmit = computed(() => !!nickname.value.trim() && !nicknameError.value && isDirty.value);
 
 async function save() {
@@ -63,9 +68,16 @@ async function signOut() {
         </div>
         <div class="spread">
           <span class="muted">電子郵件</span>
-          <strong>{{ authStore.user?.email }}</strong>
+          <strong>{{ authStore.user?.email || "未提供" }}</strong>
+        </div>
+        <div v-if="loginMethod" class="spread">
+          <span class="muted">登入方式</span>
+          <strong>{{ loginMethod }}</strong>
         </div>
       </div>
+      <p class="tiny">
+        下次請用同一種方式登入。換一個供應商會被視為另一個帳號，看不到現在的任務。
+      </p>
       <ErrorState :message="error" />
       <button class="btn btn-primary btn-block" :disabled="loading || !canSubmit" @click="save">
         {{ loading ? "儲存中..." : saved ? "已儲存" : "儲存變更" }}

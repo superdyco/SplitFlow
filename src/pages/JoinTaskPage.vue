@@ -6,7 +6,8 @@ import AppLayout from "@/layouts/AppLayout.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import type { Invite } from "@/types/task";
-import { signInWithGoogle } from "@/services/authService";
+import ProviderButtons from "@/components/auth/ProviderButtons.vue";
+import { SignInCancelled, signIn, type SignInProvider } from "@/services/authService";
 import { getInvite } from "@/services/inviteService";
 import { getTaskMember, joinTask } from "@/services/memberService";
 import { useAuthStore } from "@/stores/auth";
@@ -22,6 +23,7 @@ const loading = ref(true);
 const joining = ref(false);
 const error = ref<string | null>(null);
 const alreadyMember = ref(false);
+const pending = ref<SignInProvider | null>(null);
 const inviteCode = computed(() => String(route.params.inviteCode || ""));
 const Layout = computed(() => authStore.user ? AppLayout : AuthLayout);
 
@@ -54,9 +56,11 @@ async function load() {
   }
 }
 
-async function login() {
+async function login(provider: SignInProvider) {
+  pending.value = provider;
+  error.value = null;
   try {
-    const user = await signInWithGoogle();
+    const user = await signIn(provider);
     await userStore.load(user.uid);
     if (!userStore.profile?.nickname) {
       await router.push(`/onboarding?redirect=${encodeURIComponent(route.fullPath)}`);
@@ -65,7 +69,10 @@ async function login() {
     // 登入之後才知道是不是已經在任務裡了。
     await checkMembership();
   } catch (err) {
-    error.value = firebaseErrorMessage(err);
+    if (!(err instanceof SignInCancelled)) error.value = firebaseErrorMessage(err);
+  } finally {
+    // 使用者可能已經改按別的供應商了，別把新那個的狀態清掉。
+    if (pending.value === provider) pending.value = null;
   }
 }
 
@@ -100,7 +107,7 @@ onMounted(load);
         <p class="tiny">JOIN SPLITFLOW</p>
         <h1 class="title">{{ invite.taskName }}</h1>
         <p class="muted">主要幣別 {{ invite.defaultCurrency }} · {{ invite.startDate || "未設定日期" }} - {{ invite.endDate || "未設定日期" }}</p>
-        <button v-if="!authStore.user" class="btn btn-primary btn-block" @click="login">使用 Google 登入並加入</button>
+        <ProviderButtons v-if="!authStore.user" :pending="pending" action="登入" @select="login" />
 
         <template v-else-if="alreadyMember">
           <p class="tiny">你已經是這個任務的成員了。</p>

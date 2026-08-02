@@ -1,5 +1,5 @@
 import { FirebaseError } from "firebase/app";
-import { doc, getDoc, serverTimestamp, writeBatch, type WriteBatch } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, type WriteBatch } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import type { Invite, Task } from "@/types/task";
 
@@ -36,27 +36,3 @@ export async function getInvite(inviteCode: string): Promise<Invite | null> {
   }
 }
 
-/** 停用目前的邀請連結，之後打開連結的人只會看到已停用。 */
-export async function deactivateInvite(task: Task): Promise<void> {
-  const batch = writeBatch(db);
-  batch.update(doc(db, "invites", task.inviteCode), { active: false });
-  batch.update(doc(db, "tasks", task.id), { inviteActive: false, updatedAt: serverTimestamp() });
-  await batch.commit();
-}
-
-/** 產生新的邀請連結，同時停用舊的，舊連結立刻失效。 */
-export async function regenerateInvite(task: Task, createdBy: string): Promise<string> {
-  const inviteCode = createInviteCode();
-  const batch = writeBatch(db);
-
-  batch.update(doc(db, "invites", task.inviteCode), { active: false });
-  addInviteToBatch(batch, inviteCode, task, createdBy);
-  batch.update(doc(db, "tasks", task.id), {
-    inviteCode,
-    inviteActive: true,
-    updatedAt: serverTimestamp()
-  });
-
-  await batch.commit();
-  return inviteCode;
-}

@@ -22,7 +22,6 @@ import { useExpenses } from "@/composables/useExpenses";
 import { usePayments } from "@/composables/usePayments";
 import { useTask } from "@/composables/useTask";
 import { useTaskMembers } from "@/composables/useTaskMembers";
-import { deactivateInvite, regenerateInvite } from "@/services/inviteService";
 import { removeMember, setMemberRole } from "@/services/memberService";
 import { confirmPayment, createPayment, deletePayment } from "@/services/paymentService";
 import { buildInviteUrl, firebaseErrorMessage } from "@/utils/firestore";
@@ -38,7 +37,6 @@ const copied = ref(false);
 const denied = computed(() => route.query.denied === "1");
 const actionError = ref<string | null>(null);
 const busyUid = ref<string | null>(null);
-const inviteBusy = ref(false);
 
 const taskState = useTask(taskId.value, uid);
 const memberState = useTaskMembers(taskId.value);
@@ -48,8 +46,6 @@ const settlementState = useSettlements(taskId.value);
 const paymentBusy = ref(false);
 const settlementBusy = ref(false);
 const inviteUrl = computed(() => taskState.task.value ? buildInviteUrl(taskState.task.value.inviteCode) : "");
-// 建立於這個功能之前的任務沒有 inviteActive 欄位，沒有就當成有效。
-const inviteActive = computed(() => taskState.task.value?.inviteActive !== false);
 
 const memberNames = computed(() =>
   Object.fromEntries(memberState.members.value.map(member => [member.uid, member.nickname]))
@@ -64,6 +60,20 @@ const settlement = computed(() =>
     taskState.task.value?.defaultCurrency || "TWD"
   )
 );
+
+/**
+ * 四個區塊各自獨立讀取，任何一個失敗都只會顯示一句共用的錯誤。
+ * 標明來源才看得出是哪一種資料讀不到 —— 例如規則沒部署到某個子集合時，
+ * 其他區塊都正常，只有那一個會壞。
+ */
+const loadError = computed(() => {
+  if (actionError.value) return actionError.value;
+  if (memberState.error.value) return `讀取成員失敗：${memberState.error.value}`;
+  if (expenseState.error.value) return `讀取支出失敗：${expenseState.error.value}`;
+  if (paymentState.error.value) return `讀取付款紀錄失敗：${paymentState.error.value}`;
+  if (settlementState.error.value) return `讀取結算紀錄失敗：${settlementState.error.value}`;
+  return null;
+});
 
 const expenseView = ref<"list" | "map">("list");
 const mapAvailable = mapsEnabled();
@@ -178,32 +188,6 @@ function removeTaskMember(targetUid: string) {
   return runMemberAction(targetUid, () => removeMember(taskId.value, targetUid));
 }
 
-async function runInviteAction(action: () => Promise<unknown>) {
-  inviteBusy.value = true;
-  actionError.value = null;
-  try {
-    await action();
-    await taskState.load();
-  } catch (err) {
-    actionError.value = firebaseErrorMessage(err);
-  } finally {
-    inviteBusy.value = false;
-  }
-}
-
-function stopInvite() {
-  if (!taskState.task.value) return;
-  if (!window.confirm("停用後舊連結會立刻失效，確定要停用嗎？")) return;
-  const task = taskState.task.value;
-  return runInviteAction(() => deactivateInvite(task));
-}
-
-function newInvite() {
-  if (!taskState.task.value) return;
-  const task = taskState.task.value;
-  return runInviteAction(() => regenerateInvite(task, uid));
-}
-
 onMounted(load);
 </script>
 
@@ -233,34 +217,9 @@ onMounted(load);
               {{ taskState.task.value.expenseCount }} 筆支出
             </p>
           </div>
-          <button v-if="taskState.isAdmin.value && inviteActive" class="btn btn-ghost" @click="copyInvite">
+          <button v-if="taskState.isAdmin.value" class="btn btn-ghost" @click="copyInvite">
             {{ copied ? "已複製" : "邀請" }}
           </button>
-        </div>
-
-        <div v-if="taskState.isAdmin.value" class="card admin-card stack">
-          <strong>{{ taskState.isOwner.value ? "Owner 管理區" : "Admin 管理區" }}</strong>
-
-          <template v-if="inviteActive">
-            <p class="tiny">邀請連結目前有效，任何拿到連結的人登入後都能加入。</p>
-            <div class="row">
-              <span class="invite">{{ inviteUrl }}</span>
-              <button class="btn btn-sm" :disabled="inviteBusy" @click="copyInvite">
-                {{ copied ? "已複製" : "複製" }}
-              </button>
-            </div>
-            <div class="row">
-              <button class="btn btn-sm" :disabled="inviteBusy" @click="newInvite">重新產生連結</button>
-              <button class="btn btn-danger btn-sm" :disabled="inviteBusy" @click="stopInvite">停用連結</button>
-            </div>
-          </template>
-
-          <template v-else>
-            <p class="tiny">邀請連結已停用，目前沒有人能靠連結加入這個任務。</p>
-            <div class="row">
-              <button class="btn btn-sm" :disabled="inviteBusy" @click="newInvite">產生新的邀請連結</button>
-            </div>
-          </template>
         </div>
 
         <div class="tabs">
@@ -269,15 +228,7 @@ onMounted(load);
           <button class="tab" :class="{ active: activeTab === 'settlement' }" @click="activeTab = 'settlement'">結算</button>
         </div>
 
-        <ErrorState
-          :message="
-            actionError ||
-            memberState.error.value ||
-            expenseState.error.value ||
-            paymentState.error.value ||
-            settlementState.error.value
-          "
-        />
+        <ErrorState :message="loadError" />
 
         <section v-if="activeTab === 'expenses'" class="stack">
           <LoadingState v-if="expenseState.loading.value" title="讀取支出中" message="正在讀取 Firestore 支出資料。" />
@@ -376,27 +327,7 @@ onMounted(load);
 </template>
 
 <style scoped>
-.admin-card {
-  box-shadow: none;
-  background: var(--color-primary-soft);
-}
-
-.admin-card .row {
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .tabs.two {
   grid-template-columns: repeat(2, 1fr);
-}
-
-.invite {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  color: var(--color-muted);
-  font-size: 13px;
 }
 </style>

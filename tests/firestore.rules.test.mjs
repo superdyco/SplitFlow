@@ -15,10 +15,12 @@ import {
   getDoc,
   getDocs,
   increment,
+  query,
   runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   writeBatch
 } from "firebase/firestore";
 
@@ -62,7 +64,7 @@ const ROLES = [
 ];
 
 /** 一個四人任務，MEMBER 先付了一筆四人均分的支出。 */
-async function seed({ inviteActive = true } = {}) {
+async function seed() {
   await testEnv.clearFirestore();
   await testEnv.withSecurityRulesDisabled(async ctx => {
     const db = ctx.firestore();
@@ -77,7 +79,7 @@ async function seed({ inviteActive = true } = {}) {
       endDate: null,
       status: "active",
       inviteCode: CODE,
-      inviteActive,
+
       memberCount: 4,
       expenseCount: 1,
       createdAt: new Date(),
@@ -129,7 +131,7 @@ async function seed({ inviteActive = true } = {}) {
       startDate: null,
       endDate: null,
       createdBy: OWNER,
-      active: inviteActive,
+      active: true,
       createdAt: new Date()
     });
   });
@@ -203,6 +205,46 @@ async function main() {
   await test("非成員不能讀任務", async () => {
     await seed();
     await assertFails(getDoc(doc(as(OUTSIDER), "tasks", TASK)));
+  });
+
+  // 任務列表頁走的是 collection query（list），跟上面的 get 是不同的規則評估。
+  await test("成員可以用 array-contains 查自己的任務列表", async () => {
+    await seed();
+    const db = as(MEMBER);
+    await assertSucceeds(
+      getDocs(query(collection(db, "tasks"), where("memberIds", "array-contains", MEMBER)))
+    );
+  });
+
+  await test("非成員查任務列表只會拿到空的，不會被擋", async () => {
+    await seed();
+    const db = as(OUTSIDER);
+    await assertSucceeds(
+      getDocs(query(collection(db, "tasks"), where("memberIds", "array-contains", OUTSIDER)))
+    );
+  });
+
+  await test("不能撈整個 tasks collection", async () => {
+    await seed();
+    await assertFails(getDocs(collection(as(MEMBER), "tasks")));
+  });
+
+  await test("不能查別人的任務列表", async () => {
+    await seed();
+    const db = as(MEMBER);
+    await assertFails(
+      getDocs(query(collection(db, "tasks"), where("memberIds", "array-contains", OWNER)))
+    );
+  });
+
+  // 完整重現任務列表頁：先查任務，再逐一讀自己的 member 文件拿角色。
+  await test("任務列表頁的完整流程跑得通", async () => {
+    await seed();
+    const db = as(MEMBER);
+    const tasks = await getDocs(query(collection(db, "tasks"), where("memberIds", "array-contains", MEMBER)));
+    for (const task of tasks.docs) {
+      await assertSucceeds(getDoc(doc(db, "tasks", task.id, "members", MEMBER)));
+    }
   });
 
   // --- 任務更新與 owner 保護 ---
@@ -888,51 +930,22 @@ async function main() {
     await assertSucceeds(getDoc(doc(anon(), "invites", CODE)));
   });
 
-  await test("停用後的邀請讀不到", async () => {
-    await seed({ inviteActive: false });
-    await assertFails(getDoc(doc(anon(), "invites", CODE)));
-  });
-
-  await test("admin 可以停用邀請連結", async () => {
+  // 邀請文件建立後就固定了，沒有停用或重新產生的功能，所以誰都不能改也不能刪。
+  await test("admin 也不能改邀請文件", async () => {
     await seed();
     const db = as(ADMIN);
-    const batch = writeBatch(db);
-    batch.update(doc(db, "invites", CODE), { active: false });
-    batch.update(doc(db, "tasks", TASK), { inviteActive: false, updatedAt: serverTimestamp() });
-    await assertSucceeds(batch.commit());
+    await assertFails(updateDoc(doc(db, "invites", CODE), { active: false }));
+    await assertFails(updateDoc(doc(db, "invites", CODE), { taskId: "別的任務" }));
   });
 
-  await test("一般成員不能停用邀請連結", async () => {
+  await test("一般成員不能改邀請文件", async () => {
     await seed();
     await assertFails(updateDoc(doc(as(MEMBER), "invites", CODE), { active: false }));
   });
 
-  await test("admin 不能改邀請的 taskId", async () => {
+  await test("邀請文件不能被刪除", async () => {
     await seed();
-    await assertFails(updateDoc(doc(as(ADMIN), "invites", CODE), { taskId: "別的任務" }));
-  });
-
-  await test("admin 可以重新產生邀請連結", async () => {
-    await seed();
-    const db = as(ADMIN);
-    const batch = writeBatch(db);
-    batch.update(doc(db, "invites", CODE), { active: false });
-    batch.set(doc(db, "invites", "newcode"), {
-      taskId: TASK,
-      taskName: "曼谷旅行",
-      defaultCurrency: "TWD",
-      startDate: null,
-      endDate: null,
-      createdBy: ADMIN,
-      active: true,
-      createdAt: serverTimestamp()
-    });
-    batch.update(doc(db, "tasks", TASK), {
-      inviteCode: "newcode",
-      inviteActive: true,
-      updatedAt: serverTimestamp()
-    });
-    await assertSucceeds(batch.commit());
+    await assertFails(deleteDoc(doc(as(OWNER), "invites", CODE)));
   });
 
   await test("不能建立掛在別人名下的邀請", async () => {

@@ -36,8 +36,11 @@
 
 ## 已完成：邀請與成員管理
 
-- owner/admin 可重新複製邀請連結。
-- owner/admin 可停用 invite，也可以重新產生新連結（舊連結立刻失效）。
+- owner/admin 可重新複製邀請連結（標題列右上角的「邀請」按鈕）。
+- ~~owner/admin 可停用 invite，也可以重新產生新連結~~
+  **已移除。** 實際使用上用不到，那一整塊還把頁籤與支出擠到畫面下方。
+  邀請文件現在建立後就固定，rules 的 update 與 delete 都是 `if false`。
+  代價是**邀請連結永久有效，外流沒有補救手段**，以熟人小群組為前提可以接受。
 - owner/admin 可將 member 升級為 admin。
 - owner/admin 可將 admin 降級為 member。
 - admin 不可移除 owner，也不可改 owner 的角色。
@@ -110,10 +113,30 @@
   即時結算與快照共用同一組 `MemberBalance` / `Transfer`。
 - TaskPage 只算一次結算後傳給結算面板與結算紀錄，避免兩邊算出不同數字。
 
+## 已完成：多供應商登入
+
+- `signIn(provider)` 統一處理 Google / Apple / Facebook，登入頁與 Join 頁共用
+  `ProviderButtons` 元件。
+- 登入頁顯示哪幾個由 `ENABLED_PROVIDERS` 決定，目前是 Google 與 Facebook。
+- **Apple 先關掉**：要 Apple Developer Program（年費 US$99）才建得出 Services ID
+  與私密金鑰。程式碼路徑留著，付費後把 `"apple"` 加回 `ENABLED_PROVIDERS` 即可。
+- 只 disable 正在跑的那顆按鈕。之前是全部一起 disable，結果某個供應商卡住時整頁按不動。
+- 錯誤訊息對應成人看得懂的話：供應商未啟用、網域未授權、彈窗被擋、憑證無效、網路失敗。
+- **使用者自己關掉彈窗不再跳紅字**，用 `SignInCancelled` 區分取消與真的出錯。
+- 同 email 不同供應商會被 Firebase 擋下，程式碼抓 `account-exists-with-different-credential`
+  並告知原本註冊用的供應商；查不到時給通用訊息不亂猜。
+- 個人設定頁顯示目前的登入方式，並提醒換供應商等於換帳號。
+- 錯誤對應抽到 `utils/authError.ts`，不 import firebase，所以測得到（15 個測試）。
+
+## Facebook 待你補完
+
+- Meta for Developers 建 App，取得 App ID 與密鑰填回 Firebase Console。
+- 把 Firebase 給的 OAuth redirect URI 填進 Facebook 的 Valid OAuth Redirect URIs。
+- 在那之前按 Facebook 會顯示「還沒有在 Firebase Console 啟用」。
+
 ## 之後階段功能
 
 - Google Places nearby，依目前定位列出附近地點，需要瀏覽器定位權限。
-- Facebook 登入（需先建 Facebook App）。
 - 桌面版專用介面。
 
 ## Firebase / 部署

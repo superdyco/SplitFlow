@@ -18,17 +18,28 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const rows = ref<Array<{ task: Task; role: TaskRole }>>([]);
 
+/**
+ * 讀取分兩步：先查任務清單，再逐一讀自己在該任務的角色。
+ * 出錯時標明是哪一步，不然畫面只會顯示一句看不出來源的權限錯誤。
+ */
 async function load() {
-  if (!authStore.user) return;
+  const uid = authStore.user?.uid;
+  if (!uid) return;
   loading.value = true;
   error.value = null;
   try {
-    const tasks = await listUserTasks(authStore.user.uid);
-    const withRoles = await Promise.all(tasks.map(async task => {
-      const member = await getTaskMember(task.id, authStore.user!.uid);
-      return { task, role: member?.role || "member" as TaskRole };
-    }));
-    rows.value = withRoles;
+    const tasks = await listUserTasks(uid).catch(err => {
+      throw new Error(`讀取任務列表失敗：${firebaseErrorMessage(err)}`);
+    });
+
+    rows.value = await Promise.all(
+      tasks.map(async task => {
+        const member = await getTaskMember(task.id, uid).catch(err => {
+          throw new Error(`讀取「${task.name}」的角色失敗：${firebaseErrorMessage(err)}`);
+        });
+        return { task, role: member?.role || ("member" as TaskRole) };
+      })
+    );
   } catch (err) {
     error.value = firebaseErrorMessage(err);
   } finally {

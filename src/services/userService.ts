@@ -14,7 +14,7 @@ export async function createUserProfile(user: User, nickname: string): Promise<v
     nickname,
     email: user.email || "",
     photoURL: user.photoURL || null,
-    provider: user.providerData[0]?.providerId || "google.com",
+    provider: user.providerData[0]?.providerId || "unknown",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   }, { merge: true });
