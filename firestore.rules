@@ -51,6 +51,20 @@ service cloud.firestore {
         && request.resource.data.memberCount == resource.data.memberCount + 1;
     }
 
+    function updatesExpenseCountOnly() {
+      let changed = request.resource.data.diff(resource.data).changedKeys();
+      return isCurrentTaskMember()
+        && changed.hasOnly(["expenseCount", "updatedAt"]);
+    }
+
+    // admin 可以改任務，但不能奪走 owner 身分，也不能把 owner 踢出任務。
+    function updatesTaskAsAdmin(taskId) {
+      return isTaskAdmin(taskId)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && resource.data.ownerId in request.resource.data.memberIds
+        && resource.data.ownerId in request.resource.data.adminIds;
+    }
+
     match /users/{uid} {
       allow read: if isSelf(uid);
       allow create: if isSelf(uid)
@@ -64,11 +78,31 @@ service cloud.firestore {
     match /tasks/{taskId} {
       allow create: if createsOwnTask();
       allow read: if isCurrentTaskMember();
-      allow update: if isTaskAdmin(taskId)
-        || updatesSelfMembershipOnly();
+      allow update: if updatesTaskAsAdmin(taskId)
+        || updatesSelfMembershipOnly()
+        || updatesExpenseCountOnly();
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
 
       match /members/{uid} {
+        // owner 不能被降級也不能被移除，admin 只能動 admin/member 兩種角色。
+        function managesMemberAsAdmin() {
+          return isTaskAdmin(taskId)
+            && resource.data.role != "owner"
+            && request.resource.data.uid == resource.data.uid
+            && request.resource.data.role in ["admin", "member"];
+        }
+
+        // 被移除過的人重新用邀請連結加入時，自己把 active 改回 true，角色不能自己升。
+        function rejoinsSelf() {
+          return isSelf(uid)
+            && resource.data.active == false
+            && request.resource.data.active == true
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.uid == resource.data.uid
+            && request.resource.data.diff(resource.data).changedKeys().hasOnly(["active", "nickname"])
+            && uid in taskAfterData(taskId).memberIds;
+        }
+
         allow get: if isSelf(uid) || isTaskMember(taskId);
         allow list: if isTaskMember(taskId);
         allow create: if isSelf(uid)
@@ -80,10 +114,150 @@ service cloud.firestore {
             request.resource.data.role == "member"
             || taskAfterData(taskId).ownerId == request.auth.uid
           );
-        allow update: if isTaskAdmin(taskId)
-          && request.resource.data.uid == resource.data.uid
-          && request.resource.data.role in ["owner", "admin", "member"];
+        allow update: if managesMemberAsAdmin() || rejoinsSelf();
         allow delete: if false;
+      }
+
+      match /expenses/{expenseId} {
+        function validExpenseShape() {
+          let data = request.resource.data;
+          return data.title is string
+            && data.title.size() > 0
+            && data.title.size() <= 60
+            && data.category in ["food", "transport", "stay", "ticket", "shopping", "other"]
+            && data.amount is int
+            && data.amount > 0
+            && data.currency is string
+            && data.rate is number
+            && data.rate > 0
+            && data.baseAmount is int
+            && data.baseAmount > 0
+            && data.splitMode in ["even", "custom"]
+            && data.splits is map
+            && data.splits.size() > 0
+            && validPlace();
+        }
+
+        // 地點是選填。有填的話至少要有名稱，座標可以是 null（沒用 Google 搜尋時）。
+        function validPlace() {
+          let place = request.resource.data.place;
+          return place == null
+            || (
+              place is map
+              && place.name is string
+              && place.name.size() > 0
+              && place.name.size() <= 120
+            );
+        }
+
+        function validNewParticipants() {
+          let members = taskData(taskId).memberIds;
+          return request.resource.data.paidBy in members
+            && request.resource.data.splits.keys().hasOnly(members);
+        }
+
+        // 已被移除的成員可以留在原本就有他的支出裡，但不能把新的陌生 uid 加進來。
+        // splitMemberIds 是加入自訂分攤之前的舊欄位，舊支出被編輯時要一併認得。
+        function validEditedParticipants() {
+          let allowed = taskData(taskId).memberIds
+            .concat(resource.data.get("splits", {}).keys())
+            .concat(resource.data.get("splitMemberIds", []))
+            .concat([resource.data.paidBy]);
+          return request.resource.data.paidBy in allowed
+            && request.resource.data.splits.keys().hasOnly(allowed);
+        }
+
+        // 一般成員只能動自己建立或自己先付的支出，owner/admin 可以動全部。
+        function canManageExpense() {
+          return isTaskAdmin(taskId)
+            || resource.data.createdBy == request.auth.uid
+            || resource.data.paidBy == request.auth.uid;
+        }
+
+        allow get, list: if isTaskMember(taskId);
+        allow create: if isTaskMember(taskId)
+          && request.resource.data.createdBy == request.auth.uid
+          && validExpenseShape()
+          && validNewParticipants();
+        allow update: if isTaskMember(taskId)
+          && canManageExpense()
+          && request.resource.data.createdBy == resource.data.createdBy
+          && validExpenseShape()
+          && validEditedParticipants();
+        allow delete: if isTaskMember(taskId) && canManageExpense();
+      }
+
+      match /payments/{paymentId} {
+        function validPayment() {
+          let data = request.resource.data;
+          return data.from is string
+            && data.to is string
+            && data.from != data.to
+            && data.amount is int
+            && data.amount > 0
+            && data.currency is string
+            && data.status in ["pending", "confirmed"];
+        }
+
+        function isParty() {
+          return request.auth.uid == request.resource.data.from
+            || request.auth.uid == request.resource.data.to;
+        }
+
+        allow get, list: if isTaskMember(taskId);
+
+        // 只能記錄跟自己有關的付款；只有收款人（或 admin）能一開始就記成已確認，
+        // 因為只有收款的人能證明錢真的到了。
+        allow create: if isTaskMember(taskId)
+          && request.resource.data.createdBy == request.auth.uid
+          && validPayment()
+          && (isParty() || isTaskAdmin(taskId))
+          && (
+            request.resource.data.status == "pending"
+            || request.auth.uid == request.resource.data.to
+            || isTaskAdmin(taskId)
+          );
+
+        // 確認收到：只有收款人或 admin，而且只能 pending 變 confirmed。
+        allow update: if isTaskMember(taskId)
+          && (request.auth.uid == resource.data.to || isTaskAdmin(taskId))
+          && resource.data.status == "pending"
+          && request.resource.data.status == "confirmed"
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(["status", "confirmedAt", "updatedAt"]);
+
+        allow delete: if isTaskMember(taskId)
+          && (
+            request.auth.uid == resource.data.from
+            || request.auth.uid == resource.data.to
+            || isTaskAdmin(taskId)
+          );
+      }
+
+      match /settlements/{settlementId} {
+        function validSnapshot() {
+          let data = request.resource.data;
+          return data.currency is string
+            && data.total is int
+            && data.total >= 0
+            && data.paidTotal is int
+            && data.paidTotal >= 0
+            && data.expenseCount is int
+            && data.expenseCount >= 0
+            && data.balances is list
+            && data.transfers is list
+            && data.memberNames is map
+            && data.note is string
+            && data.note.size() <= 200;
+        }
+
+        allow get, list: if isTaskMember(taskId);
+
+        // 結算快照是歷史紀錄，存下來就不能改，只能由 owner/admin 整份刪掉。
+        allow create: if isTaskAdmin(taskId)
+          && request.resource.data.createdBy == request.auth.uid
+          && validSnapshot();
+        allow update: if false;
+        allow delete: if isTaskAdmin(taskId);
       }
     }
 
@@ -92,7 +266,10 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.active == true;
-      allow update, delete: if false;
+      // owner/admin 可以停用邀請連結，其餘欄位一律不可改。
+      allow update: if isTaskAdmin(resource.data.taskId)
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(["active"]);
+      allow delete: if false;
     }
   }
 }

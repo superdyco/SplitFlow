@@ -8,6 +8,7 @@ const OnboardingPage = () => import("@/pages/OnboardingPage.vue");
 const TaskListPage = () => import("@/pages/TaskListPage.vue");
 const CreateTaskPage = () => import("@/pages/CreateTaskPage.vue");
 const TaskPage = () => import("@/pages/TaskPage.vue");
+const ExpenseFormPage = () => import("@/pages/ExpenseFormPage.vue");
 const JoinTaskPage = () => import("@/pages/JoinTaskPage.vue");
 const ProfilePage = () => import("@/pages/ProfilePage.vue");
 
@@ -42,6 +43,8 @@ export const router = createRouter({
     { path: "/tasks", component: TaskListPage, meta: { requiresAuth: true, requiresProfile: true } },
     { path: "/tasks/new", component: CreateTaskPage, meta: { requiresAuth: true, requiresProfile: true } },
     { path: "/tasks/:taskId", component: TaskPage, meta: { requiresAuth: true, requiresProfile: true, requiresTaskMember: true } },
+    { path: "/tasks/:taskId/expenses/new", component: ExpenseFormPage, meta: { requiresAuth: true, requiresProfile: true, requiresTaskMember: true } },
+    { path: "/tasks/:taskId/expenses/:expenseId/edit", component: ExpenseFormPage, meta: { requiresAuth: true, requiresProfile: true, requiresTaskMember: true } },
     { path: "/join/:inviteCode", component: JoinTaskPage, meta: { public: true } },
     { path: "/profile", component: ProfilePage, meta: { requiresAuth: true, requiresProfile: true } }
   ]

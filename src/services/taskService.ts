@@ -17,6 +17,7 @@ export async function createTask(input: CreateTaskInput, owner: UserProfile): Pr
     endDate: input.endDate,
     status: "active" as const,
     inviteCode,
+    inviteActive: true,
     memberCount: 1,
     expenseCount: 0,
     createdAt: serverTimestamp(),
@@ -34,7 +35,7 @@ export async function createTask(input: CreateTaskInput, owner: UserProfile): Pr
     joinedAt: serverTimestamp(),
     active: true
   });
-  addInviteToBatch(batch, inviteCode, task);
+  addInviteToBatch(batch, inviteCode, task, owner.uid);
   await batch.commit();
   return task;
 }

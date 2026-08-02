@@ -13,6 +13,8 @@ export interface Task {
   endDate: string | null;
   status: TaskStatus;
   inviteCode: string;
+  /** 舊任務可能沒有這個欄位，判斷時用 `!== false`。 */
+  inviteActive: boolean;
   memberCount: number;
   expenseCount: number;
   createdAt: Timestamp;

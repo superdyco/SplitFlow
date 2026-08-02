@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "vue-tsc --noEmit && vite build && node scripts/check-chunks.mjs",
     "preview": "vite preview --host 0.0.0.0",
-    "check": "vue-tsc --noEmit"
+    "check": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-splitflow \"node tests/firestore.rules.test.mjs\""
   },
   "dependencies": {
     "@vitejs/plugin-vue": "^5.2.4",
@@ -17,8 +19,12 @@
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "@types/google.maps": "^3.65.4",
+    "firebase-tools": "^15.25.1",
     "typescript": "^5.8.3",
     "vite": "^5.4.0",
+    "vitest": "^4.1.10",
     "vue-tsc": "^2.2.10"
   }
 }

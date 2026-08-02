@@ -6,10 +6,18 @@ import ErrorState from "@/components/common/ErrorState.vue";
 import type { Task } from "@/types/task";
 import { createTask } from "@/services/taskService";
 import { useUserStore } from "@/stores/user";
-import { buildInviteUrl, firebaseErrorMessage, required } from "@/utils/firestore";
+import { CURRENCIES } from "@/utils/currency";
+import {
+  buildInviteUrl,
+  dateRangeError,
+  firebaseErrorMessage,
+  required,
+  textFieldError
+} from "@/utils/firestore";
 
 const userStore = useUserStore();
 const name = ref("");
+const nameTouched = ref(false);
 const defaultCurrency = ref("TWD");
 const startDate = ref("");
 const endDate = ref("");
@@ -18,10 +26,15 @@ const error = ref<string | null>(null);
 const createdTask = ref<Task | null>(null);
 const copied = ref(false);
 const inviteUrl = computed(() => createdTask.value ? buildInviteUrl(createdTask.value.inviteCode) : "");
-const currencies = ["TWD", "THB", "USD", "VND", "CNY", "EGP", "KRW", "EUR", "HKD"];
+
+const nameError = computed(() => textFieldError(name.value, "任務名稱", { max: 40, touched: nameTouched.value }));
+const dateError = computed(() => dateRangeError(startDate.value, endDate.value));
+const canSubmit = computed(() => !!name.value.trim() && !nameError.value && !dateError.value);
 
 async function submit() {
   if (!userStore.profile) return;
+  nameTouched.value = true;
+  if (!canSubmit.value) return;
   loading.value = true;
   error.value = null;
   try {
@@ -52,12 +65,19 @@ async function copy() {
       <div class="card stack">
         <label class="field">
           <span class="label">任務名稱</span>
-          <input v-model="name" class="input" placeholder="例如：曼谷旅行" />
+          <input
+            v-model="name"
+            class="input"
+            maxlength="40"
+            placeholder="例如：曼谷旅行"
+            @blur="nameTouched = true"
+          />
+          <span v-if="nameError" class="tiny warn">{{ nameError }}</span>
         </label>
         <label class="field">
           <span class="label">主要幣別</span>
           <select v-model="defaultCurrency" class="select">
-            <option v-for="currency in currencies" :key="currency" :value="currency">{{ currency }}</option>
+            <option v-for="currency in CURRENCIES" :key="currency" :value="currency">{{ currency }}</option>
           </select>
         </label>
         <label class="field">
@@ -66,11 +86,12 @@ async function copy() {
         </label>
         <label class="field">
           <span class="label">結束日期</span>
-          <input v-model="endDate" class="input" type="date" />
+          <input v-model="endDate" class="input" type="date" :min="startDate || undefined" />
+          <span v-if="dateError" class="tiny warn">{{ dateError }}</span>
         </label>
       </div>
       <ErrorState :message="error" />
-      <button class="btn btn-primary btn-block" :disabled="loading" @click="submit">
+      <button class="btn btn-primary btn-block" :disabled="loading || !canSubmit" @click="submit">
         {{ loading ? "建立中..." : "建立並取得邀請連結" }}
       </button>
     </div>
@@ -86,6 +107,7 @@ async function copy() {
         <button class="btn btn-ghost" @click="copy">{{ copied ? "已複製" : "複製" }}</button>
       </div>
       <RouterLink :to="`/tasks/${createdTask.id}`" class="btn btn-primary btn-block">進入任務</RouterLink>
+      <RouterLink to="/tasks" class="btn btn-block">回我的分帳</RouterLink>
     </div>
   </AppLayout>
 </template>
@@ -97,6 +119,10 @@ async function copy() {
 
 .success-card .brand-mark {
   margin: 0 auto 14px;
+}
+
+.warn {
+  color: var(--color-danger);
 }
 
 .invite {

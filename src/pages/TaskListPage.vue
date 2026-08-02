@@ -51,7 +51,7 @@ onMounted(load);
       </div>
 
       <LoadingState v-if="loading" title="讀取任務中" message="正在從 Firestore 取得你的任務。" />
-      <ErrorState v-else :message="error" />
+      <ErrorState v-else :message="error" retryable :retrying="loading" @retry="load" />
 
       <EmptyState
         v-if="!loading && !error && rows.length === 0"

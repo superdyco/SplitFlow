@@ -6,7 +6,7 @@ import ErrorState from "@/components/common/ErrorState.vue";
 import { logout } from "@/services/authService";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
-import { firebaseErrorMessage, required } from "@/utils/firestore";
+import { firebaseErrorMessage, required, textFieldError } from "@/utils/firestore";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -14,14 +14,26 @@ const userStore = useUserStore();
 const nickname = ref(userStore.profile?.nickname || "");
 const loading = ref(false);
 const error = ref<string | null>(null);
+const touched = ref(false);
+const saved = ref(false);
 const initial = computed(() => nickname.value.trim().charAt(0).toUpperCase() || "?");
+const nicknameError = computed(() =>
+  textFieldError(nickname.value, "暱稱", { max: 20, touched: touched.value })
+);
+const isDirty = computed(() => nickname.value.trim() !== (userStore.profile?.nickname || ""));
+const canSubmit = computed(() => !!nickname.value.trim() && !nicknameError.value && isDirty.value);
 
 async function save() {
   if (!authStore.user) return;
+  touched.value = true;
+  if (!canSubmit.value) return;
   loading.value = true;
   error.value = null;
+  saved.value = false;
   try {
     await userStore.updateNickname(authStore.user.uid, required(nickname.value, "暱稱"));
+    saved.value = true;
+    window.setTimeout(() => (saved.value = false), 2000);
   } catch (err) {
     error.value = firebaseErrorMessage(err);
   } finally {
@@ -45,7 +57,8 @@ async function signOut() {
           <span class="avatar">{{ initial }}</span>
           <div class="field" style="flex: 1">
             <span class="label">暱稱</span>
-            <input v-model="nickname" class="input" />
+            <input v-model="nickname" class="input" maxlength="20" @blur="touched = true" />
+            <span v-if="nicknameError" class="tiny warn">{{ nicknameError }}</span>
           </div>
         </div>
         <div class="spread">
@@ -54,10 +67,16 @@ async function signOut() {
         </div>
       </div>
       <ErrorState :message="error" />
-      <button class="btn btn-primary btn-block" :disabled="loading" @click="save">
-        {{ loading ? "儲存中..." : "儲存變更" }}
+      <button class="btn btn-primary btn-block" :disabled="loading || !canSubmit" @click="save">
+        {{ loading ? "儲存中..." : saved ? "已儲存" : "儲存變更" }}
       </button>
       <button class="btn btn-danger btn-block" @click="signOut">登出</button>
     </div>
   </AppLayout>
 </template>
+
+<style scoped>
+.warn {
+  color: var(--color-danger);
+}
+</style>
