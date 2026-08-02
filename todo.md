@@ -141,8 +141,12 @@
 
 ## Firebase / 部署
 
-- 部署 Hosting：`npm run build` 後 `firebase deploy --only hosting`。
-- Firebase Authentication Authorized domains 加入正式網域。
+- 部署設定已備妥：`.firebaserc`、`firebase.json` 的 rewrites 與快取 headers、
+  `npm run deploy`（build + Hosting + rules 一起）。剩下只要 `npx firebase login` 再跑一次。
+- Hosting 走 Firebase 而不是 GitHub Pages：後者是純靜態伺服器，沒有 rewrite，
+  `/join/:code` 邀請連結會 404，還要處理 base path 與 `buildInviteUrl` 的子路徑問題。
+- 兩把 Google API key 還沒設 HTTP referrer 限制，部署後要加上
+  `splitflow-e39c0.web.app` 與 `splitflow-e39c0.firebaseapp.com`。
 - **`.env` 與 `.env.example` 目前都被 git 追蹤，且 `.env.example` 存的是真實值。**
   `.gitignore` 裡雖然有 `.env`，但檔案先被 commit 了所以沒生效。
   要 `git rm --cached .env` 才會真正停止追蹤，歷史紀錄裡的值仍需視為已公開。

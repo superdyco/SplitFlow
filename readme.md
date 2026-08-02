@@ -260,8 +260,41 @@ total**。均分、自訂比例、換算成主要幣別三種情況都用同一�
 部署 rules：
 
 ```bash
-firebase deploy --only firestore:rules
+npm run deploy:rules
 ```
+
+## 部署到 Firebase Hosting
+
+第一次要先登入（每台機器一次）：
+
+```bash
+npx firebase login
+```
+
+之後每次部署就一行：
+
+```bash
+npm run deploy
+```
+
+這個指令會依序做：型別檢查 → 打包 → chunk 循環檢查 → 部署 Hosting **與 Firestore rules**。
+
+**rules 跟 Hosting 綁在一起部署是刻意的。** 之前手動分開部署過，結果程式碼上線了但
+`settlements` 的規則沒跟上，畫面出現看不出原因的 permission denied，花了不少時間才找到。
+綁在一起就不會有「哪一邊比較新」的問題。
+
+網址會是 `https://splitflow-e39c0.web.app`。這個網域預設就在 Firebase Authentication 的
+Authorized domains 清單裡，不用另外加。Facebook 的 OAuth redirect URI 指向的是
+`firebaseapp.com` 的 auth handler，也不需要改。
+
+`/join/:code` 這種路徑能直接開啟，是靠 `firebase.json` 的 rewrites 把所有路徑導到
+`index.html`。純靜態的 GitHub Pages 沒有這個能力，邀請連結會 404。
+
+### 快取設定
+
+`firebase.json` 的 headers 讓 `/assets/**` 永久快取（檔名帶 hash，內容變檔名就變），
+`index.html` 則是 `no-cache`。少了這組設定，`manualChunks` 拆分出來的快取效益拿不到，
+而且部署後使用者可能還會拿到舊版的 index。
 
 ## 測試
 

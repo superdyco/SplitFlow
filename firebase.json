@@ -7,6 +7,18 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "headers": [
+      {
+        "comment": "檔名帶 hash，內容變了檔名就會變，所以可以永久快取。manualChunks 的效益要靠這個才拿得到。",
+        "source": "/assets/**",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      },
+      {
+        "comment": "index.html 檔名固定，快取住的話部署後使用者會拿到舊版。",
+        "source": "/index.html",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
     ]
   },
   "firestore": {
