@@ -143,14 +143,26 @@ Meta 端的設定做到一半後決定不做了。卡點是 Meta 從 2023 年起
   他們撞到「同 email 不同供應商」時才會看到正確的供應商名稱。
 - 順帶產出的資產留著沒刪：`public/privacy.html` 是實際可用的隱私政策頁，
   `brand/meta-app-icon-1024.png` 與 `public/` 底下的圖示都跟 Meta 無關，照常在用。
+- **收尾已完成**：Firebase Console 的 Facebook provider 已停用（App Secret 一併移除），
+  Meta for Developers 上的 App 已刪除。順序是先停 Firebase 再刪 Meta App，
+  反過來的話 Firebase 會停在「啟用中但設定已失效」的狀態。
+  商業檔案與 passkey 的提醒也跟著消失了。
+- 這件事的嚴重性一直不高：App Secret 存在 Firebase 後端不會外流到前端，
+  跟 `.env` 那兩把 key 的性質不同。真正處理掉的是「Facebook 這條登入路徑
+  技術上仍然通」—— 之前就算 UI 沒有按鈕，手動呼叫 `signInWithPopup` 仍建得了帳號。
 
-## 進行中：PWA（`pwa` 分支）
+## 已完成：PWA（離線持久化與 manifest）
 
 - **離線持久化已做**：`persistentLocalCache` + `persistentMultipleTabManager`。
   斷線時已載入的資料照樣看得到，新增與修改會排隊等連線。
   代價是 firebase chunk 從 450 kB 漲到 545 kB。
 - **manifest 已做**：`display: standalone`、192／512／maskable 三張圖示，
   加上 iOS 專用的 `apple-mobile-web-app-*` meta（iOS 幾乎不看 manifest）。
+  **但實測後確認：在 iPhone 上幾乎感受不到差別。** 因為 `apple-touch-icon`
+  本來就有，圖示早就正確；manifest 只多了名稱（SplitFlow → 分帳小夥伴）
+  與啟動底色。真正的差異在 Android —— 變成 WebAPK、進應用程式抽屜、
+  maskable 圖示不會被形狀裁壞。
+  另外「加到主畫面」本身跟 PWA 無關，任何網站一直都能加。
 - **service worker 刻意不做。** 它才能讓「完全沒網路時打開 App」成立，
   但更新策略做錯會讓使用者卡在舊版本，比 index.html 那個一小時快取嚴重得多
   ——後者會自己過去，SW 卡住的舊版不清資料就不會更新。
