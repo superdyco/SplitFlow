@@ -1,6 +1,10 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -13,4 +17,19 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+/**
+ * 開啟 IndexedDB 離線快取。這是出國用的工具，網路常常時好時壞：
+ * 已經載入過的任務與支出在斷線時照樣看得到，這段期間新增或修改的資料
+ * 會排隊，連上網之後自動送出。
+ *
+ * 用 `persistentMultipleTabManager`，因為舊的單分頁模式在使用者開第二個
+ * 分頁時會讓其中一個拿不到快取。多分頁管理器會協調它們共用同一份。
+ *
+ * 注意這只解決「資料」，不解決「打開 App」——完全沒有網路時瀏覽器連
+ * index.html 與 JS 都拿不到，畫面根本走不到 Firestore 這一層。那需要
+ * service worker，是另一件事。
+ */
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});

@@ -177,6 +177,10 @@ Meta 端的設定做到一半後決定不做了。卡點是 Meta 從 2023 年起
 
 ## 已完成：bundle 拆分
 
+- **離線快取讓 firebase chunk 從 450 kB 漲到 545 kB（gzip 105 → 128 kB），
+  500 kB 的警告因此回來了。** IndexedDB 持久化那層本身就是不少程式碼。
+  要壓下去得把 firestore 的持久化拆成動態載入，但那會牽動初始化時序，
+  先接受這個體積。
 - `manualChunks` 把 556 kB 的單一 chunk 拆成 firebase 448 kB、vendor-vue 96 kB、
   vendor 3 kB、entry 8.4 kB。500 kB 警告消失。
 - 效益是快取粒度與平行下載：改自己的程式碼只會讓 8.4 kB 的 entry 失效。
