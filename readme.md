@@ -284,8 +284,7 @@ npm run deploy
 綁在一起就不會有「哪一邊比較新」的問題。
 
 網址會是 `https://splitflow-e39c0.web.app`。這個網域預設就在 Firebase Authentication 的
-Authorized domains 清單裡，不用另外加。Facebook 的 OAuth redirect URI 指向的是
-`firebaseapp.com` 的 auth handler，也不需要改。
+Authorized domains 清單裡，不用另外加。
 
 `/join/:code` 這種路徑能直接開啟，是靠 `firebase.json` 的 rewrites 把所有路徑導到
 `index.html`。純靜態的 GitHub Pages 沒有這個能力，邀請連結會 404。
@@ -320,7 +319,7 @@ npm run test:rules
 
 ## Firebase Console 需手動設定
 
-- Authentication 啟用 Google 與 Facebook provider。
+- Authentication 啟用 Google provider。
 - Authentication 的 Authorized domains 加入 `localhost` 與正式部署網域。
 - 建立 Firestore Database。
 - 若要部署 Hosting，建立專案並確認 `.firebaserc` 指到正確 project。
@@ -332,11 +331,15 @@ npm run test:rules
 | 供應商 | 狀態 | Firebase Console 以外還需要 |
 |---|---|---|
 | Google | 啟用中 | 不用，開啟即可 |
-| Facebook | 啟用中 | Meta for Developers 建 App，把 App ID 與密鑰填回 Console，並把 Firebase 的 OAuth redirect URI 填進 Facebook 的 Valid OAuth Redirect URIs |
+| Facebook | **關閉** | Meta 要求 App 上線前連結商業檔案、填隱私政策與資料刪除網址 |
 | Apple | **關閉** | Apple Developer Program（年費 US$99）才建得出 Services ID 與私密金鑰 |
 
-Apple 的程式碼路徑留著（`buildProvider` 的 apple 分支），之後有付費帳號時把 `"apple"`
-加回 `ENABLED_PROVIDERS` 就會出現在登入頁，其餘不用改。
+Facebook 是評估後拿掉的：Meta 從 2023 年起要求 App 必須連結商業檔案才能切到上線，
+還要通過隱私政策與資料使用審查。對一個朋友之間用的分帳工具來說，這些流程的成本
+遠大於「多一種登入方式」的價值，而 Google 登入完全沒有這類關卡。
+
+兩者的程式碼路徑都留著（`buildProvider` 的 apple 與 facebook 分支），
+之後要開哪個就把名字加回 `ENABLED_PROVIDERS`，其餘不用改。
 
 沒啟用的供應商按下去會顯示「還沒有在 Firebase Console 啟用」，不會是看不懂的錯誤碼。
 
@@ -352,7 +355,7 @@ onboarding 讓使用者自己填，所以不受影響。
 
 ## 第一版已完成
 
-- Google 與 Facebook 登入與登出（Apple 的程式碼備妥，等付費開發者帳號）。
+- Google 登入與登出（Apple 與 Facebook 的程式碼備妥，需要時開啟即可）。
 - Router guard 等待 Firebase 初始化後判斷登入狀態。
 - 第一次登入建立暱稱並寫入 Firestore。
 - 個人設定頁可查看 email、修改暱稱、登出。

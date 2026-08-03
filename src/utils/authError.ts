@@ -11,13 +11,16 @@ export const PROVIDER_LABELS: Record<SignInProvider, string> = {
 };
 
 /**
- * 登入頁實際顯示的供應商。
+ * 登入頁實際顯示的供應商。程式碼路徑（`buildProvider` 的各個分支）都留著，
+ * 之後要開哪個就把名字加回這個陣列，其餘不用改。
  *
- * Apple 暫時拿掉：它要 Apple Developer Program（年費 US$99）才建得出
- * Services ID 與私密金鑰，沒有付費帳號時 Firebase Console 那格根本填不完。
- * 程式碼路徑（`buildProvider` 的 apple 分支）留著，之後付費了把 "apple" 加回這個陣列即可。
+ * Apple 拿掉：要 Apple Developer Program（年費 US$99）才建得出 Services ID
+ * 與私密金鑰，沒有付費帳號時 Firebase Console 那格根本填不完。
+ *
+ * Facebook 拿掉：Meta 現在要求 App 上線前得連結商業檔案、填隱私政策與資料刪除
+ * 網址，流程太長，而 Google 登入沒有任何這類關卡。
  */
-export const ENABLED_PROVIDERS: SignInProvider[] = ["google", "facebook"];
+export const ENABLED_PROVIDERS: SignInProvider[] = ["google"];
 
 /** Firebase 回傳的 providerId 對應到人看得懂的名稱。 */
 export const PROVIDER_ID_LABELS: Record<string, string> = {

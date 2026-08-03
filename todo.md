@@ -117,9 +117,10 @@
 
 - `signIn(provider)` 統一處理 Google / Apple / Facebook，登入頁與 Join 頁共用
   `ProviderButtons` 元件。
-- 登入頁顯示哪幾個由 `ENABLED_PROVIDERS` 決定，目前是 Google 與 Facebook。
-- **Apple 先關掉**：要 Apple Developer Program（年費 US$99）才建得出 Services ID
+- 登入頁顯示哪幾個由 `ENABLED_PROVIDERS` 決定，目前只有 Google。
+- **Apple 關掉**：要 Apple Developer Program（年費 US$99）才建得出 Services ID
   與私密金鑰。程式碼路徑留著，付費後把 `"apple"` 加回 `ENABLED_PROVIDERS` 即可。
+- **Facebook 關掉**：見下面那一節。
 - 只 disable 正在跑的那顆按鈕。之前是全部一起 disable，結果某個供應商卡住時整頁按不動。
 - 錯誤訊息對應成人看得懂的話：供應商未啟用、網域未授權、彈窗被擋、憑證無效、網路失敗。
 - **使用者自己關掉彈窗不再跳紅字**，用 `SignInCancelled` 區分取消與真的出錯。
@@ -128,11 +129,20 @@
 - 個人設定頁顯示目前的登入方式，並提醒換供應商等於換帳號。
 - 錯誤對應抽到 `utils/authError.ts`，不 import firebase，所以測得到（15 個測試）。
 
-## Facebook 待你補完
+## 已放棄：Facebook 登入
 
-- Meta for Developers 建 App，取得 App ID 與密鑰填回 Firebase Console。
-- 把 Firebase 給的 OAuth redirect URI 填進 Facebook 的 Valid OAuth Redirect URIs。
-- 在那之前按 Facebook 會顯示「還沒有在 Firebase Console 啟用」。
+Meta 端的設定做到一半後決定不做了。卡點是 Meta 從 2023 年起要求 App 必須
+連結「商業檔案」才能從開發模式切到上線，還要通過隱私政策與資料使用審查。
+對一個朋友之間用的分帳工具，這些流程的成本遠大於多一種登入方式的價值，
+而 Google 登入完全沒有這些關卡。
+
+- 程式碼路徑全部留著（`buildProvider` 的 facebook 分支、`PROVIDER_LABELS`、
+  `facebook.com` 的 providerId 對應），只是從 `ENABLED_PROVIDERS` 拿掉。
+  之後想開回來就是加一個字串的事。
+- `facebook.com` 的對應**刻意留著**：萬一 Firebase 裡已經有人用 Facebook 註冊過，
+  他們撞到「同 email 不同供應商」時才會看到正確的供應商名稱。
+- 順帶產出的資產留著沒刪：`public/privacy.html` 是實際可用的隱私政策頁，
+  `brand/meta-app-icon-1024.png` 與 `public/` 底下的圖示都跟 Meta 無關，照常在用。
 
 ## 之後階段功能
 
