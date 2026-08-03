@@ -25,6 +25,7 @@ import { useTaskMembers } from "@/composables/useTaskMembers";
 import { removeMember, setMemberRole } from "@/services/memberService";
 import { confirmPayment, createPayment, deletePayment } from "@/services/paymentService";
 import { buildInviteUrl, firebaseErrorMessage } from "@/utils/firestore";
+import { removeMemberMessage } from "@/utils/memberRemoval";
 
 type Tab = "expenses" | "members" | "settlement";
 
@@ -183,8 +184,14 @@ function changeRole(targetUid: string, role: AssignableRole) {
 
 function removeTaskMember(targetUid: string) {
   const target = memberState.members.value.find(member => member.uid === targetUid);
-  const name = target?.nickname || "這位成員";
-  if (!window.confirm(`確定要把 ${name} 移出任務嗎？他就看不到這個任務了，但既有支出會保留。`)) return;
+  // 沒出現在 balances 代表他還沒參與任何一筆支出，當作已結清。
+  const balance = settlement.value.balances.find(item => item.uid === targetUid)?.balance ?? 0;
+  const message = removeMemberMessage({
+    name: target?.nickname || "",
+    balance,
+    currency: settlement.value.currency
+  });
+  if (!window.confirm(message)) return;
   return runMemberAction(targetUid, () => removeMember(taskId.value, targetUid));
 }
 
