@@ -4,10 +4,13 @@ import type { Settlement, SettlementSnapshot } from "@/types/settlement";
 import { formatAmount } from "@/utils/currency";
 import { matchesSnapshot } from "@/utils/settlement";
 import { formatDateTime } from "@/utils/firestore";
+import { buildSettlementText } from "@/utils/settlementText";
+import { useCopy } from "@/composables/useCopy";
 
 const props = defineProps<{
   settlement: Settlement;
   snapshots: SettlementSnapshot[];
+  taskName: string;
   canManage: boolean;
   busy: boolean;
 }>();
@@ -39,6 +42,27 @@ function submit() {
   emit("save", note.value.trim().slice(0, 200));
   note.value = "";
   composing.value = false;
+}
+
+const { copied, error: copyError, copy } = useCopy();
+
+/**
+ * 快照自帶 memberNames，所以有人改暱稱或離開任務之後，
+ * 複製出來的仍是結算當時的名字。
+ */
+function copySnapshot(snapshot: SettlementSnapshot) {
+  return copy(
+    buildSettlementText({
+      taskName: props.taskName,
+      currency: snapshot.currency,
+      transfers: snapshot.transfers,
+      memberNames: snapshot.memberNames,
+      expenseCount: snapshot.expenseCount,
+      total: snapshot.total,
+      snapshotDate: formatDateTime(snapshot.createdAt) || "剛剛",
+      note: snapshot.note
+    })
+  );
 }
 </script>
 
@@ -105,7 +129,13 @@ function submit() {
         </div>
 
         <div class="stack rows">
-          <span class="label">當時的轉帳建議</span>
+          <div class="spread">
+            <span class="label">當時的轉帳建議</span>
+            <button class="btn btn-ghost btn-sm" @click="copySnapshot(snapshot)">
+              {{ copied ? "已複製" : "複製結算" }}
+            </button>
+          </div>
+          <p v-if="copyError" class="tiny warn">{{ copyError }}</p>
           <p v-if="!snapshot.transfers.length" class="tiny">當時已經全部結清。</p>
           <div v-for="(transfer, index) in snapshot.transfers" :key="index" class="line">
             <span>

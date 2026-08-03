@@ -5,6 +5,8 @@ import type { TaskMember } from "@/types/member";
 import type { Payment } from "@/types/payment";
 import type { Settlement } from "@/types/settlement";
 import { amountToInput, formatAmount, parseAmountInput } from "@/utils/currency";
+import { buildSettlementText } from "@/utils/settlementText";
+import { useCopy } from "@/composables/useCopy";
 
 const props = defineProps<{
   /** 由 TaskPage 算好後傳進來，結算紀錄那一塊要用同一份。 */
@@ -12,6 +14,7 @@ const props = defineProps<{
   expenses: Expense[];
   payments: Payment[];
   members: TaskMember[];
+  taskName: string;
   defaultCurrency: string;
   currentUid: string;
   isAdmin: boolean;
@@ -86,6 +89,24 @@ function canDelete(payment: Payment) {
 function canConfirm(payment: Payment) {
   return payment.status === "pending" && (props.currentUid === payment.to || props.isAdmin);
 }
+
+const { copied, error: copyError, copy } = useCopy();
+
+/** 待確認的付款還沒扣進轉帳金額，未換算的支出根本沒進結算，兩個都要在文字裡講明。 */
+function copySettlement() {
+  return copy(
+    buildSettlementText({
+      taskName: props.taskName,
+      currency: settlement.value.currency,
+      transfers: settlement.value.transfers,
+      memberNames: memberNames.value,
+      expenseCount: settlement.value.expenseCount,
+      total: settlement.value.total,
+      unconvertedCount: settlement.value.unconverted.length,
+      pendingCount: pendingPayments.value.length
+    })
+  );
+}
 </script>
 
 <template>
@@ -134,7 +155,13 @@ function canConfirm(payment: Payment) {
       </div>
 
       <div class="stack rows">
-        <span class="label">還需要的轉帳</span>
+        <div class="spread">
+          <span class="label">還需要的轉帳</span>
+          <button class="btn btn-ghost btn-sm" @click="copySettlement">
+            {{ copied ? "已複製" : "複製結算" }}
+          </button>
+        </div>
+        <p v-if="copyError" class="tiny warn">{{ copyError }}</p>
         <p v-if="!settlement.transfers.length" class="tiny">大家都已結清，不需要轉帳。</p>
 
         <div v-for="transfer in settlement.transfers" :key="transferKey(transfer.from, transfer.to)" class="transfer">

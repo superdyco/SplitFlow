@@ -303,6 +303,7 @@ onMounted(load);
               :expenses="expenseState.expenses.value"
               :payments="paymentState.payments.value"
               :members="memberState.members.value"
+              :task-name="taskState.task.value.name"
               :default-currency="taskState.task.value.defaultCurrency"
               :current-uid="uid"
               :is-admin="taskState.isAdmin.value"
@@ -314,6 +315,7 @@ onMounted(load);
             <SettlementHistory
               :settlement="settlement"
               :snapshots="settlementState.snapshots.value"
+              :task-name="taskState.task.value.name"
               :can-manage="taskState.isAdmin.value"
               :busy="settlementBusy"
               @save="saveSettlement"
