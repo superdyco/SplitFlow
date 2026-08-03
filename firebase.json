@@ -15,7 +15,12 @@
         "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
       },
       {
-        "comment": "index.html 檔名固定，快取住的話部署後使用者會拿到舊版。",
+        "comment": "index.html 檔名固定，快取住的話部署後使用者會拿到舊版。但 header 是比對原始請求路徑而不是 rewrite 之後的目的地，所以只寫 /index.html 沒有用 —— 真實使用者打的是 / 或 /tasks/xxx。這條 regex 抓「路徑裡完全沒有點」的請求，也就是根目錄與所有 SPA 路由。刻意跟 /assets/** 互斥（asset 檔名一定含點），這樣不管 Firebase 的多規則優先序是先命中先贏還是後蓋前，結果都一樣。",
+        "regex": "^/[^.]*$",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "comment": "有人直接打 /index.html 時也要 no-cache。上面那條 regex 因為含點不會命中它。",
         "source": "/index.html",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       }
