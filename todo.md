@@ -144,6 +144,19 @@ Meta 端的設定做到一半後決定不做了。卡點是 Meta 從 2023 年起
 - 順帶產出的資產留著沒刪：`public/privacy.html` 是實際可用的隱私政策頁，
   `brand/meta-app-icon-1024.png` 與 `public/` 底下的圖示都跟 Meta 無關，照常在用。
 
+## 進行中：PWA（`pwa` 分支）
+
+- **離線持久化已做**：`persistentLocalCache` + `persistentMultipleTabManager`。
+  斷線時已載入的資料照樣看得到，新增與修改會排隊等連線。
+  代價是 firebase chunk 從 450 kB 漲到 545 kB。
+- **manifest 已做**：`display: standalone`、192／512／maskable 三張圖示，
+  加上 iOS 專用的 `apple-mobile-web-app-*` meta（iOS 幾乎不看 manifest）。
+- **service worker 刻意不做。** 它才能讓「完全沒網路時打開 App」成立，
+  但更新策略做錯會讓使用者卡在舊版本，比 index.html 那個一小時快取嚴重得多
+  ——後者會自己過去，SW 卡住的舊版不清資料就不會更新。
+  等確認「完全離線開啟」是真需求再說。
+- 因此目前的能力是「網路爛不會壞」，不是「沒網路也能用」。
+
 ## 之後階段功能
 
 - 桌面版專用介面。

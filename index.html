@@ -9,6 +9,17 @@
     -->
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- topbar 沒有自己的背景，是坐在 --color-bg 上，狀態列同色才不會有色差。 -->
+    <meta name="theme-color" content="#f2f0ec" />
+    <!--
+      iOS 幾乎不看 manifest，加到主畫面的行為是靠這幾個 meta 與 apple-touch-icon 決定的。
+      少了 apple-mobile-web-app-capable，從主畫面開啟仍會帶著 Safari 的網址列。
+    -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="分帳小夥伴" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
