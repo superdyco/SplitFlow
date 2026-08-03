@@ -4,6 +4,7 @@ import { RouterLink } from "vue-router";
 import type { Expense } from "@/types/expense";
 import { categoryMeta } from "@/types/expense";
 import { formatAmount } from "@/utils/currency";
+import { expenseDate } from "@/utils/expenseDate";
 
 const props = defineProps<{
   expense: Expense;
@@ -14,6 +15,8 @@ const props = defineProps<{
 }>();
 
 const meta = computed(() => categoryMeta(props.expense.category));
+/** 只顯示月/日，年份在任務層級就知道了，列表裡每筆都印年份太吵。 */
+const shownDate = computed(() => expenseDate(props.expense).slice(5).replace("-", "/"));
 const paidByName = computed(() => props.memberNames[props.expense.paidBy] || "已離開的成員");
 const splitCount = computed(() => Object.keys(props.expense.splits).length);
 const splitLabel = computed(() =>
@@ -39,7 +42,7 @@ const missingRate = computed(
     <span class="icon" :aria-label="meta.label">{{ meta.icon }}</span>
     <div class="body">
       <strong>{{ expense.title }}</strong>
-      <p class="tiny">{{ meta.label }} · {{ paidByName }} 先付 · {{ splitLabel }}</p>
+      <p class="tiny">{{ shownDate }} · {{ meta.label }} · {{ paidByName }} 先付 · {{ splitLabel }}</p>
       <p v-if="expense.place" class="tiny place">📍 {{ expense.place.name }}</p>
     </div>
     <div class="amount">
@@ -56,7 +59,7 @@ const missingRate = computed(
     <span class="icon" :aria-label="meta.label">{{ meta.icon }}</span>
     <div class="body">
       <strong>{{ expense.title }}</strong>
-      <p class="tiny">{{ meta.label }} · {{ paidByName }} 先付 · {{ splitLabel }}</p>
+      <p class="tiny">{{ shownDate }} · {{ meta.label }} · {{ paidByName }} 先付 · {{ splitLabel }}</p>
       <p v-if="expense.place" class="tiny place">📍 {{ expense.place.name }}</p>
     </div>
     <div class="amount">

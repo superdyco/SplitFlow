@@ -169,6 +169,25 @@ Meta 端的設定做到一半後決定不做了。卡點是 Meta 從 2023 年起
   等確認「完全離線開啟」是真需求再說。
 - 因此目前的能力是「網路爛不會壞」，不是「沒網路也能用」。
 
+## 待補：支出 date 欄位的 rules 驗證
+
+`date` 目前沒有寫進 `validExpenseShape()`，其他每個欄位都有驗，只有它沒有。
+不影響運作 —— rules 是逐欄位驗證不是 `hasOnly()` 白名單，所以新欄位本來就寫得進去。
+
+沒有一起改是因為**這台機器跑不了 rules 測試**：firebase-tools 要 JDK 21，
+目前裝的是 11（`winget install Microsoft.OpenJDK.21`）。加一條沒驗證過的規則
+萬一寫錯，線上所有支出都會存不進去，比少驗一個欄位嚴重得多。
+
+裝好 JDK 21、`npm run test:rules` 能跑之後，補進 `validExpenseShape()`：
+
+```
+&& data.date is string
+&& data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+```
+
+補之前要先確認：表單一律會送 date（`date.value || todayInput()`），
+所以編輯舊支出也不會少這個欄位。
+
 ## 之後階段功能
 
 - 桌面版專用介面。

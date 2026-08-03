@@ -58,6 +58,13 @@ export interface Expense {
   splits: Record<string, number>;
   /** 選填，沒填就是 null。 */
   place: ExpensePlace | null;
+  /**
+   * 消費實際發生的日期，`"YYYY-MM-DD"`。
+   * 用字串不用 Timestamp 是因為日期不該有時區：在曼谷凌晨買的東西，
+   * 存成 Timestamp 之後換個時區看會變成前一天。
+   * 這個欄位之前建立的舊資料是 null，顯示與排序會退回用 `createdAt`。
+   */
+  date: string | null;
   createdBy: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -74,4 +81,5 @@ export interface ExpenseInput {
   splitMode: SplitMode;
   splits: Record<string, number>;
   place: ExpensePlace | null;
+  date: string;
 }

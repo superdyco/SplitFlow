@@ -32,6 +32,7 @@ import {
   parseRateInput
 } from "@/utils/currency";
 import { firebaseErrorMessage, required } from "@/utils/firestore";
+import { expenseDate, todayInput } from "@/utils/expenseDate";
 
 const route = useRoute();
 const router = useRouter();
@@ -54,6 +55,8 @@ const title = ref("");
 const category = ref<ExpenseCategory>(DEFAULT_CATEGORY);
 const amount = ref("");
 const currency = ref("TWD");
+/** 消費發生的日期。新增預設今天，用本地時區組字串，不要走 toISOString（那是 UTC）。 */
+const date = ref(todayInput());
 const paidBy = ref(uid);
 const splitMode = ref<SplitMode>("even");
 const splitMemberIds = ref<string[]>([]);
@@ -288,6 +291,8 @@ async function load() {
     );
     selectedPlace.value = expense.place;
     placeQuery.value = expense.place?.name ?? "";
+    // 舊支出沒存日期，帶出 createdAt 換算的那天當預設，存回去就補上了。
+    date.value = expenseDate(expense);
 
     // 匯率沿用記帳當下存下來的，不重抓。舊支出沒有存匯率才去問一次當作建議值。
     if (expense.rate !== null) rate.value = String(expense.rate);
@@ -356,7 +361,8 @@ async function submit() {
       paidBy: paidBy.value,
       splitMode: splitMode.value,
       splits,
-      place: currentPlace()
+      place: currentPlace(),
+      date: date.value || todayInput()
     };
 
     if (isEdit.value) await updateExpense(taskId, expenseId, input);
@@ -439,6 +445,12 @@ onMounted(load);
               </select>
             </label>
           </div>
+
+          <label class="field">
+            <span class="label">日期</span>
+            <input v-model="date" type="date" class="input" />
+            <span class="tiny">隔天才補記的話改成消費當天，結算與排序都看這個日期。</span>
+          </label>
 
           <div v-if="needsRate" class="field">
             <span class="label">匯率（1 {{ currency }} = ? {{ baseCurrency }}）</span>

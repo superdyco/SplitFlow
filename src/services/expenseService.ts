@@ -14,6 +14,7 @@ import {
 import { db } from "@/firebase/config";
 import type { Expense, ExpenseInput } from "@/types/expense";
 import { allocate } from "@/utils/currency";
+import { compareExpenses } from "@/utils/expenseDate";
 
 function expensesRef(taskId: string) {
   return collection(db, "tasks", taskId, "expenses");
@@ -45,15 +46,21 @@ function normalizeExpense(id: string, data: DocumentData): Expense {
     splitMode: (data.splitMode as Expense["splitMode"] | undefined) ?? "even",
     splits,
     place: (data.place as Expense["place"] | undefined) ?? null,
+    date: (data.date as string | undefined) ?? null,
     createdBy: data.createdBy,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt
   };
 }
 
+/**
+ * 查詢維持 orderBy("createdAt")，排序在前端用 `compareExpenses` 做。
+ * 改成 orderBy("date") 的話，Firestore 會把沒有 date 欄位的文件整個排除掉，
+ * 舊支出就直接從列表消失了。
+ */
 export async function listExpenses(taskId: string): Promise<Expense[]> {
   const snap = await getDocs(query(expensesRef(taskId), orderBy("createdAt", "desc")));
-  return snap.docs.map(item => normalizeExpense(item.id, item.data()));
+  return snap.docs.map(item => normalizeExpense(item.id, item.data())).sort(compareExpenses);
 }
 
 export async function getExpense(taskId: string, expenseId: string): Promise<Expense | null> {
