@@ -145,12 +145,13 @@
   `npm run deploy`（build + Hosting + rules 一起）。剩下只要 `npx firebase login` 再跑一次。
 - Hosting 走 Firebase 而不是 GitHub Pages：後者是純靜態伺服器，沒有 rewrite，
   `/join/:code` 邀請連結會 404，還要處理 base path 與 `buildInviteUrl` 的子路徑問題。
-- 兩把 Google API key 還沒設 HTTP referrer 限制，部署後要加上
-  `splitflow-e39c0.web.app` 與 `splitflow-e39c0.firebaseapp.com`。
-- **`.env` 與 `.env.example` 目前都被 git 追蹤，且 `.env.example` 存的是真實值。**
-  `.gitignore` 裡雖然有 `.env`，但檔案先被 commit 了所以沒生效。
-  要 `git rm --cached .env` 才會真正停止追蹤，歷史紀錄裡的值仍需視為已公開。
-- Google Maps key 一定要設 HTTP referrer 限制，它沒有 Firestore rules 那種第二道防線。
+- 兩把 Google API key 的 HTTP referrer 限制已設定（正式網域、`firebaseapp.com`、
+  本機 5173／4173）。referrer header 可以偽造，配額上限與預算警示還沒設。
+- `.env` 已 `git rm --cached` 停止追蹤，`.env.example` 的真實值換成佔位字串。
+  **但兩把 Google key 仍留在 `ed28be9`、`b702a22` 的歷史紀錄裡，而 repo 是 public，
+  所以它們必須視為已外洩，得在 Cloud Console 換新的再刪掉舊的。**
+- Google Maps／Places key 沒有 Firestore rules 那種第二道防線，它們是用量計費的，
+  被撿去用直接算帳單，所以配額上限比 referrer 限制更重要。
 - 評估把 Firebase config 改回只透過部署環境變數管理。
 
 ## 已完成：bundle 拆分

@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>隱私權政策 | SplitFlow 分帳系統</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #1c1c1e;
+        --muted: #6b6b70;
+        --line: #e3e3e6;
+        --accent: #2f6feb;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #16171a;
+          --fg: #e8e8ea;
+          --muted: #9a9aa0;
+          --line: #2c2d31;
+          --accent: #6ea0ff;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 2.5rem 1.25rem 4rem;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC",
+          "PingFang TC", "Microsoft JhengHei", sans-serif;
+        line-height: 1.8;
+        font-size: 16px;
+      }
+      main { max-width: 720px; margin: 0 auto; }
+      h1 { font-size: 1.7rem; margin: 0 0 0.25rem; letter-spacing: -0.01em; }
+      h2 {
+        font-size: 1.15rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--line);
+      }
+      h2:first-of-type { border-top: none; padding-top: 0; }
+      .updated { color: var(--muted); font-size: 0.9rem; margin: 0 0 2rem; }
+      ul { padding-left: 1.3rem; }
+      li { margin-bottom: 0.45rem; }
+      a { color: var(--accent); }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        font-size: 0.95rem;
+      }
+      th, td {
+        text-align: left;
+        padding: 0.6rem 0.5rem;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th { color: var(--muted); font-weight: 600; }
+      .wrap { overflow-x: auto; }
+      footer {
+        margin-top: 3rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>隱私權政策</h1>
+      <p class="updated">SplitFlow 分帳系統 · 最後更新：2026 年 8 月 3 日</p>
+
+      <p>
+        SplitFlow（以下稱「本服務」）是一個協助朋友、家人或同事記錄共同支出並計算彼此
+        應付金額的網頁應用程式。本政策說明本服務會收集哪些資料、如何使用，以及你可以
+        如何管理這些資料。
+      </p>
+
+      <h2>一、我們收集的資料</h2>
+      <div class="wrap">
+        <table>
+          <thead>
+            <tr><th>類別</th><th>內容</th><th>來源</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>帳號資料</td>
+              <td>電子郵件地址、使用者識別碼（UID）、你在本服務設定的暱稱</td>
+              <td>你選擇的第三方登入服務（Google 或 Facebook）與你自行填寫</td>
+            </tr>
+            <tr>
+              <td>分帳資料</td>
+              <td>
+                你建立的任務（群組）名稱、成員與角色、支出項目的名稱、金額、幣別、匯率、
+                分類、分攤方式與各人分攤金額、付款與確認紀錄
+              </td>
+              <td>你與同一任務中的其他成員自行輸入</td>
+            </tr>
+            <tr>
+              <td>地點資料</td>
+              <td>
+                你為某筆支出選填的地點名稱、地址與經緯度座標
+              </td>
+              <td>你自行輸入，或你從地點搜尋結果中選取</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        本服務<strong>不會</strong>收集你的裝置定位、通訊錄、相簿或瀏覽紀錄，也
+        <strong>沒有</strong>安裝任何廣告或行為分析追蹤工具。
+      </p>
+
+      <h2>二、第三方登入</h2>
+      <p>
+        你可以選擇使用 Google 或 Facebook 帳號登入本服務。登入時，我們僅向該服務要求
+        <strong>基本個人資料與電子郵件地址</strong>，用來建立你的帳號並在任務中辨識你的身分。
+        我們<strong>不會</strong>取得你的好友名單、貼文、按讚紀錄，也不會以你的名義發布任何內容。
+      </p>
+      <p>
+        本服務不會取得也不會保存你在第三方服務的密碼；身分驗證全程由 Google Firebase
+        Authentication 處理。
+      </p>
+
+      <h2>三、資料如何被使用與分享</h2>
+      <ul>
+        <li>分帳資料僅用於計算並顯示成員之間的應收應付金額。</li>
+        <li>
+          <strong>同一個任務中的其他成員，可以看到該任務裡的所有支出、金額、地點與參與者暱稱。</strong>
+          這是分帳功能的必要條件，請只邀請你信任的人加入。
+        </li>
+        <li>非同一任務的其他使用者無法看到你的資料。</li>
+        <li>
+          我們<strong>不會</strong>販售、出租你的個人資料，也不會將其用於廣告或提供給
+          廣告商。
+        </li>
+        <li>
+          除非法律或主管機關依法要求，我們不會將你的資料提供給第三方。
+        </li>
+      </ul>
+
+      <h2>四、我們使用的第三方服務</h2>
+      <ul>
+        <li>
+          <strong>Google Firebase</strong>（Authentication、Cloud Firestore、Hosting）：
+          提供身分驗證、資料儲存與網站代管。資料儲存於 Google 的雲端基礎設施。
+          參見 <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase 隱私權說明</a>。
+        </li>
+        <li>
+          <strong>Google Maps 與 Places API</strong>：僅在你使用地點搜尋或檢視地圖時載入。
+          你輸入的搜尋關鍵字會傳送給 Google 以取得候選地點。
+          參見 <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google 隱私權政策</a>。
+        </li>
+        <li>
+          <strong>Meta（Facebook 登入）</strong>：僅在你選擇以 Facebook 登入時介入。
+          參見 <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener">Meta 隱私政策</a>。
+        </li>
+      </ul>
+
+      <h2>五、資料保存與安全</h2>
+      <p>
+        資料存放於 Google Cloud Firestore，傳輸過程全程使用 HTTPS 加密。資料存取受
+        Firestore 安全性規則保護：未登入者無法讀取任何資料，已登入者也只能讀寫自己有權限的
+        任務。你的資料會保存到你主動刪除或刪除帳號為止。
+      </p>   
+
+      <h2>六、兒童隱私</h2>
+      <p>
+        本服務並非針對 13 歲以下兒童設計，我們不會刻意收集兒童的個人資料。若你發現有兒童
+        在未經監護人同意下提供了個人資料，請與我們聯絡，我們會予以刪除。
+      </p>
+
+      <h2>七、政策變更</h2>
+      <p>
+        本政策如有修訂，我們會更新本頁面頂端的「最後更新」日期。重大變更會在你下次登入時
+        於服務中另行提示。
+      </p>
+      <footer>SplitFlow 分帳系統</footer>
+    </main>
+  </body>
+</html>
