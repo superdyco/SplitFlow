@@ -25,6 +25,12 @@ export default defineConfig({
 
           if (/\/node_modules\/@?firebase\//.test(path)) return "firebase";
           if (/\/node_modules\/(@vue\/|vue\/|vue-router\/|pinia\/)/.test(path)) return "vendor-vue";
+
+          // chart.js 只有結算頁的分類圖表用得到，而且是動態載入的。
+          // 不獨立成 chunk 的話會被歸進 vendor，那個是首屏就載的，
+          // 等於沒點開結算頁的人也要付這個體積。@kurkle/color 是它的相依。
+          if (/\/node_modules\/(chart\.js|@kurkle\/color)\//.test(path)) return "chart";
+
           return "vendor";
         }
       }

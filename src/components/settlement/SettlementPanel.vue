@@ -7,6 +7,7 @@ import type { Settlement } from "@/types/settlement";
 import { amountToInput, formatAmount, parseAmountInput } from "@/utils/currency";
 import { buildSettlementText } from "@/utils/settlementText";
 import { useCopy } from "@/composables/useCopy";
+import CategoryChart from "@/components/settlement/CategoryChart.vue";
 
 const props = defineProps<{
   /** 由 TaskPage 算好後傳進來，結算紀錄那一塊要用同一份。 */
@@ -262,6 +263,8 @@ function copySettlement() {
         </div>
       </div>
     </section>
+
+    <CategoryChart :expenses="expenses" :currency="settlement.currency" />
   </div>
 </template>
 
