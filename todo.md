@@ -146,8 +146,19 @@ Meta 端的設定做到一半後決定不做了。卡點是 Meta 從 2023 年起
 
 ## 之後階段功能
 
-- Google Places nearby，依目前定位列出附近地點，需要瀏覽器定位權限。
 - 桌面版專用介面。
+
+## 已放棄：Places nearby
+
+依目前定位列出附近地點，評估後不做，理由是計費。
+
+- `searchNearby` 跟現在的 Autocomplete 是同一個 API、同一把金鑰，Cloud Console
+  不用多設什麼，所以擋下它的不是設定成本。
+- 但 **nearby 沒有 session token 折扣**。Autocomplete 與 Details 靠共用 token
+  算成一次計費，nearby 是獨立 SKU，每次請求就是一次錢，單價也比較高。
+- 而且它的使用模式很容易失控：頁面一開就自動搜尋、或跟著地圖移動連發，
+  請求數會長得很快，光是開發時反覆測試就會燒掉不少。
+- 維持現況：使用者自己輸入關鍵字，`autocompletePlaces` 帶 350ms debounce。
 
 ## Firebase / 部署
 
