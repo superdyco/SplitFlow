@@ -225,6 +225,29 @@ a {
   outline-offset: 1px;
 }
 
+/*
+ * iOS Safari 的原生日期輸入有自己的固有寬度，會無視 width: 100% 直接撐破容器。
+ * 關掉原生外觀並解除最小寬度限制才收得回來（點下去仍然是系統的日期選擇器）。
+ */
+.input[type="date"] {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* iOS 會把日期文字置中，跟其他欄位的左對齊不一致。 */
+.input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+/* 關掉原生外觀之後桌面版的日曆圖示會不見，補回來並對齊右側。 */
+.input[type="date"]::-webkit-calendar-picker-indicator {
+  margin-left: auto;
+  opacity: 0.5;
+  cursor: pointer;
+}
+
 .tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
