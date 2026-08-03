@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
@@ -10,7 +10,10 @@ import type { Task } from "@/types/task";
 import type { TaskRole } from "@/types/member";
 import { useAuthStore } from "@/stores/auth";
 import { listUserTasks } from "@/services/taskService";
-import { getTaskMember } from "@/services/memberService";
+import { getTaskMember, listTaskMembers } from "@/services/memberService";
+import { listExpenses } from "@/services/expenseService";
+import { myTripCost, sumByCurrency } from "@/utils/myCost";
+import { formatAmount } from "@/utils/currency";
 import { firebaseErrorMessage } from "@/utils/firestore";
 
 const authStore = useAuthStore();
@@ -47,6 +50,58 @@ async function load() {
   }
 }
 
+/**
+ * 我的花費要把每個任務的支出全部載下來在前端算 —— 換算後的分攤金額沒有存在
+ * 資料庫裡，沒辦法用 Firestore 的聚合查詢在伺服器端加總（跨幣別會算錯）。
+ *
+ * 所以做成按需載入：不點就維持列表原本的速度，點了才付「任務數 × 支出數」
+ * 這個讀取成本。
+ */
+const costs = ref<Map<string, number>>(new Map());
+const costsLoading = ref(false);
+const costsError = ref<string | null>(null);
+const costsLoaded = ref(false);
+
+const totals = computed(() =>
+  sumByCurrency(
+    rows.value.map(row => ({
+      currency: row.task.defaultCurrency,
+      amount: costs.value.get(row.task.id) ?? 0
+    }))
+  )
+);
+
+async function loadCosts() {
+  const uid = authStore.user?.uid;
+  if (!uid) return;
+  costsLoading.value = true;
+  costsError.value = null;
+  try {
+    const entries = await Promise.all(
+      rows.value.map(async row => {
+        // 成員也要載：餘數分給誰取決於加入順序，少了它數字會跟結算頁差幾分錢。
+        const [expenses, members] = await Promise.all([
+          listExpenses(row.task.id),
+          listTaskMembers(row.task.id)
+        ]);
+        const cost = myTripCost(
+          expenses,
+          members.map(member => member.uid),
+          uid,
+          row.task.defaultCurrency
+        );
+        return [row.task.id, cost] as const;
+      })
+    );
+    costs.value = new Map(entries);
+    costsLoaded.value = true;
+  } catch (err) {
+    costsError.value = firebaseErrorMessage(err);
+  } finally {
+    costsLoading.value = false;
+  }
+}
+
 onMounted(load);
 </script>
 
@@ -72,9 +127,76 @@ onMounted(load);
         <RouterLink to="/tasks/new" class="btn btn-primary" style="margin-top: 16px">建立分帳任務</RouterLink>
       </EmptyState>
 
+      <section v-if="!loading && !error && rows.length" class="card stack cost-card">
+        <div class="spread">
+          <div>
+            <strong class="section-title">我的花費</strong>
+            <p class="tiny">你實際分攤的金額，先付出去的錢會被還，不算在內。</p>
+          </div>
+          <button
+            v-if="!costsLoaded"
+            class="btn btn-sm"
+            :disabled="costsLoading"
+            @click="loadCosts"
+          >
+            {{ costsLoading ? "計算中..." : "計算" }}
+          </button>
+          <button v-else class="btn btn-ghost btn-sm" :disabled="costsLoading" @click="loadCosts">
+            重新整理
+          </button>
+        </div>
+
+        <p v-if="costsError" class="tiny warn">{{ costsError }}</p>
+
+        <div v-else-if="costsLoaded" class="totals">
+          <div v-for="item in totals" :key="item.currency" class="total">
+            <span class="tiny">{{ item.currency }}</span>
+            <strong class="figure">{{ formatAmount(item.amount, item.currency) }}</strong>
+          </div>
+          <p v-if="!totals.length" class="tiny">目前還沒有算得出金額的支出。</p>
+        </div>
+
+        <p v-else class="tiny">
+          需要把每趟旅程的支出都讀下來才算得出來，所以不會自動計算。
+        </p>
+      </section>
+
       <div v-if="!loading && rows.length" class="stack">
-        <TaskCard v-for="row in rows" :key="row.task.id" :task="row.task" :role="row.role" />
+        <TaskCard
+          v-for="row in rows"
+          :key="row.task.id"
+          :task="row.task"
+          :role="row.role"
+          :my-cost="costsLoaded ? costs.get(row.task.id) ?? 0 : null"
+        />
       </div>
     </div>
   </AppLayout>
 </template>
+
+<style scoped>
+.cost-card {
+  box-shadow: none;
+}
+
+.totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+}
+
+.total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.figure {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.warn {
+  color: var(--color-danger);
+}
+</style>

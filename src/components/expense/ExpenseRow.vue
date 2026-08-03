@@ -14,6 +14,15 @@ const props = defineProps<{
   canManage: boolean;
 }>();
 
+const emit = defineEmits<{ (e: "repeat", expenseId: string): void }>();
+
+/** 整列是連結，按鈕在裡面要擋掉導航，不然會跳去編輯頁。 */
+function repeat(event: Event) {
+  event.preventDefault();
+  event.stopPropagation();
+  emit("repeat", props.expense.id);
+}
+
 const meta = computed(() => categoryMeta(props.expense.category));
 /** 只顯示月/日，年份在任務層級就知道了，列表裡每筆都印年份太吵。 */
 const shownDate = computed(() => expenseDate(props.expense).slice(5).replace("-", "/"));
@@ -34,16 +43,22 @@ const missingRate = computed(
 </script>
 
 <template>
-  <RouterLink
-    v-if="canManage"
-    :to="`/tasks/${taskId}/expenses/${expense.id}/edit`"
-    class="card expense-row"
-  >
+  <!--
+    整張卡片可點是既有的操作方式，但 <a> 依規範不能包互動元素，
+    所以用 stretched link：連結本身只放在標題上，再用 ::after 覆蓋整張卡，
+    「再記一筆」則疊在它上面。這樣兩個動作都能點，HTML 也是合法的。
+  -->
+  <div v-if="canManage" class="card expense-row">
     <span class="icon" :aria-label="meta.label">{{ meta.icon }}</span>
     <div class="body">
-      <strong>{{ expense.title }}</strong>
+      <strong>
+        <RouterLink :to="`/tasks/${taskId}/expenses/${expense.id}/edit`" class="stretch">
+          {{ expense.title }}
+        </RouterLink>
+      </strong>
       <p class="tiny">{{ shownDate }} · {{ meta.label }} · {{ paidByName }} 先付 · {{ splitLabel }}</p>
       <p v-if="expense.place" class="tiny place">📍 {{ expense.place.name }}</p>
+      <button type="button" class="repeat tiny" @click="repeat">再記一筆</button>
     </div>
     <div class="amount">
       <strong>{{ formatAmount(expense.amount, expense.currency) }}</strong>
@@ -53,7 +68,7 @@ const missingRate = computed(
         <span v-else-if="missingRate" class="warn">未換算</span>
       </p>
     </div>
-  </RouterLink>
+  </div>
 
   <div v-else class="card expense-row">
     <span class="icon" :aria-label="meta.label">{{ meta.icon }}</span>
@@ -61,6 +76,7 @@ const missingRate = computed(
       <strong>{{ expense.title }}</strong>
       <p class="tiny">{{ shownDate }} · {{ meta.label }} · {{ paidByName }} 先付 · {{ splitLabel }}</p>
       <p v-if="expense.place" class="tiny place">📍 {{ expense.place.name }}</p>
+      <button type="button" class="repeat tiny" @click="repeat">再記一筆</button>
     </div>
     <div class="amount">
       <strong>{{ formatAmount(expense.amount, expense.currency) }}</strong>
@@ -75,6 +91,8 @@ const missingRate = computed(
 
 <style scoped>
 .expense-row {
+  /* stretch 的 ::after 要靠這個定位，少了它覆蓋層會跑去對齊 viewport。 */
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -113,6 +131,37 @@ const missingRate = computed(
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 連結只包標題，但 ::after 撐滿整張卡片，所以整張卡都可點。 */
+.stretch {
+  color: inherit;
+  text-decoration: none;
+}
+
+.stretch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.repeat {
+  /* 疊在 stretch 的覆蓋層之上，不然會點到編輯。 */
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.repeat:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .amount {

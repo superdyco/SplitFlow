@@ -33,6 +33,7 @@ import {
 } from "@/utils/currency";
 import { firebaseErrorMessage, required } from "@/utils/firestore";
 import { expenseDate, todayInput } from "@/utils/expenseDate";
+import { repeatFieldsOf } from "@/utils/repeatExpense";
 
 const route = useRoute();
 const router = useRouter();
@@ -41,6 +42,8 @@ const uid = authStore.user!.uid;
 const taskId = String(route.params.taskId || "");
 const expenseId = String(route.params.expenseId || "");
 const isEdit = computed(() => !!expenseId);
+/** 從支出列表的「再記一筆」帶過來的來源 id。 */
+const repeatFromId = String(route.query.from || "");
 
 const taskState = useTask(taskId, uid);
 const memberState = useTaskMembers(taskId);
@@ -245,6 +248,33 @@ async function loadRate() {
   }
 }
 
+/**
+ * 「再記一筆」：帶入來源的分類、幣別、付款人與分攤設定，金額留空。
+ * 日期是今天、匯率重新查 —— 見 `repeatFieldsOf` 的說明。
+ * 來源讀不到就當作一般的新增，不要擋住使用者記帳。
+ */
+async function applyRepeatSource() {
+  const source = await getExpense(taskId, repeatFromId).catch(() => null);
+  if (!source) return;
+
+  const fields = repeatFieldsOf(source);
+  title.value = fields.title;
+  category.value = fields.category;
+  currency.value = fields.currency;
+  paidBy.value = fields.paidBy;
+  splitMode.value = fields.splitMode;
+  involvedIds.value = [...Object.keys(fields.splits), fields.paidBy];
+  splitMemberIds.value = selectableMembers.value
+    .map(member => member.uid)
+    .filter(memberUid => memberUid in fields.splits);
+  selectedPlace.value = fields.place;
+  placeQuery.value = fields.place?.name ?? "";
+
+  // 自訂分攤的金額跟著原金額走，但新的一筆金額還沒填，留空讓使用者重填。
+  if (fields.splitMode === "custom") customAmounts.value = {};
+  if (needsRate.value) await loadRate();
+}
+
 async function load() {
   loading.value = true;
   loadError.value = null;
@@ -260,7 +290,10 @@ async function load() {
     currency.value = baseCurrency.value;
     splitMemberIds.value = memberState.activeMembers.value.map(member => member.uid);
 
-    if (!isEdit.value) return;
+    if (!isEdit.value) {
+      if (repeatFromId) await applyRepeatSource();
+      return;
+    }
 
     const expense = await getExpense(taskId, expenseId);
     if (!expense) {

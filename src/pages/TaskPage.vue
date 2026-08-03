@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import AccessDenied from "@/components/common/AccessDenied.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import ExpenseRow from "@/components/expense/ExpenseRow.vue";
+import ExpenseDayGroup from "@/components/expense/ExpenseDayGroup.vue";
 import MemberRow from "@/components/member/MemberRow.vue";
 import SettlementPanel from "@/components/settlement/SettlementPanel.vue";
 import SettlementHistory from "@/components/settlement/SettlementHistory.vue";
@@ -15,6 +16,7 @@ import { mapsEnabled } from "@/services/mapsLoader";
 import { useSettlements } from "@/composables/useSettlements";
 import { createSettlement, deleteSettlement } from "@/services/settlementService";
 import { settleExpenses, toSnapshotInput } from "@/utils/settlement";
+import { groupExpensesByDate } from "@/utils/expenseGroups";
 import type { Expense } from "@/types/expense";
 import type { AssignableRole } from "@/types/member";
 import { useAuthStore } from "@/stores/auth";
@@ -30,6 +32,7 @@ import { removeMemberMessage } from "@/utils/memberRemoval";
 type Tab = "expenses" | "members" | "settlement";
 
 const route = useRoute();
+const router = useRouter();
 const authStore = useAuthStore();
 const uid = authStore.user!.uid;
 const taskId = computed(() => String(route.params.taskId || ""));
@@ -51,6 +54,29 @@ const inviteUrl = computed(() => taskState.task.value ? buildInviteUrl(taskState
 const memberNames = computed(() =>
   Object.fromEntries(memberState.members.value.map(member => [member.uid, member.nickname]))
 );
+
+const expenseGroups = computed(() =>
+  groupExpensesByDate(
+    expenseState.expenses.value,
+    taskState.task.value?.defaultCurrency || "TWD"
+  )
+);
+
+/**
+ * 記「收合了哪幾天」而不是「展開了哪幾天」，這樣預設全展開，
+ * 新的一天出現時也會是展開的，不用另外處理。
+ */
+const collapsedDays = ref(new Set<string>());
+
+function toggleDay(date: string) {
+  if (collapsedDays.value.has(date)) collapsedDays.value.delete(date);
+  else collapsedDays.value.add(date);
+}
+
+/** 再記一筆：把來源帶到新增頁，金額、日期與匯率重來。 */
+function repeatExpense(expenseId: string) {
+  return router.push(`/tasks/${taskId.value}/expenses/new?from=${expenseId}`);
+}
 
 /** 結算結果算一次，結算面板與結算紀錄共用同一份，不會有兩邊算出不同數字的問題。 */
 const settlement = computed(() =>
@@ -264,15 +290,25 @@ onMounted(load);
                 title="目前尚無支出"
                 message="新增第一筆支出後，結算就會根據真實資料計算。"
               />
-              <ExpenseRow
-                v-for="expense in expenseState.expenses.value"
-                :key="expense.id"
-                :expense="expense"
-                :task-id="taskId"
-                :member-names="memberNames"
-                :base-currency="taskState.task.value.defaultCurrency"
-                :can-manage="canManage(expense)"
-              />
+              <ExpenseDayGroup
+                v-for="group in expenseGroups"
+                :key="group.date"
+                :group="group"
+                :currency="taskState.task.value.defaultCurrency"
+                :open="!collapsedDays.has(group.date)"
+                @toggle="toggleDay"
+              >
+                <ExpenseRow
+                  v-for="expense in group.expenses"
+                  :key="expense.id"
+                  :expense="expense"
+                  :task-id="taskId"
+                  :member-names="memberNames"
+                  :base-currency="taskState.task.value.defaultCurrency"
+                  :can-manage="canManage(expense)"
+                  @repeat="repeatExpense"
+                />
+              </ExpenseDayGroup>
             </template>
           </template>
         </section>
