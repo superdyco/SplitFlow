@@ -34,6 +34,7 @@ import {
 import { firebaseErrorMessage, required } from "@/utils/firestore";
 import { expenseDate, todayInput } from "@/utils/expenseDate";
 import { repeatFieldsOf } from "@/utils/repeatExpense";
+import { settleWrite } from "@/utils/offlineWrite";
 
 const route = useRoute();
 const router = useRouter();
@@ -53,6 +54,8 @@ const saving = ref(false);
 const removing = ref(false);
 const loadError = ref<string | null>(null);
 const error = ref<string | null>(null);
+/** 離線排隊時要告訴使用者資料沒有不見，只是還沒送出去。 */
+const queuedNotice = ref(false);
 
 const title = ref("");
 const category = ref<ExpenseCategory>(DEFAULT_CATEGORY);
@@ -398,9 +401,11 @@ async function submit() {
       date: date.value || todayInput()
     };
 
-    if (isEdit.value) await updateExpense(taskId, expenseId, input);
-    else await createExpense(taskId, input, uid);
+    const outcome = isEdit.value
+      ? await settleWrite(updateExpense(taskId, expenseId, input))
+      : await settleWrite(createExpense(taskId, input, uid).synced);
 
+    if (outcome === "queued") queuedNotice.value = true;
     await router.push(`/tasks/${taskId}`);
   } catch (err) {
     error.value = firebaseErrorMessage(err);
@@ -414,7 +419,7 @@ async function remove() {
   removing.value = true;
   error.value = null;
   try {
-    await deleteExpense(taskId, expenseId);
+    await settleWrite(deleteExpense(taskId, expenseId));
     await router.push(`/tasks/${taskId}`);
   } catch (err) {
     error.value = firebaseErrorMessage(err);
@@ -618,6 +623,10 @@ onMounted(load);
             </p>
           </div>
         </div>
+
+        <p v-if="queuedNotice" class="card tiny">
+          目前沒有連線，已經先存在這台裝置上，連上網路後會自動同步。
+        </p>
 
         <ErrorState :message="error" />
 
