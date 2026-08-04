@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// 注意：Storage 的規則無法查詢 Firestore，所以寫不出「只有這個任務的成員能看」。
+// 實際的防線是路徑裡那兩段 20 字元的隨機 ID —— 要拿到 ID 得先通過 Firestore
+// 的成員檢查。對「朋友出國分帳」的威脅模型可以接受；要做到嚴格得上 Cloud
+// Functions 發簽名 URL，不值得為此多一個服務。
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /tasks/{taskId}/expenses/{expenseId}/receipt.jpg {
+      allow read: if request.auth != null;
+
+      // 2MB 是壓縮後大小的五倍以上，正常照片一定過得了，
+      // 但擋掉繞過前端直接上傳大檔把免費額度吃光。
+      allow create, update: if request.auth != null
+        && request.resource.size <= 2 * 1024 * 1024
+        && request.resource.contentType == 'image/jpeg';
+
+      allow delete: if request.auth != null;
+    }
+
+    // 其他路徑一律不開。
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
