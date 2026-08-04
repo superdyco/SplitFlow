@@ -6,10 +6,12 @@ import EmptyState from "@/components/common/EmptyState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import TaskCard from "@/components/task/TaskCard.vue";
-import type { Task } from "@/types/task";
+import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
+import type { Task, TaskStatus } from "@/types/task";
 import type { TaskRole } from "@/types/member";
 import { useAuthStore } from "@/stores/auth";
-import { listUserTasks } from "@/services/taskService";
+import { listUserTasks, setTaskStatus } from "@/services/taskService";
+import { settleWrite } from "@/utils/offlineWrite";
 import { getTaskMember, listTaskMembers } from "@/services/memberService";
 import { listExpenses } from "@/services/expenseService";
 import { myTripCost, sumByCurrency } from "@/utils/myCost";
@@ -108,6 +110,70 @@ async function loadCosts() {
   }
 }
 
+/**
+ * 對話框只有一個，住在頁面而不是每張卡各一個 —— DOM 裡永遠只有一份，
+ * 而且「刪除的規則」集中在這裡而不是散在每張卡。
+ */
+const pending = ref<{ task: Task; next: TaskStatus } | null>(null);
+const actionError = ref<string | null>(null);
+
+const dialogTitle = computed(() => {
+  if (!pending.value) return "";
+  if (pending.value.next === "archived") return "封存這個任務？";
+  if (pending.value.next === "active") return "解除封存？";
+  return "刪除這個任務？";
+});
+
+const dialogMessage = computed(() => {
+  const entry = pending.value;
+  if (!entry) return "";
+  if (entry.next === "archived") {
+    return "封存之後資料留著可以查，但不能再記帳或修改。隨時可以解除。";
+  }
+  if (entry.next === "active") {
+    return "解除之後這個任務就恢復正常，可以繼續記帳。";
+  }
+  // 刪除：講出實際規模，讓人知道自己在刪什麼。
+  return `這個任務有 ${entry.task.memberCount} 位成員、${entry.task.expenseCount} 筆支出。刪除之後所有成員都會看不到，而且無法復原。`;
+});
+
+const dialogConfirmLabel = computed(() => {
+  if (!pending.value) return "";
+  if (pending.value.next === "archived") return "封存";
+  if (pending.value.next === "active") return "解除封存";
+  return "刪除";
+});
+
+/**
+ * 分級摩擦：後果越嚴重、需要越刻意的動作。
+ * 建錯的空任務刪掉風險是零，不該被懲罰；有支出的任務被誤刪是不可逆的災難。
+ */
+const dialogRequireText = computed(() => {
+  const entry = pending.value;
+  if (!entry || entry.next !== "deleted") return null;
+  return entry.task.expenseCount > 0 ? entry.task.name : null;
+});
+
+function ask(task: Task, next: TaskStatus) {
+  actionError.value = null;
+  pending.value = { task, next };
+}
+
+async function confirmAction() {
+  const entry = pending.value;
+  if (!entry) return;
+  pending.value = null;
+  actionError.value = null;
+  try {
+    await settleWrite(setTaskStatus(entry.task.id, entry.next));
+    // 不做樂觀更新：失敗時要把卡片放回去，多一組狀態換一點點速度，
+    // 而這個操作一輩子按不到幾次。
+    await load();
+  } catch (err) {
+    actionError.value = firebaseErrorMessage(err);
+  }
+}
+
 onMounted(load);
 </script>
 
@@ -172,6 +238,9 @@ onMounted(load);
           :task="row.task"
           :role="row.role"
           :my-cost="costsLoaded ? costs.get(row.task.id) ?? 0 : null"
+          @archive="ask($event, 'archived')"
+          @unarchive="ask($event, 'active')"
+          @delete="ask($event, 'deleted')"
         />
       </div>
 
@@ -187,8 +256,24 @@ onMounted(load);
           :task="row.task"
           :role="row.role"
           :my-cost="null"
+          @archive="ask($event, 'archived')"
+          @unarchive="ask($event, 'active')"
+          @delete="ask($event, 'deleted')"
         />
       </div>
+
+      <ErrorState :message="actionError" />
+
+      <ConfirmDialog
+        :open="pending !== null"
+        :title="dialogTitle"
+        :message="dialogMessage"
+        :confirm-label="dialogConfirmLabel"
+        :danger="pending?.next === 'deleted'"
+        :require-text="dialogRequireText"
+        @confirm="confirmAction"
+        @cancel="pending = null"
+      />
     </div>
   </AppLayout>
 </template>
