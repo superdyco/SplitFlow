@@ -1,43 +1,137 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import type { Task } from "@/types/task";
-import type { TaskRole } from "@/types/member";
+import { ROLE_LABELS, type TaskRole } from "@/types/member";
+import { STATUS_LABELS } from "@/utils/taskStatus";
 import { formatDate } from "@/utils/firestore";
 import { formatAmount } from "@/utils/currency";
 
-defineProps<{
+const props = defineProps<{
   task: Task;
   role: TaskRole;
   /** 我在這趟旅程分攤的金額。null 代表還沒計算（列表預設不算）。 */
   myCost: number | null;
 }>();
+
+const emit = defineEmits<{
+  (e: "archive", task: Task): void;
+  (e: "unarchive", task: Task): void;
+  (e: "delete", task: Task): void;
+}>();
+
+/** 只有 owner 能封存與刪除。firestore.rules 也擋著，這裡只是不要讓人按了才失敗。 */
+const isOwner = computed(() => props.role === "owner");
+const isArchived = computed(() => props.task.status === "archived");
 </script>
 
 <template>
-  <RouterLink :to="`/tasks/${task.id}`" class="card task-card">
+  <!--
+    整張卡片可點是既有的操作方式，但 <a> 依規範不能包互動元素，
+    所以用 stretched link：連結本身只放在標題上，再用 ::after 覆蓋整張卡，
+    動作按鈕則疊在它上面。這樣兩個動作都能點，HTML 也是合法的。
+  -->
+  <div class="card task-card">
     <div class="spread">
       <div>
-        <h2 class="section-title">{{ task.name }}</h2>
+        <h2 class="section-title">
+          <RouterLink :to="`/tasks/${task.id}`" class="stretch">{{ task.name }}</RouterLink>
+        </h2>
         <p class="tiny">{{ task.startDate || "未設定" }} - {{ task.endDate || "未設定" }}</p>
       </div>
-      <span class="role-pill">{{ role }}</span>
+      <span class="role-pill">{{ ROLE_LABELS[role] }}</span>
     </div>
+
     <div class="task-meta">
       <span>{{ task.memberCount }} 位成員</span>
       <span>{{ task.expenseCount }} 筆支出</span>
-      <span>{{ task.status }}</span>
+      <!-- 進行中不掛標籤 —— 沒消息就是好消息，每張卡貼一個「進行中」只是噪音。 -->
+      <span v-if="isArchived" class="archived-pill">{{ STATUS_LABELS.archived }}</span>
     </div>
+
     <p v-if="myCost !== null" class="my-cost">
       <span class="tiny">我的花費</span>
       <strong>{{ task.defaultCurrency }} {{ formatAmount(myCost, task.defaultCurrency) }}</strong>
     </p>
+
     <p class="tiny">建立日期 {{ formatDate(task.createdAt) || "剛剛" }}</p>
-  </RouterLink>
+
+    <!--
+      .prevent.stop 是必要的：按鈕疊在 stretched link 的覆蓋層上，
+      不擋掉的話點按鈕會連帶導航到任務頁。
+    -->
+    <div v-if="isOwner" class="actions">
+      <button
+        v-if="isArchived"
+        type="button"
+        class="action"
+        @click.prevent.stop="emit('unarchive', task)"
+      >
+        解除封存
+      </button>
+      <button v-else type="button" class="action" @click.prevent.stop="emit('archive', task)">
+        封存
+      </button>
+      <button type="button" class="action danger" @click.prevent.stop="emit('delete', task)">
+        刪除
+      </button>
+    </div>
+  </div>
 </template>
 
 <style scoped>
 .task-card {
-  display: block;
+  /* stretch 的 ::after 要靠這個定位，少了它覆蓋層會跑去對齊 viewport。 */
+  position: relative;
+}
+
+/* 連結只包標題，但 ::after 撐滿整張卡片，所以整張卡都可點。 */
+.stretch {
+  color: inherit;
+  text-decoration: none;
+}
+
+.stretch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.actions {
+  /* 疊在 stretch 的覆蓋層之上，不然會點到任務頁。 */
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.action {
+  padding: 5px 12px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.action:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.action.danger:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.archived-pill {
+  background: var(--color-line);
+  color: var(--color-muted);
 }
 
 .task-meta {
