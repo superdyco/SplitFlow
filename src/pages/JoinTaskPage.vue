@@ -88,7 +88,12 @@ async function join() {
     await joinTask(invite.value.taskId, userStore.profile);
     await router.push(`/tasks/${invite.value.taskId}`);
   } catch (err) {
-    error.value = firebaseErrorMessage(err);
+    // 封存的任務規則會擋掉 members 的 create，錯誤碼跟一般權限不足一樣，
+    // 但使用者需要知道的是「這個任務結束了」而不是「你沒有權限」。
+    error.value =
+      (err as { code?: string }).code === "permission-denied"
+        ? "這個任務已封存或已結束，無法加入。請聯絡發起人。"
+        : firebaseErrorMessage(err);
   } finally {
     joining.value = false;
   }

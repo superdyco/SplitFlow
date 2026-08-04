@@ -51,6 +51,13 @@ const paymentBusy = ref(false);
 const settlementBusy = ref(false);
 const inviteUrl = computed(() => taskState.task.value ? buildInviteUrl(taskState.task.value.inviteCode) : "");
 
+/** 封存的任務唯讀。firestore.rules 已經擋死，這裡只是不要讓人按了才失敗。 */
+const isArchived = computed(() => taskState.task.value?.status === "archived");
+/** 軟刪除只是一個欄位，規則仍允許成員讀取，所以要自己擋掉這個幽靈任務。 */
+const isDeleted = computed(() => taskState.task.value?.status === "deleted");
+/** 有管理權而且任務還能寫。所有寫入入口都看這個，不要各自拼條件。 */
+const canWrite = computed(() => taskState.isAdmin.value && !isArchived.value);
+
 const memberNames = computed(() =>
   Object.fromEntries(memberState.members.value.map(member => [member.uid, member.nickname]))
 );
@@ -118,7 +125,9 @@ const expenseMarkers = computed(() =>
 );
 
 // 一般成員只能動自己建立或自己先付的支出，owner/admin 可以動全部。
+// 封存之後誰都不能動 —— 這也是規則的行為，前端跟著收起編輯連結與「再記一筆」。
 function canManage(expense: Expense) {
+  if (isArchived.value) return false;
   return taskState.isAdmin.value || expense.createdBy === uid || expense.paidBy === uid;
 }
 
@@ -240,6 +249,12 @@ onMounted(load);
         />
       </div>
 
+      <!--
+        這條一定要排在 task.value 那條之前：已刪除的任務 task.value 也是有值的，
+        放在後面就永遠不會命中。
+      -->
+      <ErrorState v-else-if="isDeleted" message="這個任務已被刪除。" />
+
       <template v-else-if="taskState.task.value">
         <div class="spread">
           <div>
@@ -250,10 +265,14 @@ onMounted(load);
               {{ taskState.task.value.expenseCount }} 筆支出
             </p>
           </div>
-          <button v-if="taskState.isAdmin.value" class="btn btn-ghost" @click="copyInvite">
+          <button v-if="canWrite" class="btn btn-ghost" @click="copyInvite">
             {{ copied ? "已複製" : "邀請" }}
           </button>
         </div>
+
+        <p v-if="isArchived" class="card tiny archived-banner">
+          這個任務已封存，目前唯讀。到「我的分帳」解除封存後才能繼續記帳。
+        </p>
 
         <div class="tabs">
           <button class="tab" :class="{ active: activeTab === 'expenses' }" @click="activeTab = 'expenses'">支出</button>
@@ -266,7 +285,13 @@ onMounted(load);
         <section v-if="activeTab === 'expenses'" class="stack">
           <LoadingState v-if="expenseState.loading.value" title="讀取支出中" message="正在讀取 Firestore 支出資料。" />
           <template v-else>
-            <RouterLink :to="`/tasks/${taskId}/expenses/new`" class="btn btn-primary btn-block">新增支出</RouterLink>
+            <RouterLink
+              v-if="!isArchived"
+              :to="`/tasks/${taskId}/expenses/new`"
+              class="btn btn-primary btn-block"
+            >
+              新增支出
+            </RouterLink>
 
             <div v-if="mapAvailable && expenseMarkers.length" class="tabs two">
               <button class="tab" :class="{ active: expenseView === 'list' }" @click="expenseView = 'list'">
@@ -349,7 +374,7 @@ onMounted(load);
               :task-name="taskState.task.value.name"
               :default-currency="taskState.task.value.defaultCurrency"
               :current-uid="uid"
-              :is-admin="taskState.isAdmin.value"
+              :is-admin="canWrite"
               :busy="paymentBusy"
               @record="recordPayment"
               @confirm="acceptPayment"
@@ -359,7 +384,7 @@ onMounted(load);
               :settlement="settlement"
               :snapshots="settlementState.snapshots.value"
               :task-name="taskState.task.value.name"
-              :can-manage="taskState.isAdmin.value"
+              :can-manage="canWrite"
               :busy="settlementBusy"
               @save="saveSettlement"
               @remove="removeSettlement"
@@ -372,6 +397,11 @@ onMounted(load);
 </template>
 
 <style scoped>
+.archived-banner {
+  border-left: 3px solid var(--color-muted);
+  color: var(--color-muted);
+}
+
 .tabs.two {
   grid-template-columns: repeat(2, 1fr);
 }

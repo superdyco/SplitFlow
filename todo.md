@@ -228,6 +228,43 @@ Meta 端的設定做到一半後決定不做了。卡點是 Meta 從 2023 年起
   要保證清乾淨一樣得上 Cloud Functions，換來的只是幾 KB 額度。
 - **佇列不跨裝置。** 換手機的話那筆會一直顯示「待上傳」，使用者可以直接移除收據解決。
 
+## 已完成：任務封存與刪除
+
+只有 owner 能操作，兩者都要確認。規格與計畫在 `docs/superpowers/`（2026-08-04）。
+
+- **封存**：任務變唯讀，資料留著可查，隨時可解除。`TaskStatus` 從只有一個值的聯集
+  擴成 `active | archived | deleted`。
+- **刪除**：軟刪除。**Firestore 沒有 cascade delete** —— 真刪掉任務文件會讓底下四個
+  子集合變成永遠的孤兒，所以只把 status 改掉、前端濾除。介面上不做復原。
+- **分級摩擦**：刪除沒有支出的任務按一次確認即可；有支出的要輸入任務名稱，
+  訊息會講出實際的成員數與支出數。摩擦力跟後果成正比，而不是均勻灑。
+- 順手修掉 TaskCard 直接把英文 `active`、`owner` 印給使用者看的問題
+  （`ROLE_LABELS` 早就存在，只是沒被用）。
+
+**唯讀必須在規則層強制，不是藏按鈕。** `taskIsActive()` 掛在 expenses / payments /
+settlements 的寫入上，read 不掛（封存的重點就是留著查）。另外 `updatesTaskAsAdmin`
+本來就讓任何 admin 改任務欄位（含 status），不堵掉那個後門，「只有 owner」就是假的。
+
+**一個容易踩的坑**：`members` 的 create 不能用 `taskIsActive()`。建立任務時任務文件與
+owner 的成員文件在同一個 batch，`get()` 那當下讀不到任務，會把建立任務整個擋掉。
+要用 `taskAfterData()`（`getAfter()`），既有規則早就是這樣寫的。
+
+**⚠️ 規則從未在本機驗證過**：14 個新測試案例寫好了，但 emulator 需要 JDK 21，
+本機是 Java 11，而公司網路連不到 winget 的來源。見下面的 CI 待辦。
+
+## 待辦：用 GitHub Actions 跑規則測試
+
+本機裝不了 JDK 21（公司擋 Microsoft Store，winget 取不到來源），但 GitHub 的 runner
+內建 Java。加一個 workflow 在每次 push 跑 `npm run test:rules`，就能繞過本機限制。
+
+這比裝 JDK 更值得做：規則會一直改，而規則出錯的代價是資料外洩或功能整個壞掉 ——
+那正是最該有自動化把關的地方，不該依賴某一台機器的環境。
+
+## 待辦：確認框統一
+
+`ExpenseFormPage` 的刪除支出仍用 `window.confirm`，跟新的 `ConfirmDialog` 不一致。
+`window.confirm` 在手機上是系統對話框、按鈕位置不受控，容易手滑。
+
 ## 待辦：唯讀的支出詳情頁
 
 規格原本寫「沒權限的成員看得到收據、看不到更換／移除」，但目前**沒有唯讀詳情頁** ——
