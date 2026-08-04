@@ -398,6 +398,8 @@ async function submit() {
       splitMode: splitMode.value,
       splits,
       place: currentPlace(),
+      // 收據的實際處理在後面的 Task，這裡先把欄位補上讓型別完整。
+      receipt: null,
       date: date.value || todayInput()
     };
 

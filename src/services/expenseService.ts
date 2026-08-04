@@ -46,6 +46,7 @@ function normalizeExpense(id: string, data: DocumentData): Expense {
     splitMode: (data.splitMode as Expense["splitMode"] | undefined) ?? "even",
     splits,
     place: (data.place as Expense["place"] | undefined) ?? null,
+    receipt: (data.receipt as Expense["receipt"] | undefined) ?? null,
     date: (data.date as string | undefined) ?? null,
     createdBy: data.createdBy,
     createdAt: data.createdAt,

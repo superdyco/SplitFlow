@@ -135,7 +135,8 @@ service cloud.firestore {
             && data.splitMode in ["even", "custom"]
             && data.splits is map
             && data.splits.size() > 0
-            && validPlace();
+            && validPlace()
+            && validReceipt();
         }
 
         // 地點是選填。有填的話至少要有名稱，座標可以是 null（沒用 Google 搜尋時）。
@@ -147,6 +148,19 @@ service cloud.firestore {
               && place.name is string
               && place.name.size() > 0
               && place.name.size() <= 120
+            );
+        }
+
+        // 收據是選填。有的話兩個欄位都可以是 null（待上傳時 path 是 null，
+        // 傳完之後 localId 是 null），但型別不能亂。
+        // 用 .get() 是因為這個功能之前建立的舊支出沒有這個欄位。
+        function validReceipt() {
+          let receipt = request.resource.data.get("receipt", null);
+          return receipt == null
+            || (
+              receipt is map
+              && (receipt.path == null || receipt.path is string)
+              && (receipt.localId == null || receipt.localId is string)
             );
         }
 
