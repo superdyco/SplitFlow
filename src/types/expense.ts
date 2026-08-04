@@ -38,6 +38,21 @@ export interface ExpensePlace {
   placeId: string | null;
 }
 
+/**
+ * 支出的收據照片。用兩個欄位表達三種狀態，不另外開 status 欄位，
+ * 因為多一個列舉就多一個會跟實際欄位對不上的機會。
+ *
+ *   path=null, localId="xxx"  待上傳（照片還在拍攝者的手機裡）
+ *   path="...", localId=null  已上傳
+ *   receipt 整個是 null        這筆支出沒有收據
+ */
+export interface ExpenseReceipt {
+  /** Storage 物件路徑。等上傳時是 null。 */
+  path: string | null;
+  /** 本機待上傳佇列的 key。上傳成功後設回 null。 */
+  localId: string | null;
+}
+
 export interface Expense {
   id: string;
   title: string;
@@ -58,6 +73,8 @@ export interface Expense {
   splits: Record<string, number>;
   /** 選填，沒填就是 null。 */
   place: ExpensePlace | null;
+  /** 收據照片，選填。這個功能之前建立的舊資料是 null。 */
+  receipt: ExpenseReceipt | null;
   /**
    * 消費實際發生的日期，`"YYYY-MM-DD"`。
    * 用字串不用 Timestamp 是因為日期不該有時區：在曼谷凌晨買的東西，
@@ -81,5 +98,6 @@ export interface ExpenseInput {
   splitMode: SplitMode;
   splits: Record<string, number>;
   place: ExpensePlace | null;
+  receipt: ExpenseReceipt | null;
   date: string;
 }

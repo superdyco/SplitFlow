@@ -162,6 +162,7 @@ function newExpense(overrides = {}) {
     splitMode: "even",
     splits: { [OWNER]: 12500, [MEMBER]: 12500 },
     place: null,
+    receipt: null,
     createdBy: MEMBER,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -181,6 +182,7 @@ function editedExpense(overrides = {}) {
     splitMode: "even",
     splits: { [OWNER]: 3000, [ADMIN]: 3000, [MEMBER]: 3000, [OTHER]: 3000 },
     place: null,
+    receipt: null,
     updatedAt: serverTimestamp(),
     ...overrides
   };
@@ -486,6 +488,48 @@ async function main() {
     await seed();
     const db = as(MEMBER);
     await assertFails(setDoc(doc(db, "tasks", TASK, "expenses", "e2"), newExpense({ splits: {} })));
+  });
+
+  await test("成員可以建立帶收據的支出", async () => {
+    await seed();
+    const db = as(MEMBER);
+    await assertSucceeds(
+      setDoc(
+        doc(db, "tasks", TASK, "expenses", "e2"),
+        newExpense({ receipt: { path: null, localId: "local-1" } })
+      )
+    );
+  });
+
+  await test("收據欄位型別不對要被擋下來", async () => {
+    await seed();
+    const db = as(MEMBER);
+    await assertFails(
+      setDoc(
+        doc(db, "tasks", TASK, "expenses", "e2"),
+        newExpense({ receipt: { path: 123, localId: "local-1" } })
+      )
+    );
+  });
+
+  // 這條特別重要：它證明補傳時那次只寫 receipt 的部分 update 能通過
+  // validExpenseShape()，也就是規則不需要為了補傳而放寬。
+  await test("上傳完成後把 receipt 換成 Storage 路徑，只改這一個欄位也要放行", async () => {
+    await seed();
+    await assertSucceeds(
+      updateDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e1"), {
+        receipt: { path: "tasks/task1/expenses/e1/receipt.jpg", localId: null }
+      })
+    );
+  });
+
+  await test("沒有管理權的成員不能動別人支出的收據", async () => {
+    await seed();
+    await assertFails(
+      updateDoc(doc(as(OTHER), "tasks", TASK, "expenses", "e1"), {
+        receipt: { path: "tasks/task1/expenses/e1/receipt.jpg", localId: null }
+      })
+    );
   });
 
   await test("splitMode 只能是 even 或 custom", async () => {

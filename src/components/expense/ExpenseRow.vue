@@ -58,6 +58,8 @@ const missingRate = computed(
       </strong>
       <p class="tiny">{{ shownDate }} · {{ meta.label }} · {{ paidByName }} 先付 · {{ splitLabel }}</p>
       <p v-if="expense.place" class="tiny place">📍 {{ expense.place.name }}</p>
+      <!-- 只標示有沒有，不放縮圖：一天十筆就是十個網路請求，漫遊網路下會很難看。 -->
+      <p v-if="expense.receipt" class="tiny">📎 有收據</p>
       <button type="button" class="repeat tiny" @click="repeat">再記一筆</button>
     </div>
     <div class="amount">
@@ -76,6 +78,8 @@ const missingRate = computed(
       <strong>{{ expense.title }}</strong>
       <p class="tiny">{{ shownDate }} · {{ meta.label }} · {{ paidByName }} 先付 · {{ splitLabel }}</p>
       <p v-if="expense.place" class="tiny place">📍 {{ expense.place.name }}</p>
+      <!-- 只標示有沒有，不放縮圖：一天十筆就是十個網路請求，漫遊網路下會很難看。 -->
+      <p v-if="expense.receipt" class="tiny">📎 有收據</p>
       <button type="button" class="repeat tiny" @click="repeat">再記一筆</button>
     </div>
     <div class="amount">

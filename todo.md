@@ -188,9 +188,56 @@ Meta 端的設定做到一半後決定不做了。卡點是 Meta 從 2023 年起
 補之前要先確認：表單一律會送 date（`date.value || todayInput()`），
 所以編輯舊支出也不會少這個欄位。
 
+## 已完成：支出收據照片
+
+一筆支出可以附一張收據照片當對帳憑證。純憑證用途，沒有 OCR。
+規格與計畫在 `docs/superpowers/specs/` 與 `docs/superpowers/plans/`（2026-08-04）。
+
+- 照片壓縮到長邊 1600px、JPEG 0.8（約 200–400KB）後存進 IndexedDB 佇列，
+  支出文件先標成待上傳，有網路時背景補傳，成功後回頭改寫 `receipt` 欄位。
+  **這是為了「在餐廳沒訊號時拍的收據」**：Firestore 的寫入會排隊，Storage 的上傳不會。
+- 順手修掉一個既有問題：`await batch.commit()` 要等伺服器確認才 resolve，
+  離線時新增／編輯／刪除支出都會卡在「儲存中...」。改用 `settleWrite` 等 2.5 秒就放行。
+- `firebase/storage` 拆成獨立 chunk，首屏的 firebase chunk 從 gzip 139.96 降到 128.70 kB。
+
+**實作後修掉的四個問題**（都是第一版做完才發現的，記下來免得重蹈）：
+
+- **競態**：`queueReceipt` 原本入列後就 `void flushReceipts()`，線上時會搶在表單
+  自己那次 `updateDoc` 之前完成，把文件寫成已上傳、再被蓋回待上傳，而佇列已空。
+  改成呼叫端在文件寫完後才觸發 flush。
+- **`unsaved` 狀態缺失**：使用者以為選了照片就上傳了。上傳延到按送出才做是對的
+  （新增模式要先有 `expenseId`），但選完就顯示縮圖、看起來跟存好一樣。
+  現在有「未儲存」標籤，並寫出要按哪顆按鈕。
+- **`failed` 狀態算不出來**：型別裡有、卻沒有任何分支回傳它，導致上傳失敗五次
+  之後畫面還顯示「待上傳」，而重試鈕只在 `failed` 時渲染 —— 使用者永久卡死。
+- **錯誤全部靜默**：`useReceipt.error` 沒有被渲染在任何地方；背景上傳的失敗也沒有
+  log。一個靜默失敗的背景上傳器等於無法除錯，這正是當初查不出問題的原因。
+  現在失敗會帶 error code 進 console。
+
+**已知取捨（都是有意識的決定，不是疏漏）：**
+
+- **Storage 規則擋不住非成員。** Storage rules 無法查詢 Firestore，所以寫不出
+  「只有這個任務的成員能看」。防線是路徑裡兩段 20 字元的隨機 ID —— 要拿到 ID
+  得先通過 Firestore 的成員檢查。要做到嚴格得上 Cloud Functions 發簽名 URL。
+- **可能留下孤兒檔案。** 刪支出時盡力刪 Storage，失敗（離線、權限）就留著。
+  要保證清乾淨一樣得上 Cloud Functions，換來的只是幾 KB 額度。
+- **佇列不跨裝置。** 換手機的話那筆會一直顯示「待上傳」，使用者可以直接移除收據解決。
+
+## 待辦：唯讀的支出詳情頁
+
+規格原本寫「沒權限的成員看得到收據、看不到更換／移除」，但目前**沒有唯讀詳情頁** ——
+非管理者連編輯頁都進不去（`load()` 會設 loadError）。所以他們實際只看得到列表上的
+「📎 有收據」，看不到照片本身。
+
+`ReceiptField` 已經留好 `canManage` prop，加了這一頁之後傳 `false` 進去即可，元件不用改。
+
 ## 之後階段功能
 
 - 桌面版專用介面。
+- 包成原生 iOS：評估用 Capacitor 包 WKWebView 殼。最大的一塊是
+  `signInWithPopup` 在 WKWebView 不能用，要換 `@capacitor-firebase/authentication`
+  的原生登入；另外 clipboard、邀請連結的 Universal Links 也要處理。
+  需要 Mac 才能打包（本機是 Windows）。
 
 ## 已放棄：Places nearby
 
@@ -232,7 +279,9 @@ Meta 端的設定做到一半後決定不做了。卡點是 Meta 從 2023 年起
 - 第一版把 firebase 依 firestore / auth / core 三分，造成循環相依，
   正式站噴 `Cannot access 'li' before initialization`。原因是 umbrella 的
   `firebase/auth` 只是 re-export，實作在 `@firebase/auth`，被分到了不同 chunk。
-  Firebase 現在整包放同一個 chunk。
+- 後來加收據功能時修正了上一條的結論：不能拆的是「**同一個產品**的 umbrella 與實作」，
+  不是「firebase 整包」。`firebase/storage` 連同 `@firebase/storage` 一起搬到獨立
+  chunk 是單向依賴、不會成環，首屏因此少了 gzip 11 kB。
 - `scripts/check-chunks.mjs` 在每次 build 最後檢查 chunk 循環相依，防止重蹈覆轍。
   這種錯誤 build 不會報、dev server 也正常，只有正式站會壞。
 
