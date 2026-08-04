@@ -203,6 +203,7 @@ function newExpense(overrides = {}) {
     splits: { [OWNER]: 12500, [MEMBER]: 12500 },
     place: null,
     receipt: null,
+    note: "",
     createdBy: MEMBER,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -223,6 +224,7 @@ function editedExpense(overrides = {}) {
     splits: { [OWNER]: 3000, [ADMIN]: 3000, [MEMBER]: 3000, [OTHER]: 3000 },
     place: null,
     receipt: null,
+    note: "",
     updatedAt: serverTimestamp(),
     ...overrides
   };
@@ -684,6 +686,44 @@ async function main() {
     await seed();
     const db = as(MEMBER);
     await assertFails(setDoc(doc(db, "tasks", TASK, "expenses", "e2"), newExpense({ splits: {} })));
+  });
+
+  await test("備註可以留空", async () => {
+    await seed();
+    await assertSucceeds(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e2"), newExpense({ note: "" }))
+    );
+  });
+
+  await test("備註可以寫 500 字", async () => {
+    await seed();
+    await assertSucceeds(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e2"), newExpense({ note: "備".repeat(500) }))
+    );
+  });
+
+  await test("備註超過 500 字要被擋", async () => {
+    await seed();
+    await assertFails(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e2"), newExpense({ note: "備".repeat(501) }))
+    );
+  });
+
+  await test("備註不是字串要被擋", async () => {
+    await seed();
+    await assertFails(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e2"), newExpense({ note: 123 }))
+    );
+  });
+
+  // 這個功能之前的支出沒有 note 欄位，validNote 用 .get() 就是為了它們。
+  await test("沒有 note 欄位的舊格式支出仍然編輯得動", async () => {
+    await seed();
+    const withoutNote = editedExpense();
+    delete withoutNote.note;
+    await assertSucceeds(
+      updateDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "legacy"), withoutNote)
+    );
   });
 
   await test("成員可以建立帶收據的支出", async () => {

@@ -76,6 +76,13 @@ export interface Expense {
   /** 收據照片，選填。這個功能之前建立的舊資料是 null。 */
   receipt: ExpenseReceipt | null;
   /**
+   * 這筆支出的補充說明，最多 500 字。空字串代表沒有備註。
+   *
+   * 用空字串而不是 null：place 與 receipt 是物件，「沒有」只能用 null 表達；
+   * 純字串的空值就是空字串，模板也不用寫 `note ?? ""`。
+   */
+  note: string;
+  /**
    * 消費實際發生的日期，`"YYYY-MM-DD"`。
    * 用字串不用 Timestamp 是因為日期不該有時區：在曼谷凌晨買的東西，
    * 存成 Timestamp 之後換個時區看會變成前一天。
@@ -99,5 +106,6 @@ export interface ExpenseInput {
   splits: Record<string, number>;
   place: ExpensePlace | null;
   receipt: ExpenseReceipt | null;
+  note: string;
   date: string;
 }
