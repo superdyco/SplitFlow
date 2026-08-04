@@ -634,6 +634,21 @@ onMounted(load);
           />
 
           <label class="field">
+            <span class="label">備註（選填）</span>
+            <!--
+              maxlength 擋在輸入端，所以根本產不出不合法的值，
+              不需要再多一個錯誤訊息。比照支出名稱的 maxlength="60"。
+            -->
+            <textarea
+              v-model="note"
+              class="input note-input"
+              maxlength="500"
+              rows="3"
+              placeholder="例如：含小費、阿明先付現金、發票在小美那"
+            ></textarea>
+          </label>
+
+          <label class="field">
             <span class="label">誰先付</span>
             <select v-model="paidBy" class="select">
               <option v-for="member in selectableMembers" :key="member.uid" :value="member.uid">
@@ -754,6 +769,21 @@ onMounted(load);
 .currency {
   flex: none;
   width: 110px;
+}
+
+/*
+  .input 是為單行輸入設計的（padding 上下是 0、固定 min-height），
+  textarea 要自己補上下內距與行高，不然文字會貼著上緣。
+  font-family: inherit 也是必要的 —— textarea 預設是等寬字體，
+  不加的話它會跟表單其他欄位長得不一樣。
+*/
+.note-input {
+  min-height: 0;
+  padding: 12px 14px;
+  line-height: 1.6;
+  font-weight: 600;
+  font-family: inherit;
+  resize: vertical;
 }
 
 .row {
