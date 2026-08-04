@@ -21,13 +21,18 @@ import {
   setReportActive,
   updateReport
 } from "@/services/reportService";
-import { fetchStaticMap, reportMapPath } from "@/services/staticMap";
+import { fetchStaticMap, MAX_MAP_BYTES, reportMapPath } from "@/services/staticMap";
 
 export function useTripReport(taskId: string) {
   const report = ref<TripReport | null>(null);
   const loading = ref(false);
   const busy = ref(false);
   const error = ref<string | null>(null);
+  /**
+   * 報告產出來了、但地圖沒做出來的原因。跟 error 分開：報告是成功的，
+   * 混在一起會讓人以為整份報告失敗了。
+   */
+  const mapWarning = ref<string | null>(null);
 
   const shareUrl = computed(() =>
     report.value ? `${window.location.origin}/r/${taskId}/${report.value.id}` : ""
@@ -45,22 +50,32 @@ export function useTripReport(taskId: string) {
     }
   }
 
-  /** 地圖失敗一律回傳 null —— 呼叫端把它當成「這份報告沒有地圖」。 */
-  async function uploadMap(reportId: string, blob: Blob): Promise<string | null> {
+  /** 地圖失敗不擋報告，但要講得出原因 —— 回傳 path 或說明。 */
+  async function uploadMap(
+    reportId: string,
+    blob: Blob
+  ): Promise<{ path: string | null; reason: string | null }> {
+    // 先自己擋一次，錯誤訊息才看得懂。交給規則擋的話只會拿到 unauthorized。
+    if (blob.size > MAX_MAP_BYTES) {
+      const kb = Math.round(blob.size / 1024);
+      return { path: null, reason: `地圖圖檔 ${kb} KB，超過 Storage 規則的 1 MB 上限。` };
+    }
+
     try {
       const { getStorage, ref: storageRef, uploadBytes } = await import("firebase/storage");
       const { app } = await import("@/firebase/config");
       const path = reportMapPath(taskId, reportId);
       await uploadBytes(storageRef(getStorage(app), path), blob, { contentType: "image/png" });
-      return path;
-    } catch {
-      return null;
+      return { path, reason: null };
+    } catch (err) {
+      return { path: null, reason: `地圖上傳失敗：${firebaseErrorMessage(err)}` };
     }
   }
 
   async function generate(task: Task, expenses: Expense[]) {
     busy.value = true;
     error.value = null;
+    mapWarning.value = null;
     try {
       // 沿用既有 id，連結才不會變。已經傳出去的網址得繼續有效。
       const existing = report.value;
@@ -75,8 +90,11 @@ export function useTripReport(taskId: string) {
         endDate: task.endDate
       });
 
-      const blob = await fetchStaticMap(places);
-      const mapPath = blob ? await uploadMap(reportId, blob) : null;
+      const map = await fetchStaticMap(places);
+      const uploaded = map.blob
+        ? await uploadMap(reportId, map.blob)
+        : { path: null, reason: map.reason };
+      mapWarning.value = uploaded.reason;
 
       // 既有的用 update 才不會把第一次產生的 createdAt 洗掉。
       const write = existing ? updateReport : createReport;
@@ -93,7 +111,7 @@ export function useTripReport(taskId: string) {
           perPerson: summary.perPerson,
           categories: categoryTotals(expenses, currency),
           places,
-          mapPath,
+          mapPath: uploaded.path,
           active: true
         })
       );
@@ -120,5 +138,5 @@ export function useTripReport(taskId: string) {
     }
   }
 
-  return { report, loading, busy, error, shareUrl, load, generate, setActive };
+  return { report, loading, busy, error, mapWarning, shareUrl, load, generate, setActive };
 }

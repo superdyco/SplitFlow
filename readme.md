@@ -70,9 +70,15 @@ VITE_GOOGLE_MAPS_API_KEY=
 | 變數 | 用途 | 沒設會怎樣 |
 |---|---|---|
 | `VITE_GOOGLE_PLACES_API_KEY` | Places API (New)，地點搜尋 | 地點欄位退回純文字輸入 |
-| `VITE_GOOGLE_MAPS_API_KEY` | Maps JavaScript API，地圖顯示 | 不顯示地圖，其餘不受影響 |
+| `VITE_GOOGLE_MAPS_API_KEY` | Maps JavaScript API + Maps Static API，地圖顯示 | 不顯示地圖，其餘不受影響 |
 
 只設 `VITE_GOOGLE_MAPS_API_KEY` 一把也能動，地點搜尋會沿用它。
+
+地圖那把要**開通兩個 API**，它們在 Google Cloud 是分開的：`Maps JavaScript API`
+給支出頁的互動地圖，`Maps Static API` 給公開報告裡那張圖。只開一個的話，
+另一邊會變成「沒有地圖」—— 這個失敗以前是無聲的，現在產生報告時會把
+Google 的錯誤原文顯示出來。金鑰的「API 限制」清單也要同時勾這兩個，
+啟用（activation）跟限制（restriction）是兩件事，少任何一邊都會被擋。
 
 兩把都會被打包進前端原始碼，**一定要在 Google Cloud Console 設 HTTP referrer 限制**
 （只允許 localhost 與正式網域）並各自只啟用需要的 API。Firebase 的 Web API key 靠
@@ -185,6 +191,12 @@ Maps JavaScript API 用 `src/services/mapsLoader.ts` **動態插 script 標籤�
 兩個地方會用到：支出表單選完有座標的地點後出現預覽小地圖，以及支出頁籤的
 「清單 / 地圖」切換，把整趟旅行有座標的支出標在同一張圖上並自動框住全部標記。
 純文字地點沒有座標，不會出現在地圖上。
+
+公開報告裡的地圖走另一條路：`src/services/staticMap.ts` 在**產生報告時**呼叫
+Maps Static API 一次，把 PNG 存進 Storage，之後不管連結被轉傳幾次都是 0 次
+API 呼叫，公開頁面也完全不帶金鑰。代價是不能縮放拖曳。地圖失敗不擋報告，
+但會把原因顯示給產生報告的人 —— 這些失敗全都長得一樣（沒有地圖），
+不講原因就沒辦法查。
 
 ### 分攤
 

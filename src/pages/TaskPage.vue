@@ -345,6 +345,13 @@ onMounted(load);
           </button>
 
           <p v-if="reportState.error.value" class="tiny warn">{{ reportState.error.value }}</p>
+          <!--
+            報告是成功的，只是沒有地圖 —— 用 muted 而不是 warn，
+            不然看起來像整份報告失敗了。
+          -->
+          <p v-if="reportState.mapWarning.value" class="tiny">
+            報告已產生，但沒有地圖：{{ reportState.mapWarning.value }}
+          </p>
         </section>
 
         <div class="tabs">
