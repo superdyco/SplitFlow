@@ -11,6 +11,7 @@ const TaskPage = () => import("@/pages/TaskPage.vue");
 const ExpenseFormPage = () => import("@/pages/ExpenseFormPage.vue");
 const JoinTaskPage = () => import("@/pages/JoinTaskPage.vue");
 const ProfilePage = () => import("@/pages/ProfilePage.vue");
+const ReportPage = () => import("@/pages/ReportPage.vue");
 
 function waitForAuth(authStore: ReturnType<typeof useAuthStore>) {
   if (authStore.initialized) return Promise.resolve();
@@ -46,6 +47,8 @@ export const router = createRouter({
     { path: "/tasks/:taskId/expenses/new", component: ExpenseFormPage, meta: { requiresAuth: true, requiresProfile: true, requiresTaskMember: true } },
     { path: "/tasks/:taskId/expenses/:expenseId/edit", component: ExpenseFormPage, meta: { requiresAuth: true, requiresProfile: true, requiresTaskMember: true } },
     { path: "/join/:inviteCode", component: JoinTaskPage, meta: { public: true } },
+    // 公開的旅費報告：不需要帳號，守衛在 `if (!user) return true` 就放行了。
+    { path: "/r/:taskId/:reportId", component: ReportPage, meta: { public: true } },
     { path: "/profile", component: ProfilePage, meta: { requiresAuth: true, requiresProfile: true } }
   ]
 });

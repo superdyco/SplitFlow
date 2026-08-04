@@ -22,6 +22,20 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
+    // 旅費報告的地圖。這是整份規則裡唯一公開讀取的路徑 ——
+    // 報告連結任何人都能開，看的人沒有登入，所以圖必須讀得到。
+    match /tasks/{taskId}/reports/{reportId}/map.png {
+      allow read: if true;
+
+      // 跟收據一樣的限制：Storage 規則查不到 Firestore，所以擋不住
+      // 「任何登入者往別人的報告路徑寫圖」。防線是路徑裡兩段隨機 ID。
+      allow create, update: if request.auth != null
+        && request.resource.size <= 1 * 1024 * 1024
+        && request.resource.contentType == 'image/png';
+
+      allow delete: if false;
+    }
+
     // 其他路徑一律不開。
     match /{allPaths=**} {
       allow read, write: if false;

@@ -24,6 +24,7 @@ import { useExpenses } from "@/composables/useExpenses";
 import { usePayments } from "@/composables/usePayments";
 import { useTask } from "@/composables/useTask";
 import { useTaskMembers } from "@/composables/useTaskMembers";
+import { useTripReport } from "@/composables/useTripReport";
 import { removeMember, setMemberRole } from "@/services/memberService";
 import { confirmPayment, createPayment, deletePayment } from "@/services/paymentService";
 import { buildInviteUrl, firebaseErrorMessage } from "@/utils/firestore";
@@ -57,6 +58,26 @@ const isArchived = computed(() => taskState.task.value?.status === "archived");
 const isDeleted = computed(() => taskState.task.value?.status === "deleted");
 /** 有管理權而且任務還能寫。所有寫入入口都看這個，不要各自拼條件。 */
 const canWrite = computed(() => taskState.isAdmin.value && !isArchived.value);
+
+const reportState = useTripReport(taskId.value);
+const reportCopied = ref(false);
+
+/** 沒有支出就沒有東西可報告。 */
+const canGenerateReport = computed(
+  () => isArchived.value && taskState.isOwner.value && expenseState.expenses.value.length > 0
+);
+
+async function copyShareUrl() {
+  await navigator.clipboard.writeText(reportState.shareUrl.value);
+  reportCopied.value = true;
+  window.setTimeout(() => (reportCopied.value = false), 1500);
+}
+
+function generateReport() {
+  const task = taskState.task.value;
+  if (!task) return;
+  return reportState.generate(task, expenseState.expenses.value);
+}
 
 const memberNames = computed(() =>
   Object.fromEntries(memberState.members.value.map(member => [member.uid, member.nickname]))
@@ -138,7 +159,8 @@ async function load() {
     memberState.load(),
     expenseState.load(),
     paymentState.load(),
-    settlementState.load()
+    settlementState.load(),
+    reportState.load()
   ]);
 }
 
@@ -274,6 +296,57 @@ onMounted(load);
           這個任務已封存，目前唯讀。到「我的分帳」解除封存後才能繼續記帳。
         </p>
 
+        <section v-if="isArchived && taskState.isOwner.value" class="card stack">
+          <strong class="section-title">分享這趟旅程</strong>
+          <p class="tiny">
+            產生一份公開報告，讓沒去的人知道這樣玩一趟大概要花多少錢。
+            只會顯示總花費、每人平均、分類與去過的地點 ——
+            <strong>不會有任何人名、支出名稱或誰欠誰</strong>。
+          </p>
+
+          <p v-if="!expenseState.expenses.value.length" class="tiny warn">
+            這個任務還沒有支出，沒有東西可以報告。
+          </p>
+
+          <template v-else-if="reportState.report.value">
+            <p class="tiny warn">
+              這個連結任何人都打開得了，不需要帳號。傳出去之前想清楚要給誰。
+            </p>
+            <div class="row">
+              <input :value="reportState.shareUrl.value" class="input grow" readonly />
+              <button class="btn btn-sm" @click="copyShareUrl">
+                {{ reportCopied ? "已複製" : "複製" }}
+              </button>
+            </div>
+            <p v-if="!reportState.report.value.active" class="tiny warn">
+              目前已關閉，連結打不開。
+            </p>
+            <div class="row">
+              <button class="btn btn-sm" :disabled="reportState.busy.value" @click="generateReport">
+                重新產生
+              </button>
+              <button
+                class="btn btn-sm"
+                :disabled="reportState.busy.value"
+                @click="reportState.setActive(!reportState.report.value.active)"
+              >
+                {{ reportState.report.value.active ? "關閉連結" : "重新開啟" }}
+              </button>
+            </div>
+          </template>
+
+          <button
+            v-else
+            class="btn btn-primary btn-block"
+            :disabled="!canGenerateReport || reportState.busy.value"
+            @click="generateReport"
+          >
+            {{ reportState.busy.value ? "產生中..." : "產生分享報告" }}
+          </button>
+
+          <p v-if="reportState.error.value" class="tiny warn">{{ reportState.error.value }}</p>
+        </section>
+
         <div class="tabs">
           <button class="tab" :class="{ active: activeTab === 'expenses' }" @click="activeTab = 'expenses'">支出</button>
           <button class="tab" :class="{ active: activeTab === 'members' }" @click="activeTab = 'members'">成員</button>
@@ -400,6 +473,16 @@ onMounted(load);
 .archived-banner {
   border-left: 3px solid var(--color-muted);
   color: var(--color-muted);
+}
+
+/* 分享連結的輸入框要吃掉剩餘寬度，複製鈕才不會被擠掉。 */
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.warn {
+  color: var(--color-danger);
 }
 
 .tabs.two {
