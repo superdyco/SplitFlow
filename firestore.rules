@@ -58,11 +58,30 @@ service cloud.firestore {
     }
 
     // admin 可以改任務，但不能奪走 owner 身分，也不能把 owner 踢出任務。
+    // 最後一條擋住封存與刪除：那是 owner 專屬，走 changesStatusAsOwner。
+    // 少了它，admin 從這條路一樣改得到 status，「只有 owner」就是假的。
     function updatesTaskAsAdmin(taskId) {
       return isTaskAdmin(taskId)
         && request.resource.data.ownerId == resource.data.ownerId
         && resource.data.ownerId in request.resource.data.memberIds
-        && resource.data.ownerId in request.resource.data.adminIds;
+        && resource.data.ownerId in request.resource.data.adminIds
+        && request.resource.data.status == resource.data.status;
+    }
+
+    // 只有 owner 能封存、解除封存、刪除，而且這次寫入只能動 status。
+    // 沒有 hasOnly 的話，owner 可以藉著改狀態的名義順便改掉別的欄位。
+    function changesStatusAsOwner() {
+      let changed = request.resource.data.diff(resource.data).changedKeys();
+      return signedIn()
+        && resource.data.ownerId == request.auth.uid
+        && changed.hasOnly(["status", "updatedAt"])
+        && request.resource.data.status in ["active", "archived", "deleted"];
+    }
+
+    // 封存的任務唯讀。這個 get 不會多花錢 —— isTaskMember 已經讀過同一份文件，
+    // Firestore 規則在同一次評估內會快取 get()。
+    function taskIsActive(taskId) {
+      return taskData(taskId).status == "active";
     }
 
     match /users/{uid} {
@@ -78,9 +97,11 @@ service cloud.firestore {
     match /tasks/{taskId} {
       allow create: if createsOwnTask();
       allow read: if isCurrentTaskMember();
+      // changesStatusAsOwner 刻意不加 taskIsActive —— 加了就解除不了封存。
       allow update: if updatesTaskAsAdmin(taskId)
         || updatesSelfMembershipOnly()
-        || updatesExpenseCountOnly();
+        || (updatesExpenseCountOnly() && taskIsActive(taskId))
+        || changesStatusAsOwner();
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
 
       match /members/{uid} {
@@ -105,7 +126,11 @@ service cloud.firestore {
 
         allow get: if isSelf(uid) || isTaskMember(taskId);
         allow list: if isTaskMember(taskId);
+        // 用 after 狀態而不是 taskIsActive：建立任務時，任務文件與 owner 的成員
+        // 文件在同一個 batch 裡，那當下 get() 讀不到任務，會把建立任務整個擋掉。
+        // 封存的任務其 after 狀態仍是 archived，所以照樣擋得住新成員加入。
         allow create: if isSelf(uid)
+          && taskAfterData(taskId).status == "active"
           && uid in taskAfterData(taskId).memberIds
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.active == true
@@ -188,17 +213,20 @@ service cloud.firestore {
             || resource.data.paidBy == request.auth.uid;
         }
 
+        // 讀取不受封存影響 —— 封存的重點就是留著查。寫入才擋。
         allow get, list: if isTaskMember(taskId);
         allow create: if isTaskMember(taskId)
+          && taskIsActive(taskId)
           && request.resource.data.createdBy == request.auth.uid
           && validExpenseShape()
           && validNewParticipants();
         allow update: if isTaskMember(taskId)
+          && taskIsActive(taskId)
           && canManageExpense()
           && request.resource.data.createdBy == resource.data.createdBy
           && validExpenseShape()
           && validEditedParticipants();
-        allow delete: if isTaskMember(taskId) && canManageExpense();
+        allow delete: if isTaskMember(taskId) && taskIsActive(taskId) && canManageExpense();
       }
 
       match /payments/{paymentId} {
@@ -223,6 +251,7 @@ service cloud.firestore {
         // 只能記錄跟自己有關的付款；只有收款人（或 admin）能一開始就記成已確認，
         // 因為只有收款的人能證明錢真的到了。
         allow create: if isTaskMember(taskId)
+          && taskIsActive(taskId)
           && request.resource.data.createdBy == request.auth.uid
           && validPayment()
           && (isParty() || isTaskAdmin(taskId))
@@ -234,12 +263,14 @@ service cloud.firestore {
 
         // 確認收到：只有收款人或 admin，而且只能 pending 變 confirmed。
         allow update: if isTaskMember(taskId)
+          && taskIsActive(taskId)
           && (request.auth.uid == resource.data.to || isTaskAdmin(taskId))
           && resource.data.status == "pending"
           && request.resource.data.status == "confirmed"
           && request.resource.data.diff(resource.data).changedKeys().hasOnly(["status", "confirmedAt", "updatedAt"]);
 
         allow delete: if isTaskMember(taskId)
+          && taskIsActive(taskId)
           && (
             request.auth.uid == resource.data.from
             || request.auth.uid == resource.data.to
@@ -268,10 +299,11 @@ service cloud.firestore {
 
         // 結算快照是歷史紀錄，存下來就不能改，只能由 owner/admin 整份刪掉。
         allow create: if isTaskAdmin(taskId)
+          && taskIsActive(taskId)
           && request.resource.data.createdBy == request.auth.uid
           && validSnapshot();
         allow update: if false;
-        allow delete: if isTaskAdmin(taskId);
+        allow delete: if isTaskAdmin(taskId) && taskIsActive(taskId);
       }
     }
 

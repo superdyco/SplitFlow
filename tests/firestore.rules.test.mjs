@@ -137,6 +137,13 @@ async function seed() {
   });
 }
 
+/** 直接改資料庫做出「已封存」的狀態，不經過 rules。 */
+async function archiveTask() {
+  await testEnv.withSecurityRulesDisabled(async ctx => {
+    await updateDoc(doc(ctx.firestore(), "tasks", TASK), { status: "archived" });
+  });
+}
+
 /** 直接改資料庫做出「已被移除」的狀態，不經過 rules。 */
 async function removeFromTask(uid) {
   await testEnv.withSecurityRulesDisabled(async ctx => {
@@ -263,6 +270,98 @@ async function main() {
   await test("admin 不能把 ownerId 換成自己", async () => {
     await seed();
     await assertFails(updateDoc(doc(as(ADMIN), "tasks", TASK), { ownerId: ADMIN }));
+  });
+
+  await test("owner 可以封存任務", async () => {
+    await seed();
+    await assertSucceeds(updateDoc(doc(as(OWNER), "tasks", TASK), { status: "archived" }));
+  });
+
+  await test("owner 可以解除封存", async () => {
+    await seed();
+    await archiveTask();
+    await assertSucceeds(updateDoc(doc(as(OWNER), "tasks", TASK), { status: "active" }));
+  });
+
+  await test("owner 可以刪除（軟刪除）", async () => {
+    await seed();
+    await assertSucceeds(updateDoc(doc(as(OWNER), "tasks", TASK), { status: "deleted" }));
+  });
+
+  // 這條最重要：updatesTaskAsAdmin 本來就讓 admin 改得動任務欄位，
+  // 不堵住那個後門的話「只有 owner」就是假的。
+  await test("admin 不能封存或刪除任務 —— 那是 owner 專屬", async () => {
+    await seed();
+    await assertFails(updateDoc(doc(as(ADMIN), "tasks", TASK), { status: "archived" }));
+    await assertFails(updateDoc(doc(as(ADMIN), "tasks", TASK), { status: "deleted" }));
+  });
+
+  await test("一般成員不能改任務狀態", async () => {
+    await seed();
+    await assertFails(updateDoc(doc(as(MEMBER), "tasks", TASK), { status: "archived" }));
+  });
+
+  await test("改狀態時不能順便改別的欄位", async () => {
+    await seed();
+    await assertFails(
+      updateDoc(doc(as(OWNER), "tasks", TASK), { status: "archived", name: "偷改" })
+    );
+  });
+
+  await test("狀態只能是那三個值", async () => {
+    await seed();
+    await assertFails(updateDoc(doc(as(OWNER), "tasks", TASK), { status: "zombie" }));
+  });
+
+  await test("封存後不能新增支出 —— 唯讀要在規則層擋住，不是只藏按鈕", async () => {
+    await seed();
+    await archiveTask();
+    await assertFails(setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e2"), newExpense()));
+  });
+
+  await test("封存後不能修改既有支出", async () => {
+    await seed();
+    await archiveTask();
+    await assertFails(updateDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e1"), editedExpense()));
+  });
+
+  await test("封存後不能刪除支出", async () => {
+    await seed();
+    await archiveTask();
+    await assertFails(deleteDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e1")));
+  });
+
+  await test("封存後仍然看得到支出 —— 封存的重點就是留著查", async () => {
+    await seed();
+    await archiveTask();
+    await assertSucceeds(getDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e1")));
+  });
+
+  await test("封存後不能單獨改 expenseCount", async () => {
+    await seed();
+    await archiveTask();
+    await assertFails(updateDoc(doc(as(MEMBER), "tasks", TASK), { expenseCount: increment(1) }));
+  });
+
+  await test("封存後不能有人加入這個任務", async () => {
+    await seed();
+    await archiveTask();
+    await assertFails(
+      setDoc(doc(as(OUTSIDER), "tasks", TASK, "members", OUTSIDER), {
+        uid: OUTSIDER,
+        nickname: OUTSIDER,
+        role: "member",
+        joinedAt: serverTimestamp(),
+        active: true
+      })
+    );
+  });
+
+  await test("解除封存之後又可以記帳了", async () => {
+    await seed();
+    await archiveTask();
+    await assertSucceeds(updateDoc(doc(as(OWNER), "tasks", TASK), { status: "active" }));
+    await assertSucceeds(setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e2"), newExpense()));
   });
 
   await test("admin 不能把 owner 踢出 memberIds", async () => {
