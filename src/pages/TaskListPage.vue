@@ -116,6 +116,11 @@ onMounted(load);
         <RouterLink to="/tasks/new" class="btn btn-primary">＋ 建立</RouterLink>
       </div>
 
+      <p class="tiny intro">
+        專為出國旅行設計：多幣別記帳，匯率在當下就鎖住，事後波動不影響帳目。沒訊號也能記，
+        連上網自動同步。收據可拍照存證。結算時自動算出最少的轉帳次數。
+      </p>
+
       <LoadingState v-if="loading" title="讀取任務中" message="正在從 Firestore 取得你的任務。" />
       <ErrorState v-else :message="error" retryable :retrying="loading" @retry="load" />
 
@@ -127,39 +132,31 @@ onMounted(load);
         <RouterLink to="/tasks/new" class="btn btn-primary" style="margin-top: 16px">建立分帳任務</RouterLink>
       </EmptyState>
 
-      <section v-if="!loading && !error && rows.length" class="card stack cost-card">
-        <div class="spread">
-          <div>
-            <strong class="section-title">我的花費</strong>
-            <p class="tiny">你實際分攤的金額，先付出去的錢會被還，不算在內。</p>
+      <template v-if="!loading && !error && rows.length">
+        <button
+          v-if="!costsLoaded"
+          class="btn btn-block"
+          :disabled="costsLoading"
+          @click="loadCosts"
+        >
+          {{ costsLoading ? "計算中..." : "計算我的花費" }}
+        </button>
+
+        <div v-else class="spread totals-row">
+          <div class="totals">
+            <div v-for="item in totals" :key="item.currency" class="total">
+              <span class="tiny">{{ item.currency }}</span>
+              <strong class="figure">{{ formatAmount(item.amount, item.currency) }}</strong>
+            </div>
+            <p v-if="!totals.length" class="tiny">目前還沒有算得出金額的支出。</p>
           </div>
-          <button
-            v-if="!costsLoaded"
-            class="btn btn-sm"
-            :disabled="costsLoading"
-            @click="loadCosts"
-          >
-            {{ costsLoading ? "計算中..." : "計算" }}
-          </button>
-          <button v-else class="btn btn-ghost btn-sm" :disabled="costsLoading" @click="loadCosts">
-            重新整理
+          <button class="link" :disabled="costsLoading" @click="loadCosts">
+            {{ costsLoading ? "計算中..." : "重新計算" }}
           </button>
         </div>
 
         <p v-if="costsError" class="tiny warn">{{ costsError }}</p>
-
-        <div v-else-if="costsLoaded" class="totals">
-          <div v-for="item in totals" :key="item.currency" class="total">
-            <span class="tiny">{{ item.currency }}</span>
-            <strong class="figure">{{ formatAmount(item.amount, item.currency) }}</strong>
-          </div>
-          <p v-if="!totals.length" class="tiny">目前還沒有算得出金額的支出。</p>
-        </div>
-
-        <p v-else class="tiny">
-          需要把每趟旅程的支出都讀下來才算得出來，所以不會自動計算。
-        </p>
-      </section>
+      </template>
 
       <div v-if="!loading && rows.length" class="stack">
         <TaskCard
@@ -175,14 +172,33 @@ onMounted(load);
 </template>
 
 <style scoped>
-.cost-card {
-  box-shadow: none;
+.intro {
+  margin: -4px 0 0;
+  line-height: 1.7;
+}
+
+.totals-row {
+  align-items: flex-end;
 }
 
 .totals {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 24px;
+}
+
+.link {
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.link:disabled {
+  color: var(--color-muted);
 }
 
 .total {
