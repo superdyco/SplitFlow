@@ -36,6 +36,7 @@ import { expenseDate, todayInput } from "@/utils/expenseDate";
 import { repeatFieldsOf } from "@/utils/repeatExpense";
 import { settleWrite } from "@/utils/offlineWrite";
 import ReceiptField from "@/components/expense/ReceiptField.vue";
+import ReceiptViewer from "@/components/expense/ReceiptViewer.vue";
 import { useReceipt } from "@/composables/useReceipt";
 import { deleteReceipt, flushReceipts } from "@/services/receiptService";
 import { removeQueued } from "@/services/receiptQueue";
@@ -708,6 +709,12 @@ onMounted(load);
         </button>
         <button class="btn btn-block" @click="router.push(`/tasks/${taskId}`)">取消</button>
       </template>
+
+      <ReceiptViewer
+        :url="receiptState.previewUrl.value"
+        :open="viewerOpen"
+        @close="viewerOpen = false"
+      />
     </div>
   </AppLayout>
 </template>
