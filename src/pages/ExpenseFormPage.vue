@@ -17,8 +17,11 @@ import {
   getPlaceDetails,
   newSessionToken,
   placesEnabled,
+  recallPlaceBias,
+  rememberPlaceBias,
   type PlaceSuggestion
 } from "@/services/placeService";
+import { biasFromPlaces, type LatLng } from "@/utils/placeBias";
 import { mapsEnabled } from "@/services/mapsLoader";
 import PlaceMap from "@/components/map/PlaceMap.vue";
 import {
@@ -99,6 +102,11 @@ const suggestions = ref<PlaceSuggestion[]>([]);
 const placeLoading = ref(false);
 const placeError = ref<string | null>(null);
 const placeSearchable = placesEnabled();
+/**
+ * 搜尋的位置偏好。沒有它的話「星巴克」會回傳全世界的分店 ——
+ * 人在曼谷卻搜到台北那間。第一筆支出還沒有參考點，就退回原本的全球搜尋。
+ */
+const placeBias = ref<LatLng | null>(recallPlaceBias(taskId));
 const mapAvailable = mapsEnabled();
 let placeSession = newSessionToken();
 let placeTimer: number | undefined;
@@ -217,7 +225,7 @@ async function searchPlaces() {
   placeLoading.value = true;
   placeError.value = null;
   try {
-    suggestions.value = await autocompletePlaces(placeQuery.value, placeSession);
+    suggestions.value = await autocompletePlaces(placeQuery.value, placeSession, placeBias.value);
   } catch (err) {
     suggestions.value = [];
     placeError.value = err instanceof Error ? err.message : String(err);
@@ -234,6 +242,9 @@ async function pickPlace(suggestion: PlaceSuggestion) {
     selectedPlace.value = detail;
     placeQuery.value = detail.name;
     suggestions.value = [];
+    // 這個任務接下來的搜尋就以這裡為中心。選到沒有座標的地點時保留原本的偏好。
+    rememberPlaceBias(taskId, detail);
+    placeBias.value = biasFromPlaces([detail]) ?? placeBias.value;
     // 一次 autocomplete + details 算一個 session，選完就換新的。
     placeSession = newSessionToken();
   } catch (err) {
@@ -346,6 +357,8 @@ async function load() {
     );
     selectedPlace.value = expense.place;
     placeQuery.value = expense.place?.name ?? "";
+    // 編輯這筆支出時，它自己的座標比 localStorage 裡那個更能代表要找的區域。
+    placeBias.value = biasFromPlaces([expense.place]) ?? placeBias.value;
     // 舊支出沒存日期，帶出 createdAt 換算的那天當預設，存回去就補上了。
     date.value = expenseDate(expense);
     await receiptState.loadExisting(expense.receipt);
