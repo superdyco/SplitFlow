@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   allocate,
+  amountInputError,
   amountToInput,
   convertAmount,
   formatAmount,
+  rateInputError,
   minorUnits,
   parseAmountInput,
   parseRateInput
@@ -139,5 +141,49 @@ describe("convertAmount", () => {
 
   it("四捨五入到最小單位", () => {
     expect(convertAmount(100, "THB", "TWD", 0.925)).toBe(93);
+  });
+});
+
+describe("amountInputError", () => {
+  it("合法的金額沒有錯誤", () => {
+    expect(amountInputError("450.50", "THB")).toBeNull();
+    expect(amountInputError("450", "VND")).toBeNull();
+  });
+
+  it("空白不算錯 —— 還沒填不該在畫面上跳紅字", () => {
+    expect(amountInputError("", "THB")).toBeNull();
+    expect(amountInputError("   ", "THB")).toBeNull();
+  });
+
+  // 這就是「編輯支出換幣別後儲存鍵變灰」的根因：
+  // 既有的 "450.50" 在 THB 合法，換成 0 位小數的 VND 就不合法了，
+  // 而原本的程式把錯誤吞掉，使用者只看到按鈕變灰、沒有任何說明。
+  it("換成不用小數的幣別時，帶小數的金額要講出原因", () => {
+    expect(amountInputError("450.50", "VND")).toBe("VND 金額只能是整數");
+  });
+
+  it("小數位超過上限也要講出原因", () => {
+    expect(amountInputError("450.567", "THB")).toBe("金額只能是數字，最多 2 位小數");
+  });
+
+  it("零與負數要擋", () => {
+    expect(amountInputError("0", "TWD")).toBe("金額必須大於 0");
+    expect(amountInputError("-5", "TWD")).toBe("金額只能是數字，最多 2 位小數");
+  });
+});
+
+describe("rateInputError", () => {
+  it("合法的匯率沒有錯誤", () => {
+    expect(rateInputError("0.92")).toBeNull();
+    expect(rateInputError("41.5")).toBeNull();
+  });
+
+  it("空白不算錯", () => {
+    expect(rateInputError("")).toBeNull();
+  });
+
+  it("打錯字要講出原因，而不是讓送出鍵默默變灰", () => {
+    expect(rateInputError("abc")).toBe("匯率只能是數字，最多 6 位小數");
+    expect(rateInputError("0")).toBe("匯率必須大於 0");
   });
 });

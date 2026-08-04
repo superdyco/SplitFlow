@@ -100,3 +100,33 @@ export function parseRateInput(value: string): number {
   if (!(rate > 0)) throw new Error("匯率必須大於 0");
   return rate;
 }
+
+/** 把 parse 丟出來的訊息接住。空白回 null —— 還沒填不該在畫面上跳紅字。 */
+function messageOf(value: string, parse: (input: string) => unknown): string | null {
+  if (!value.trim()) return null;
+  try {
+    parse(value);
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+/**
+ * 金額字串在這個幣別下的錯誤訊息，合法或空白時是 null。
+ *
+ * 存在的理由是一個實際發生過的 bug：編輯支出時換幣別，儲存鍵突然變灰、
+ * 畫面上卻沒有任何說明。原因是既有的 "450.50" 在 THB 合法，換成 0 位小數的
+ * VND 就不合法了，而呼叫端只拿得到 null，只能讓按鈕變灰。
+ *
+ * `parseAmountInput` 本來就會產生好訊息（「VND 金額只能是整數」），
+ * 之前只是被 catch 吞掉。這支函式就是把它接回來。
+ */
+export function amountInputError(value: string, currency: string): string | null {
+  return messageOf(value, input => parseAmountInput(input, currency));
+}
+
+/** 匯率字串的錯誤訊息，理由同上：打錯字不該只是讓送出鍵默默變灰。 */
+export function rateInputError(value: string): string | null {
+  return messageOf(value, parseRateInput);
+}
