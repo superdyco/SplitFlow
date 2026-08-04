@@ -11,6 +11,7 @@ import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage
 const PROJECT_ID = "demo-splitflow";
 const MEMBER = "uid_member";
 const PATH = "tasks/task1/expenses/e1/receipt.jpg";
+const MAP_PATH = "tasks/task1/reports/report1/map.png";
 
 let testEnv;
 let passed = 0;
@@ -41,6 +42,7 @@ function jpeg(bytes = 1024) {
 }
 
 const JPEG = { contentType: "image/jpeg" };
+const PNG = { contentType: "image/png" };
 
 async function main() {
   testEnv = await initializeTestEnvironment({
@@ -80,6 +82,28 @@ async function main() {
 
   await test("規則沒開的路徑一律擋住", async () => {
     await assertFails(uploadBytes(ref(as(MEMBER), "random/other.jpg"), jpeg(), JPEG));
+  });
+
+  // --- 旅費報告的地圖 ---
+  await test("報告地圖登入後傳得上去", async () => {
+    await assertSucceeds(uploadBytes(ref(as(MEMBER), MAP_PATH), jpeg(2048), PNG));
+  });
+
+  // 這條是整個公開報告功能的前提 —— 讀不到圖，報告頁就是壞的。
+  await test("報告地圖未登入也讀得到 —— 公開報告的前提", async () => {
+    await assertSucceeds(getDownloadURL(ref(anon(), MAP_PATH)));
+  });
+
+  await test("報告地圖不接受非 PNG", async () => {
+    await assertFails(uploadBytes(ref(as(MEMBER), MAP_PATH), jpeg(2048), JPEG));
+  });
+
+  await test("報告地圖超過 1MB 要被擋", async () => {
+    await assertFails(uploadBytes(ref(as(MEMBER), MAP_PATH), jpeg(1024 * 1024 + 1), PNG));
+  });
+
+  await test("未登入不能上傳報告地圖", async () => {
+    await assertFails(uploadBytes(ref(anon(), MAP_PATH), jpeg(2048), PNG));
   });
 
   await testEnv.cleanup();
