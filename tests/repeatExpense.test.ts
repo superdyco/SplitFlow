@@ -15,6 +15,7 @@ function source(overrides: Partial<Expense> = {}): Expense {
     splitMode: "even",
     splits: { u_ming: 6000, u_hua: 6000 },
     place: { name: "7-ELEVEN", address: null, lat: null, lng: null, placeId: null },
+    note: "含小費",
     date: "2026-03-01",
     ...overrides
   } as Expense;
@@ -53,6 +54,10 @@ describe("repeatFieldsOf", () => {
     const fields = repeatFieldsOf(original);
     fields.splits.u_ming = 999;
     expect(original.splits.u_ming).toBe(6000);
+  });
+
+  it("不帶備註 —— 那是這一次的狀況，下次不一定成立", () => {
+    expect("note" in (repeatFieldsOf(source()) as Record<string, unknown>)).toBe(false);
   });
 
   it("沒有地點的支出，place 是 null 不是壞掉", () => {

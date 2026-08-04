@@ -60,6 +60,7 @@ const missingRate = computed(
       <p v-if="expense.place" class="tiny place">📍 {{ expense.place.name }}</p>
       <!-- 只標示有沒有，不放縮圖：一天十筆就是十個網路請求，漫遊網路下會很難看。 -->
       <p v-if="expense.receipt" class="tiny">📎 有收據</p>
+      <p v-if="expense.note" class="tiny note">📝 {{ expense.note }}</p>
       <button type="button" class="repeat tiny" @click="repeat">再記一筆</button>
     </div>
     <div class="amount">
@@ -80,6 +81,7 @@ const missingRate = computed(
       <p v-if="expense.place" class="tiny place">📍 {{ expense.place.name }}</p>
       <!-- 只標示有沒有，不放縮圖：一天十筆就是十個網路請求，漫遊網路下會很難看。 -->
       <p v-if="expense.receipt" class="tiny">📎 有收據</p>
+      <p v-if="expense.note" class="tiny note">📝 {{ expense.note }}</p>
       <button type="button" class="repeat tiny" @click="repeat">再記一筆</button>
     </div>
     <div class="amount">
@@ -132,6 +134,13 @@ const missingRate = computed(
 }
 
 .place {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 備註可以到 500 字，列表一定要截成一行，不然一筆就佔滿整個畫面。 */
+.note {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
