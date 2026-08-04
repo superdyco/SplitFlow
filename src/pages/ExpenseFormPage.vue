@@ -35,6 +35,10 @@ import { firebaseErrorMessage, required } from "@/utils/firestore";
 import { expenseDate, todayInput } from "@/utils/expenseDate";
 import { repeatFieldsOf } from "@/utils/repeatExpense";
 import { settleWrite } from "@/utils/offlineWrite";
+import ReceiptField from "@/components/expense/ReceiptField.vue";
+import { useReceipt } from "@/composables/useReceipt";
+import { deleteReceipt, flushReceipts } from "@/services/receiptService";
+import { removeQueued } from "@/services/receiptQueue";
 
 const route = useRoute();
 const router = useRouter();
@@ -48,6 +52,27 @@ const repeatFromId = String(route.query.from || "");
 
 const taskState = useTask(taskId, uid);
 const memberState = useTaskMembers(taskId);
+const receiptState = useReceipt();
+
+/** 有 localId 就是還沒傳完；path 有值就是好了。 */
+const receiptFieldState = computed<"empty" | "ready" | "pending" | "failed">(() => {
+  if (!receiptState.previewUrl.value && !receiptState.receipt.value) return "empty";
+  if (receiptState.receipt.value?.localId) return "pending";
+  return "ready";
+});
+
+/**
+ * 走到這裡的人一定有管理權：load() 對沒權限的人會設 loadError，
+ * template 就顯示 ErrorState 而不是表單，根本渲染不到收據欄位。
+ *
+ * 那為什麼 ReceiptField 還留著 canManage 這個 prop？因為那是元件正確的介面 ——
+ * 「能不能改」不該由元件自己猜。之後如果加了唯讀的支出詳情頁，
+ * 那一頁傳 false 進來就好，元件不用改。
+ */
+const canManageReceipt = true;
+
+/** 收據大圖的開關。 */
+const viewerOpen = ref(false);
 
 const loading = ref(true);
 const saving = ref(false);
@@ -329,6 +354,7 @@ async function load() {
     placeQuery.value = expense.place?.name ?? "";
     // 舊支出沒存日期，帶出 createdAt 換算的那天當預設，存回去就補上了。
     date.value = expenseDate(expense);
+    await receiptState.loadExisting(expense.receipt);
 
     // 匯率沿用記帳當下存下來的，不重抓。舊支出沒有存匯率才去問一次當作建議值。
     if (expense.rate !== null) rate.value = String(expense.rate);
@@ -398,14 +424,37 @@ async function submit() {
       splitMode: splitMode.value,
       splits,
       place: currentPlace(),
-      // 收據的實際處理在後面的 Task，這裡先把欄位補上讓型別完整。
-      receipt: null,
+      // 先寫既有的值；新選的照片要等下面拿到 id 之後才處理。
+      receipt: receiptState.receipt.value,
       date: date.value || todayInput()
     };
 
-    const outcome = isEdit.value
-      ? await settleWrite(updateExpense(taskId, expenseId, input))
-      : await settleWrite(createExpense(taskId, input, uid).synced);
+    let outcome: Awaited<ReturnType<typeof settleWrite>>;
+    let savedId = expenseId;
+
+    if (isEdit.value) {
+      outcome = await settleWrite(updateExpense(taskId, expenseId, input));
+    } else {
+      const created = createExpense(taskId, input, uid);
+      savedId = created.id;
+      outcome = await settleWrite(created.synced);
+    }
+
+    // 收據放在文件寫完之後：新增模式要先有 expenseId 才知道要傳到哪個路徑。
+    // 這一步失敗不該讓已經存好的支出看起來像沒存，所以錯誤只提示不擋跳轉。
+    try {
+      const saved = await receiptState.commit(taskId, savedId);
+      if (saved !== input.receipt) {
+        await settleWrite(updateExpense(taskId, savedId, { ...input, receipt: saved }));
+      }
+      // 一定要等文件寫完才開始上傳，否則 flush 會先把文件改成已上傳、
+      // 再被上面那次寫入蓋回待上傳（見 queueReceipt 的說明）。
+      if (saved?.localId) void flushReceipts();
+    } catch (err) {
+      error.value = `支出已儲存，但收據沒有存成功：${firebaseErrorMessage(err)}`;
+      saving.value = false;
+      return;
+    }
 
     if (outcome === "queued") queuedNotice.value = true;
     await router.push(`/tasks/${taskId}`);
@@ -421,6 +470,14 @@ async function remove() {
   removing.value = true;
   error.value = null;
   try {
+    // 先清收據再刪支出：反過來的話 deleteReceipt 失敗時就沒有東西能告訴我們該刪哪個路徑了。
+    // 兩者都是盡力而為，失敗不擋刪除 —— 留下孤兒檔案是設計上接受的取捨。
+    const orphan = receiptState.receipt.value;
+    if (orphan) {
+      await deleteReceipt(taskId, expenseId);
+      if (orphan.localId) await removeQueued(orphan.localId).catch(() => {});
+    }
+
     await settleWrite(deleteExpense(taskId, expenseId));
     await router.push(`/tasks/${taskId}`);
   } catch (err) {
@@ -537,6 +594,17 @@ onMounted(load);
             </span>
             <PlaceMap v-if="mapAvailable && placeMarkers.length" :markers="placeMarkers" height="180px" />
           </div>
+
+          <ReceiptField
+            :preview-url="receiptState.previewUrl.value"
+            :state="receiptFieldState"
+            :busy="receiptState.busy.value"
+            :can-manage="canManageReceipt"
+            @pick="receiptState.pickFile"
+            @clear="receiptState.clear"
+            @retry="receiptState.retry"
+            @view="viewerOpen = true"
+          />
 
           <label class="field">
             <span class="label">誰先付</span>

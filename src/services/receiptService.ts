@@ -47,7 +47,14 @@ export async function uploadDirect(taskId: string, expenseId: string, blob: Blob
   return path;
 }
 
-/** 排進佇列，然後立刻試一次 —— 線上的話這一次就傳完，使用者不會看到「待上傳」。 */
+/**
+ * 只排進佇列，**不**在這裡觸發上傳。
+ *
+ * 呼叫端必須先把 expense 文件寫成待上傳狀態，再自己呼叫 flushReceipts()。
+ * 順序反過來會有競態：flush 完成後會把文件改成 { path, localId: null } 並刪掉
+ * 佇列項目，接著呼叫端那次寫入又用 { path: null, localId } 蓋回去 ——
+ * 照片其實傳上去了，但文件永遠顯示「待上傳」，而且佇列已空、補救不了。
+ */
 export async function queueReceipt(
   taskId: string,
   expenseId: string,
@@ -55,7 +62,6 @@ export async function queueReceipt(
   localId: string
 ): Promise<void> {
   await enqueue({ id: localId, taskId, expenseId, blob, createdAt: Date.now(), attempts: 0 });
-  void flushReceipts();
 }
 
 /** 使用者手動重試：把失敗次數歸零再跑一次 flush。 */
