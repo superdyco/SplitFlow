@@ -27,12 +27,14 @@ import PlaceMap from "@/components/map/PlaceMap.vue";
 import {
   CURRENCIES,
   allocate,
+  amountInputError,
   amountToInput,
   convertAmount,
   formatAmount,
   minorUnits,
   parseAmountInput,
-  parseRateInput
+  parseRateInput,
+  rateInputError
 } from "@/utils/currency";
 import { firebaseErrorMessage, required } from "@/utils/firestore";
 import { expenseDate, todayInput } from "@/utils/expenseDate";
@@ -140,6 +142,17 @@ function safeParse(value: string, code: string): number | null {
 }
 
 const parsedAmount = computed(() => safeParse(amount.value, currency.value));
+
+/**
+ * 金額與匯率的錯誤訊息一定要顯示出來。
+ *
+ * 之前只有 `parsedAmount` 變 null 讓送出鍵變灰，畫面上沒有任何說明 ——
+ * 使用者編輯支出時把幣別從 THB 換成 VND，原本的 "450.50" 突然不合法
+ * （VND 不用小數），按鈕就死了而且完全不知道為什麼。
+ */
+const amountError = computed(() => amountInputError(amount.value, currency.value));
+/** 格式錯誤，跟 `rateError`（查詢匯率失敗）是兩回事，不要混用。 */
+const rateFormatError = computed(() => (needsRate.value ? rateInputError(rate.value) : null));
 const parsedRate = computed(() => {
   if (!needsRate.value) return 1;
   try {
@@ -540,7 +553,7 @@ onMounted(load);
             <label class="field grow">
               <span class="label">金額</span>
               <input v-model="amount" class="input" inputmode="decimal" placeholder="0" />
-              <span class="tiny">{{ amountHint }}</span>
+              <span class="tiny" :class="{ warn: amountError }">{{ amountError || amountHint }}</span>
             </label>
             <label class="field currency">
               <span class="label">幣別</span>
@@ -564,7 +577,8 @@ onMounted(load);
                 {{ rateLoading ? "查詢中..." : "重新查詢" }}
               </button>
             </div>
-            <span v-if="rateError" class="tiny warn">{{ rateError }}</span>
+            <span v-if="rateFormatError" class="tiny warn">{{ rateFormatError }}</span>
+            <span v-else-if="rateError" class="tiny warn">{{ rateError }}</span>
             <span v-else-if="rateUpdatedAt" class="tiny">參考匯率更新於 {{ rateUpdatedAt }}，可以自己改成實際成交匯率。</span>
             <span v-if="baseAmount !== null" class="tiny">
               換算後約 {{ baseCurrency }} {{ formatAmount(baseAmount, baseCurrency) }}，記帳後就固定不再變動。
