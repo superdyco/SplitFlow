@@ -31,7 +31,7 @@ const isArchived = computed(() => props.task.status === "archived");
     所以用 stretched link：連結本身只放在標題上，再用 ::after 覆蓋整張卡，
     動作按鈕則疊在它上面。這樣兩個動作都能點，HTML 也是合法的。
   -->
-  <div class="card task-card">
+  <div class="card task-card" :class="{ archived: isArchived }">
     <div class="spread">
       <div>
         <h2 class="section-title">
@@ -85,6 +85,28 @@ const isArchived = computed(() => props.task.status === "archived");
   position: relative;
 }
 
+/*
+  封存的卡片要一眼就看得出「沒在用」。做法是讓它退回頁面底色並拿掉陰影 ——
+  陰影代表浮起來、正在進行，平貼下去就是已經收起來的東西。
+*/
+.task-card.archived {
+  background: var(--color-bg);
+  border-color: var(--color-line-strong);
+  box-shadow: none;
+}
+
+.task-card.archived .section-title,
+.task-card.archived .my-cost strong {
+  color: var(--color-muted);
+}
+
+/* 進行中的橘色標籤在封存卡片上會太搶眼，但「已封存」那顆要留著看得見。 */
+.task-card.archived .task-meta span:not(.archived-pill),
+.task-card.archived .role-pill {
+  background: var(--color-line);
+  color: var(--color-soft);
+}
+
 /* 連結只包標題，但 ::after 撐滿整張卡片，所以整張卡都可點。 */
 .stretch {
   color: inherit;
@@ -130,8 +152,8 @@ const isArchived = computed(() => props.task.status === "archived");
 }
 
 .archived-pill {
-  background: var(--color-line);
-  color: var(--color-muted);
+  background: var(--color-line-strong);
+  color: var(--color-ink);
 }
 
 .task-meta {
