@@ -17,6 +17,46 @@ export const MAX_ATTEMPTS = 5;
 export const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
+ * 原始檔的上限。這**不是** Storage 的限制，是為了保護記憶體：
+ * createImageBitmap 會把整張圖解碼進記憶體，一張 50MB 的 RAW 在手機上會直接當掉。
+ * 壓縮前就要擋。
+ */
+export const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
+
+/**
+ * 壓縮後的上限。**必須跟 storage.rules 的數字一致**，否則會傳出去才被規則拒絕，
+ * 使用者拿到的是沒有原因的失敗。改這裡就要改 storage.rules，反之亦然。
+ */
+export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+
+/** 給訊息用。不到 1MB 顯示 KB，否則全部會變成沒有資訊量的「0.0 MB」。 */
+export function formatBytes(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  if (mb < 1) return `${Math.round(bytes / 1024)} KB`;
+  return `${mb.toFixed(1)} MB`;
+}
+
+/** 壓縮前看原始檔，壓縮後看產出物。 */
+export type SizeStage = "source" | "upload";
+
+/**
+ * 太大就回傳要顯示給使用者的訊息，沒問題是 null。
+ *
+ * 大小一定要在前端擋。交給 storage.rules 擋的話，上傳會失敗成
+ * `storage/unauthorized`，那跟「權限不足」長得一模一樣，使用者不會知道
+ * 是檔案太大，而且還會白白重試好幾次。
+ */
+export function sizeRejection(stage: SizeStage, bytes: number): string | null {
+  if (stage === "source") {
+    if (bytes <= MAX_SOURCE_BYTES) return null;
+    return `這張照片 ${formatBytes(bytes)} 太大了（上限 ${formatBytes(MAX_SOURCE_BYTES)}），請改用相機拍一張，或先用手機的編輯功能縮小。`;
+  }
+
+  if (bytes <= MAX_UPLOAD_BYTES) return null;
+  return `壓縮後仍有 ${formatBytes(bytes)}，超過上限 ${formatBytes(MAX_UPLOAD_BYTES)}。請改拍一張只有收據、背景單純一點的照片。`;
+}
+
+/**
  * 一筆支出一張收據，所以路徑可以直接推導、不需要存檔名。
  * 這也讓「換照片」變成單純的覆蓋，不會累積舊檔。
  *

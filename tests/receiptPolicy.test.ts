@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { MAX_AGE_MS, MAX_ATTEMPTS, queueAction, receiptPath } from "@/utils/receiptPolicy";
+import {
+  MAX_AGE_MS,
+  MAX_ATTEMPTS,
+  MAX_SOURCE_BYTES,
+  MAX_UPLOAD_BYTES,
+  formatBytes,
+  queueAction,
+  receiptPath,
+  sizeRejection
+} from "@/utils/receiptPolicy";
 
 const NOW = Date.UTC(2026, 7, 4);
 
@@ -38,5 +47,44 @@ describe("queueAction", () => {
     expect(queueAction(item({ createdAt: NOW - MAX_AGE_MS - 1, attempts: MAX_ATTEMPTS }), NOW)).toBe(
       "drop-expired"
     );
+  });
+});
+
+describe("sizeRejection", () => {
+  it("一般大小的照片放行", () => {
+    expect(sizeRejection("source", 4 * 1024 * 1024)).toBeNull();
+    expect(sizeRejection("upload", 300 * 1024)).toBeNull();
+  });
+
+  it("原始檔超過上限就擋在解碼之前 —— 解碼超大圖會把手機記憶體吃爆", () => {
+    expect(sizeRejection("source", MAX_SOURCE_BYTES + 1)).toContain("太大");
+  });
+
+  it("壓縮後仍然超過 Storage 上限也要擋，不能傳出去才被規則拒絕", () => {
+    expect(sizeRejection("upload", MAX_UPLOAD_BYTES + 1)).toContain("2.0 MB");
+  });
+
+  it("剛好等於上限是放行，不是拒絕", () => {
+    expect(sizeRejection("source", MAX_SOURCE_BYTES)).toBeNull();
+    expect(sizeRejection("upload", MAX_UPLOAD_BYTES)).toBeNull();
+  });
+
+  it("訊息裡要有實際大小，使用者才知道差多少", () => {
+    expect(sizeRejection("upload", 3 * 1024 * 1024)).toContain("3.0 MB");
+  });
+});
+
+describe("formatBytes", () => {
+  it("MB 等級取一位小數", () => {
+    expect(formatBytes(2 * 1024 * 1024)).toBe("2.0 MB");
+    expect(formatBytes(3.45 * 1024 * 1024)).toBe("3.5 MB");
+  });
+
+  it("不到 1MB 用 KB，不然會全部顯示成 0.0 MB", () => {
+    expect(formatBytes(300 * 1024)).toBe("300 KB");
+  });
+
+  it("0 不會變成空字串或 NaN", () => {
+    expect(formatBytes(0)).toBe("0 KB");
   });
 });

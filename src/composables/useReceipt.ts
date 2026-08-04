@@ -8,7 +8,7 @@
  */
 import { computed, onUnmounted, ref } from "vue";
 import { compressImage } from "@/utils/imageCompress";
-import { MAX_ATTEMPTS } from "@/utils/receiptPolicy";
+import { MAX_ATTEMPTS, sizeRejection } from "@/utils/receiptPolicy";
 import { getQueued, queueAvailable } from "@/services/receiptQueue";
 import {
   deleteReceipt,
@@ -63,7 +63,25 @@ export function useReceipt() {
     busy.value = true;
     error.value = null;
     try {
+      // 第一關在解碼之前：createImageBitmap 會把整張圖攤進記憶體，
+      // 超大檔在手機上會直接讓分頁當掉，那時候什麼訊息都來不及顯示。
+      const tooBig = sizeRejection("source", file.size);
+      if (tooBig) {
+        error.value = tooBig;
+        return;
+      }
+
       const blob = await compressImage(file);
+
+      // 第二關看產出物。壓縮「通常」會壓到 2MB 以下，但不保證 ——
+      // 讓它傳出去才被 storage.rules 拒絕的話，使用者拿到的是
+      // storage/unauthorized，跟權限不足長得一樣，而且還會白白重試好幾次。
+      const stillBig = sizeRejection("upload", blob.size);
+      if (stillBig) {
+        error.value = stillBig;
+        return;
+      }
+
       releasePreview();
       objectUrl = URL.createObjectURL(blob);
       previewUrl.value = objectUrl;

@@ -11,6 +11,10 @@ service firebase.storage {
 
       // 2MB 是壓縮後大小的五倍以上，正常照片一定過得了，
       // 但擋掉繞過前端直接上傳大檔把免費額度吃光。
+      //
+      // 這個數字跟 src/utils/receiptPolicy.ts 的 MAX_UPLOAD_BYTES 必須一致。
+      // 前端會先擋一次 —— 這裡只負責擋繞過前端的請求。兩邊不同步的話，
+      // 使用者會遇到「前端說可以、上傳卻失敗」而且錯誤碼是看不懂的 unauthorized。
       allow create, update: if request.auth != null
         && request.resource.size <= 2 * 1024 * 1024
         && request.resource.contentType == 'image/jpeg';

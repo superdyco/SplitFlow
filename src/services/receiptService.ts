@@ -8,7 +8,7 @@
  */
 import { doc, updateDoc } from "firebase/firestore";
 import { app, db } from "@/firebase/config";
-import { queueAction, receiptPath } from "@/utils/receiptPolicy";
+import { MAX_ATTEMPTS, queueAction, receiptPath } from "@/utils/receiptPolicy";
 import {
   enqueue,
   listQueued,
@@ -125,6 +125,16 @@ export async function flushReceipts(): Promise<void> {
           await removeQueued(item.id);
           continue;
         }
+
+        // 規則拒絕是確定性的：再試一百次也一樣（權限不對、檔案不合規）。
+        // 不像斷線那樣值得等，所以直接跳到上限、讓畫面立刻顯示失敗，
+        // 而不是讓使用者等五輪毫無意義的重試。
+        // 注意 storage/unauthenticated 不算在內 —— 那是 token 過期，重登入就好。
+        if (code === "storage/unauthorized" || code === "permission-denied") {
+          await setAttempts(item.id, MAX_ATTEMPTS);
+          continue;
+        }
+
         await setAttempts(item.id, item.attempts + 1);
       }
     }
