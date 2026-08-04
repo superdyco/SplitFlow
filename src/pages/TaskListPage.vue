@@ -68,10 +68,16 @@ const costsLoaded = ref(false);
 /** 已刪除的一律不出現在任何一區 —— 規則在 partitionTasks 裡，有測試釘住。 */
 const partitioned = computed(() => partitionTasks(rows.value));
 
-/** 只算進行中的：已封存的旅程帳都結完了，不該再算進「我的花費」。 */
+/**
+ * 封存的也要算。封存代表「這趟結束了，不再記帳」，不代表錢沒花過 ——
+ * 而且旅程通常是走完才封存，把它們排除掉，總花費會少掉最完整的那幾趟。
+ * 已刪除的不算：那是使用者明確表示不要了。
+ */
+const costable = computed(() => [...partitioned.value.active, ...partitioned.value.archived]);
+
 const totals = computed(() =>
   sumByCurrency(
-    partitioned.value.active.map(row => ({
+    costable.value.map(row => ({
       currency: row.task.defaultCurrency,
       amount: costs.value.get(row.task.id) ?? 0
     }))
@@ -84,9 +90,8 @@ async function loadCosts() {
   costsLoading.value = true;
   costsError.value = null;
   try {
-    // 已封存的任務不需要為了算花費而把支出全部載下來。
     const entries = await Promise.all(
-      partitioned.value.active.map(async row => {
+      costable.value.map(async row => {
         // 成員也要載：餘數分給誰取決於加入順序，少了它數字會跟結算頁差幾分錢。
         const [expenses, members] = await Promise.all([
           listExpenses(row.task.id),
@@ -204,8 +209,8 @@ onMounted(load);
         <RouterLink to="/tasks/new" class="btn btn-primary" style="margin-top: 16px">建立分帳任務</RouterLink>
       </EmptyState>
 
-      <!-- 只剩封存任務的人不該看到一顆算不出東西的按鈕。 -->
-      <template v-if="!loading && !error && partitioned.active.length">
+      <!-- 一個任務都沒有的人不該看到一顆算不出東西的按鈕。 -->
+      <template v-if="!loading && !error && costable.length">
         <button
           v-if="!costsLoaded"
           class="btn btn-block"
@@ -246,16 +251,12 @@ onMounted(load);
 
       <div v-if="!loading && partitioned.archived.length" class="stack">
         <strong class="section-title">已封存</strong>
-        <!--
-          封存的一律傳 null 而不是 0：那些任務沒有被計算，
-          傳 0 會顯示成「花了 0 元」，是錯的。
-        -->
         <TaskCard
           v-for="row in partitioned.archived"
           :key="row.task.id"
           :task="row.task"
           :role="row.role"
-          :my-cost="null"
+          :my-cost="costsLoaded ? costs.get(row.task.id) ?? 0 : null"
           @archive="ask($event, 'archived')"
           @unarchive="ask($event, 'active')"
           @delete="ask($event, 'deleted')"
