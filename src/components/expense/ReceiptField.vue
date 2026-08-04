@@ -7,6 +7,8 @@ defineProps<{
   state: "empty" | "ready" | "pending" | "failed";
   busy: boolean;
   canManage: boolean;
+  /** 壓縮失敗、重試失敗之類。一定要顯示 —— 靜默失敗會讓使用者以為照片存好了。 */
+  error: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -87,8 +89,12 @@ function onChange(event: Event) {
       </div>
     </div>
 
-    <span v-if="state === 'pending'" class="tiny">
+    <span v-if="error" class="tiny warn">{{ error }}</span>
+    <span v-else-if="state === 'pending'" class="tiny">
       照片還在這台裝置上，連上網路後會自動傳出去。
+    </span>
+    <span v-else-if="state === 'failed'" class="tiny warn">
+      這張照片試了幾次都傳不出去。點「重試」再試一次，或移除後重拍。
     </span>
   </div>
 </template>
@@ -156,5 +162,9 @@ function onChange(event: Event) {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.warn {
+  color: var(--color-danger);
 }
 </style>

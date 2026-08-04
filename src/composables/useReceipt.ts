@@ -6,9 +6,10 @@
  * 新增模式不提早，兩條路徑的狀態機就會分岔 —— 一致比早幾秒重要。
  * 送出之前預覽用記憶體裡的 blob URL，使用者不會覺得慢。
  */
-import { onUnmounted, ref } from "vue";
+import { computed, onUnmounted, ref } from "vue";
 import { compressImage } from "@/utils/imageCompress";
-import { queueAvailable } from "@/services/receiptQueue";
+import { MAX_ATTEMPTS } from "@/utils/receiptPolicy";
+import { getQueued, queueAvailable } from "@/services/receiptQueue";
 import {
   deleteReceipt,
   queueReceipt,
@@ -28,6 +29,20 @@ export function useReceipt() {
   const error = ref<string | null>(null);
   /** 使用者按了移除，送出時要把舊檔一起刪掉。 */
   const removed = ref(false);
+  /** 對應佇列項目的失敗次數。到上限就不再自動重試，要讓使用者看得到。 */
+  const attempts = ref(0);
+  /** 照片標成待上傳，但佇列裡找不到 —— 這台裝置永遠補不了這一筆。 */
+  const orphaned = ref(false);
+
+  /**
+   * 這個狀態一定要算得出 failed，否則使用者會卡在一個永遠不會變的「待上傳」，
+   * 而且連重試按鈕都看不到。
+   */
+  const state = computed<"empty" | "ready" | "pending" | "failed">(() => {
+    if (!previewUrl.value && !receipt.value) return "empty";
+    if (!receipt.value?.localId) return "ready";
+    return orphaned.value || attempts.value >= MAX_ATTEMPTS ? "failed" : "pending";
+  });
 
   let objectUrl: string | null = null;
 
@@ -66,6 +81,17 @@ export function useReceipt() {
   async function loadExisting(existing: ExpenseReceipt | null) {
     receipt.value = existing;
     removed.value = false;
+    attempts.value = 0;
+    orphaned.value = false;
+
+    if (existing?.localId) {
+      const queued = await getQueued(existing.localId).catch(() => undefined);
+      // 標成待上傳卻不在佇列裡，代表照片在另一台裝置上、或本機資料被清掉了。
+      // 這台裝置怎麼等都不會傳成功，要當成失敗讓使用者能處理。
+      if (queued) attempts.value = queued.attempts;
+      else orphaned.value = true;
+    }
+
     if (!existing?.path) return;
     try {
       previewUrl.value = await receiptUrl(existing.path);
@@ -75,10 +101,22 @@ export function useReceipt() {
   }
 
   async function retry() {
-    if (!receipt.value?.localId) return;
+    const localId = receipt.value?.localId;
+    if (!localId) return;
+
     busy.value = true;
+    error.value = null;
     try {
-      await retryReceipt(receipt.value.localId);
+      // 佇列裡沒有的話重試只是空轉，講清楚比讓使用者一直按有用。
+      if (!(await getQueued(localId))) {
+        orphaned.value = true;
+        error.value = "這張照片不在這台裝置上（可能是用另一台裝置拍的），請移除後重新拍一張。";
+        return;
+      }
+      await retryReceipt(localId);
+      attempts.value = 0;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err);
     } finally {
       busy.value = false;
     }
@@ -113,5 +151,5 @@ export function useReceipt() {
     return receipt.value;
   }
 
-  return { receipt, previewUrl, busy, error, pickFile, clear, loadExisting, retry, commit };
+  return { receipt, previewUrl, state, busy, error, pickFile, clear, loadExisting, retry, commit };
 }

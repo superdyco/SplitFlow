@@ -55,13 +55,6 @@ const taskState = useTask(taskId, uid);
 const memberState = useTaskMembers(taskId);
 const receiptState = useReceipt();
 
-/** 有 localId 就是還沒傳完；path 有值就是好了。 */
-const receiptFieldState = computed<"empty" | "ready" | "pending" | "failed">(() => {
-  if (!receiptState.previewUrl.value && !receiptState.receipt.value) return "empty";
-  if (receiptState.receipt.value?.localId) return "pending";
-  return "ready";
-});
-
 /**
  * 走到這裡的人一定有管理權：load() 對沒權限的人會設 loadError，
  * template 就顯示 ErrorState 而不是表單，根本渲染不到收據欄位。
@@ -598,9 +591,10 @@ onMounted(load);
 
           <ReceiptField
             :preview-url="receiptState.previewUrl.value"
-            :state="receiptFieldState"
+            :state="receiptState.state.value"
             :busy="receiptState.busy.value"
             :can-manage="canManageReceipt"
+            :error="receiptState.error.value"
             @pick="receiptState.pickFile"
             @clear="receiptState.clear"
             @retry="receiptState.retry"

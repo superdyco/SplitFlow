@@ -92,8 +92,16 @@ export function removeQueued(id: string): Promise<void> {
   return run("readwrite", store => store.delete(id)).then(() => undefined);
 }
 
+/**
+ * 查單一項目。回傳 undefined 有兩種意思：已經傳完刪掉了，或者照片根本
+ * 不在這台裝置上（用另一台拍的、本機資料被清掉）。呼叫端要分辨得出來。
+ */
+export function getQueued(id: string): Promise<QueuedReceipt | undefined> {
+  return run<QueuedReceipt | undefined>("readonly", store => store.get(id));
+}
+
 export async function setAttempts(id: string, attempts: number): Promise<void> {
-  const item = await run<QueuedReceipt | undefined>("readonly", store => store.get(id));
+  const item = await getQueued(id);
   // 項目可能在這之間被刪掉了（例如使用者刪了那筆支出），沒有就算了。
   if (!item) return;
   await run("readwrite", store => store.put({ ...item, attempts }));

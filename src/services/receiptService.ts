@@ -96,9 +96,15 @@ export async function flushReceipts(): Promise<void> {
     const items = await listQueued().catch(() => [] as QueuedReceipt[]);
     const now = Date.now();
 
+    console.info(`[receipt] flush 開始，佇列有 ${items.length} 筆`);
+
     // 序列處理不併發：行動網路上併發傳圖沒有好處，還會讓記憶體同時扛好幾張。
     for (const item of items) {
       const action = queueAction(item, now);
+      console.info(
+        `[receipt] ${item.id} → ${action}（已失敗 ${item.attempts} 次，目標 ${receiptPath(item.taskId, item.expenseId)}）`
+      );
+
       if (action === "drop-expired") {
         await removeQueued(item.id);
         continue;
@@ -107,9 +113,15 @@ export async function flushReceipts(): Promise<void> {
 
       try {
         await uploadOne(item);
+        console.info(`[receipt] ${item.id} 上傳成功`);
       } catch (err) {
+        // 背景上傳失敗如果不留下記錄，使用者只會看到一個永遠不會消失的「待上傳」，
+        // 而我們完全查不出原因。這行是刻意留著的。
+        const code = (err as { code?: string }).code;
+        console.error(`[receipt] ${item.id} 上傳失敗（code=${code ?? "無"}）`, err);
+
         // 支出已經被刪掉了，這個項目永遠不會成功，直接丟棄不要一直重試。
-        if ((err as { code?: string }).code === "not-found") {
+        if (code === "not-found") {
           await removeQueued(item.id);
           continue;
         }
