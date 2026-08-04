@@ -23,6 +23,41 @@ const urlCache = new Map<string, string>();
 /** 擋重入：三個觸發點可能同時到，同一批項目不要被傳兩次。 */
 let flushing = false;
 
+/**
+ * 上傳進度要能通知畫面。
+ *
+ * 補傳是在背景發生的，而 App 讀支出用的是一次性的 getDocs 而不是 onSnapshot ——
+ * 沒有這個通知的話，照片傳完了畫面還停在「待上傳」，使用者只能手動重整。
+ */
+export type ReceiptEvent =
+  | { localId: string; status: "uploading" }
+  | { localId: string; status: "uploaded"; path: string }
+  | { localId: string; status: "failed" };
+
+const listeners = new Set<(event: ReceiptEvent) => void>();
+
+/** 回傳取消訂閱的函式，呼叫端在 onUnmounted 要記得叫它。 */
+export function onReceiptEvent(cb: (event: ReceiptEvent) => void): () => void {
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+}
+
+let uploadingId: string | null = null;
+
+/**
+ * 現在正在傳的項目。畫面載入時 flush 可能已經在跑了、事件早就發過，
+ * 所以除了訂閱事件之外還要問得到「當下」的狀態。
+ */
+export function uploadingReceiptId(): string | null {
+  return uploadingId;
+}
+
+function emit(event: ReceiptEvent) {
+  for (const cb of listeners) cb(event);
+}
+
 async function storage() {
   const { getStorage } = await import("firebase/storage");
   return getStorage(app);
@@ -70,7 +105,7 @@ export async function retryReceipt(localId: string): Promise<void> {
   await flushReceipts();
 }
 
-async function uploadOne(item: QueuedReceipt): Promise<void> {
+async function uploadOne(item: QueuedReceipt): Promise<string> {
   const { ref, uploadBytes } = await import("firebase/storage");
   const path = receiptPath(item.taskId, item.expenseId);
 
@@ -85,6 +120,7 @@ async function uploadOne(item: QueuedReceipt): Promise<void> {
 
   urlCache.delete(path);
   await removeQueued(item.id);
+  return path;
 }
 
 export async function flushReceipts(): Promise<void> {
@@ -111,14 +147,19 @@ export async function flushReceipts(): Promise<void> {
       }
       if (action === "hold-exhausted") continue;
 
+      uploadingId = item.id;
+      emit({ localId: item.id, status: "uploading" });
+
       try {
-        await uploadOne(item);
+        const path = await uploadOne(item);
         console.info(`[receipt] ${item.id} 上傳成功`);
+        emit({ localId: item.id, status: "uploaded", path });
       } catch (err) {
         // 背景上傳失敗如果不留下記錄，使用者只會看到一個永遠不會消失的「待上傳」，
         // 而我們完全查不出原因。這行是刻意留著的。
         const code = (err as { code?: string }).code;
         console.error(`[receipt] ${item.id} 上傳失敗（code=${code ?? "無"}）`, err);
+        emit({ localId: item.id, status: "failed" });
 
         // 支出已經被刪掉了，這個項目永遠不會成功，直接丟棄不要一直重試。
         if (code === "not-found") {
@@ -136,6 +177,8 @@ export async function flushReceipts(): Promise<void> {
         }
 
         await setAttempts(item.id, item.attempts + 1);
+      } finally {
+        uploadingId = null;
       }
     }
   } finally {

@@ -12,10 +12,12 @@ import { MAX_ATTEMPTS, sizeRejection } from "@/utils/receiptPolicy";
 import { getQueued, queueAvailable } from "@/services/receiptQueue";
 import {
   deleteReceipt,
+  onReceiptEvent,
   queueReceipt,
   receiptUrl,
   retryReceipt,
-  uploadDirect
+  uploadDirect,
+  uploadingReceiptId
 } from "@/services/receiptService";
 import type { ExpenseReceipt } from "@/types/expense";
 
@@ -33,21 +35,55 @@ export function useReceipt() {
   const attempts = ref(0);
   /** 照片標成待上傳，但佇列裡找不到 —— 這台裝置永遠補不了這一筆。 */
   const orphaned = ref(false);
+  /** 這一筆此刻正在傳。 */
+  const uploading = ref(false);
 
   /**
    * unsaved 一定要是獨立狀態。照片是等按下送出、拿到 expenseId 之後才上傳的，
    * 但選完就顯示縮圖，看起來跟已經存好完全一樣 —— 使用者會以為選了就上傳了，
    * 然後直接離開頁面，照片就沒了。
    *
+   * uploading 跟 pending 也一定要分開。兩者的文案完全相反：pending 是「等網路」，
+   * uploading 是「正在傳，等一下就好」。混在一起的話，明明有網路的人會看到
+   * 「連上網路後會自動傳出去」，那句話會讓他以為壞了。
+   *
    * failed 也一定要算得出來，否則使用者會卡在一個永遠不會變的「待上傳」，
    * 連重試按鈕都看不到。
    */
-  const state = computed<"empty" | "unsaved" | "ready" | "pending" | "failed">(() => {
+  const state = computed<"empty" | "unsaved" | "uploading" | "ready" | "pending" | "failed">(() => {
     // 剛選的照片優先：不管原本有沒有收據，現在都是還沒存的狀態。
     if (pending.value) return "unsaved";
     if (!previewUrl.value && !receipt.value) return "empty";
     if (!receipt.value?.localId) return "ready";
-    return orphaned.value || attempts.value >= MAX_ATTEMPTS ? "failed" : "pending";
+    if (orphaned.value || attempts.value >= MAX_ATTEMPTS) return "failed";
+    return uploading.value ? "uploading" : "pending";
+  });
+
+  /**
+   * 背景傳完之後要自己更新畫面。App 讀支出用的是一次性的 getDocs，
+   * 沒有這段訂閱的話照片傳完了畫面還停在「待上傳」，使用者得手動重整。
+   */
+  const unsubscribe = onReceiptEvent(async event => {
+    if (event.localId !== receipt.value?.localId) return;
+
+    if (event.status === "uploading") {
+      uploading.value = true;
+      return;
+    }
+
+    uploading.value = false;
+
+    if (event.status === "failed") {
+      attempts.value += 1;
+      return;
+    }
+
+    receipt.value = { path: event.path, localId: null };
+    try {
+      previewUrl.value = await receiptUrl(event.path);
+    } catch {
+      // 拿不到 URL 不影響「已上傳」這件事，縮圖空著就好。
+    }
   });
 
   let objectUrl: string | null = null;
@@ -57,7 +93,10 @@ export function useReceipt() {
     objectUrl = null;
   }
 
-  onUnmounted(releasePreview);
+  onUnmounted(() => {
+    releasePreview();
+    unsubscribe();
+  });
 
   async function pickFile(file: File) {
     busy.value = true;
@@ -109,11 +148,16 @@ export function useReceipt() {
     orphaned.value = false;
 
     if (existing?.localId) {
+      // flush 可能在畫面載入之前就開始跑了，那個 uploading 事件我們沒接到，
+      // 所以除了訂閱之外還要問一次當下的狀態。
+      uploading.value = uploadingReceiptId() === existing.localId;
+
       const queued = await getQueued(existing.localId).catch(() => undefined);
       // 標成待上傳卻不在佇列裡，代表照片在另一台裝置上、或本機資料被清掉了。
       // 這台裝置怎麼等都不會傳成功，要當成失敗讓使用者能處理。
+      // 但正在傳的不算 —— uploadOne 成功時會先把佇列項目刪掉才發事件。
       if (queued) attempts.value = queued.attempts;
-      else orphaned.value = true;
+      else if (!uploading.value) orphaned.value = true;
     }
 
     if (!existing?.path) return;

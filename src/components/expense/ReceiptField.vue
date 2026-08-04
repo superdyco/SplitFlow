@@ -4,10 +4,10 @@ import { ref } from "vue";
 defineProps<{
   previewUrl: string | null;
   /**
-   * empty=還沒有照片，unsaved=選好了但還沒按送出，ready=已上傳，
-   * pending=等著補傳，failed=傳太多次失敗了
+   * empty=還沒有照片，unsaved=選好了但還沒按送出，uploading=正在傳，
+   * ready=已上傳，pending=排隊等網路，failed=傳太多次失敗了
    */
-  state: "empty" | "unsaved" | "ready" | "pending" | "failed";
+  state: "empty" | "unsaved" | "uploading" | "ready" | "pending" | "failed";
   /** 送出鈕的文字，用在提示裡。新增與編輯的字不一樣。 */
   submitLabel: string;
   busy: boolean;
@@ -60,6 +60,7 @@ function onChange(event: Event) {
         <img v-if="previewUrl" :src="previewUrl" alt="收據縮圖" />
         <span v-else class="tiny">收據</span>
         <span v-if="state === 'unsaved'" class="badge unsaved">未儲存</span>
+        <span v-else-if="state === 'uploading'" class="badge uploading">上傳中</span>
         <span v-else-if="state === 'pending'" class="badge">待上傳</span>
         <span v-else-if="state === 'failed'" class="badge failed">上傳失敗</span>
       </button>
@@ -102,6 +103,13 @@ function onChange(event: Event) {
     -->
     <span v-else-if="state === 'unsaved'" class="tiny warn">
       還沒儲存。要按下面的「{{ submitLabel }}」，這張照片才會上傳。
+    </span>
+    <!--
+      uploading 與 pending 的文案必須分開。使用者明明有網路、照片正在傳的時候，
+      如果看到「連上網路後會自動傳出去」，會以為功能壞了。
+    -->
+    <span v-else-if="state === 'uploading'" class="tiny">
+      正在上傳，傳完會自動更新，不用重整。
     </span>
     <span v-else-if="state === 'pending'" class="tiny">
       照片還在這台裝置上，連上網路後會自動傳出去。
@@ -173,6 +181,24 @@ function onChange(event: Event) {
 
 .badge.unsaved {
   background: var(--color-primary);
+}
+
+.badge.uploading {
+  background: var(--color-primary);
+  /* 會動代表真的在進行中，靜態標籤看起來跟卡住一樣。 */
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge.uploading {
+    animation: none;
+  }
 }
 
 .actions {
