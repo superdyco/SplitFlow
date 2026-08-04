@@ -3,8 +3,13 @@ import { ref } from "vue";
 
 defineProps<{
   previewUrl: string | null;
-  /** empty=還沒有照片，ready=已上傳或剛選好，pending=等著補傳，failed=傳太多次失敗了 */
-  state: "empty" | "ready" | "pending" | "failed";
+  /**
+   * empty=還沒有照片，unsaved=選好了但還沒按送出，ready=已上傳，
+   * pending=等著補傳，failed=傳太多次失敗了
+   */
+  state: "empty" | "unsaved" | "ready" | "pending" | "failed";
+  /** 送出鈕的文字，用在提示裡。新增與編輯的字不一樣。 */
+  submitLabel: string;
   busy: boolean;
   canManage: boolean;
   /** 壓縮失敗、重試失敗之類。一定要顯示 —— 靜默失敗會讓使用者以為照片存好了。 */
@@ -54,7 +59,8 @@ function onChange(event: Event) {
       <button type="button" class="thumb" @click="emit('view')">
         <img v-if="previewUrl" :src="previewUrl" alt="收據縮圖" />
         <span v-else class="tiny">收據</span>
-        <span v-if="state === 'pending'" class="badge">待上傳</span>
+        <span v-if="state === 'unsaved'" class="badge unsaved">未儲存</span>
+        <span v-else-if="state === 'pending'" class="badge">待上傳</span>
         <span v-else-if="state === 'failed'" class="badge failed">上傳失敗</span>
       </button>
 
@@ -90,6 +96,13 @@ function onChange(event: Event) {
     </div>
 
     <span v-if="error" class="tiny warn">{{ error }}</span>
+    <!--
+      這句是必要的：照片要等按下送出、拿到 expenseId 之後才會上傳，
+      但縮圖一出現就跟存好了長得一樣。不講的話使用者會直接離開，照片就沒了。
+    -->
+    <span v-else-if="state === 'unsaved'" class="tiny warn">
+      還沒儲存。要按下面的「{{ submitLabel }}」，這張照片才會上傳。
+    </span>
     <span v-else-if="state === 'pending'" class="tiny">
       照片還在這台裝置上，連上網路後會自動傳出去。
     </span>
@@ -156,6 +169,10 @@ function onChange(event: Event) {
 
 .badge.failed {
   background: var(--color-danger);
+}
+
+.badge.unsaved {
+  background: var(--color-primary);
 }
 
 .actions {

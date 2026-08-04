@@ -35,10 +35,16 @@ export function useReceipt() {
   const orphaned = ref(false);
 
   /**
-   * 這個狀態一定要算得出 failed，否則使用者會卡在一個永遠不會變的「待上傳」，
-   * 而且連重試按鈕都看不到。
+   * unsaved 一定要是獨立狀態。照片是等按下送出、拿到 expenseId 之後才上傳的，
+   * 但選完就顯示縮圖，看起來跟已經存好完全一樣 —— 使用者會以為選了就上傳了，
+   * 然後直接離開頁面，照片就沒了。
+   *
+   * failed 也一定要算得出來，否則使用者會卡在一個永遠不會變的「待上傳」，
+   * 連重試按鈕都看不到。
    */
-  const state = computed<"empty" | "ready" | "pending" | "failed">(() => {
+  const state = computed<"empty" | "unsaved" | "ready" | "pending" | "failed">(() => {
+    // 剛選的照片優先：不管原本有沒有收據，現在都是還沒存的狀態。
+    if (pending.value) return "unsaved";
     if (!previewUrl.value && !receipt.value) return "empty";
     if (!receipt.value?.localId) return "ready";
     return orphaned.value || attempts.value >= MAX_ATTEMPTS ? "failed" : "pending";

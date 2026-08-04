@@ -595,6 +595,7 @@ onMounted(load);
             :busy="receiptState.busy.value"
             :can-manage="canManageReceipt"
             :error="receiptState.error.value"
+            :submit-label="isEdit ? '儲存變更' : '新增支出'"
             @pick="receiptState.pickFile"
             @clear="receiptState.clear"
             @retry="receiptState.retry"
