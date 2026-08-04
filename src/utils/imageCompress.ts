@@ -24,9 +24,20 @@ export function scaledSize(width: number, height: number, maxEdge: number): Size
 }
 
 export async function compressImage(file: File, maxEdge = MAX_EDGE, quality = 0.8): Promise<Blob> {
-  // imageOrientation 一定要指定 from-image：iPhone 拍的直式照片是橫的畫素
-  // 加上一個 EXIF 旋轉旗標，預設的 "none" 會讓收據躺著存進去。
-  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  let bitmap: ImageBitmap;
+  try {
+    // imageOrientation 一定要指定 from-image：iPhone 拍的直式照片是橫的畫素
+    // 加上一個 EXIF 旋轉旗標，預設的 "none" 會讓收據躺著存進去。
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    // 瀏覽器解不開這個格式時丟的是英文原文（"The source image could not be
+    // decoded."），對使用者沒有意義。實際上幾乎都是同一件事：iPhone 的 HEIC
+    // 或 ProRAW 拿到非 Safari 的瀏覽器上。訊息要講得出下一步怎麼辦。
+    throw new Error(
+      "讀不出這張照片的格式（iPhone 的 HEIC 或 ProRAW 在部分瀏覽器打不開）。" +
+        "請直接用相機拍一張，或先把照片轉存成 JPEG。"
+    );
+  }
 
   try {
     const { width, height } = scaledSize(bitmap.width, bitmap.height, maxEdge);
