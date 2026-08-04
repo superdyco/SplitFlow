@@ -305,6 +305,20 @@ service cloud.firestore {
         allow update: if false;
         allow delete: if isTaskAdmin(taskId) && taskIsActive(taskId);
       }
+
+      // 公開的旅費報告。這是整份規則裡唯一開放未登入讀取的地方。
+      match /reports/{reportId} {
+        // 撤銷就是 active 改成 false，讀取直接失敗，頁面顯示找不到。
+        // 跟 invites 是同一個模式。成員仍讀得到已關閉的，才能重新開啟。
+        allow get: if resource.data.active == true || isTaskMember(taskId);
+        // 成員才列得出來 —— owner 的介面靠這個找到既有報告來沿用 id。
+        allow list: if isTaskMember(taskId);
+        // 只有 owner 能產生與撤銷：公開別人的消費資料只有他能決定。
+        // 不加 taskIsActive —— 報告本來就只在封存後產生，而封存的任務
+        // 仍要能重新產生與撤銷報告。
+        allow create, update: if taskData(taskId).ownerId == request.auth.uid;
+        allow delete: if false;
+      }
     }
 
     match /invites/{inviteCode} {

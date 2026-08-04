@@ -137,6 +137,39 @@ async function seed() {
   });
 }
 
+const REPORT = "report1";
+
+/** 一份合法的報告內容，測試建立與塞資料共用。 */
+function reportData(overrides = {}) {
+  return {
+    taskName: "曼谷旅行",
+    currency: "TWD",
+    startDate: null,
+    endDate: null,
+    days: 5,
+    memberCount: 4,
+    expenseCount: 1,
+    total: 10000,
+    perPerson: 2500,
+    categories: [],
+    places: [],
+    mapPath: null,
+    active: true,
+    ...overrides
+  };
+}
+
+/** 直接塞一份報告進資料庫，不經過 rules。 */
+async function seedReport(active = true) {
+  await testEnv.withSecurityRulesDisabled(async ctx => {
+    await setDoc(doc(ctx.firestore(), "tasks", TASK, "reports", REPORT), {
+      ...reportData({ active }),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  });
+}
+
 /** 直接改資料庫做出「已封存」的狀態，不經過 rules。 */
 async function archiveTask() {
   await testEnv.withSecurityRulesDisabled(async ctx => {
@@ -362,6 +395,70 @@ async function main() {
     await archiveTask();
     await assertSucceeds(updateDoc(doc(as(OWNER), "tasks", TASK), { status: "active" }));
     await assertSucceeds(setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e2"), newExpense()));
+  });
+
+  // --- 公開旅費報告 ---
+  await test("未登入的人可以讀公開的報告 —— 這就是這個功能的重點", async () => {
+    await seed();
+    await seedReport(true);
+    await assertSucceeds(getDoc(doc(anon(), "tasks", TASK, "reports", REPORT)));
+  });
+
+  // 這條是「可撤銷」的唯一證明。沒有它，撤銷就只是介面上的錯覺。
+  await test("撤銷之後未登入的人就讀不到了", async () => {
+    await seed();
+    await seedReport(false);
+    await assertFails(getDoc(doc(anon(), "tasks", TASK, "reports", REPORT)));
+  });
+
+  await test("成員讀得到已撤銷的報告，才能重新開啟", async () => {
+    await seed();
+    await seedReport(false);
+    await assertSucceeds(getDoc(doc(as(OWNER), "tasks", TASK, "reports", REPORT)));
+  });
+
+  await test("owner 可以產生報告", async () => {
+    await seed();
+    await assertSucceeds(
+      setDoc(doc(as(OWNER), "tasks", TASK, "reports", REPORT), {
+        ...reportData(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
+  await test("admin 不能產生報告 —— 公開別人的消費資料只有 owner 能決定", async () => {
+    await seed();
+    await assertFails(
+      setDoc(doc(as(ADMIN), "tasks", TASK, "reports", REPORT), {
+        ...reportData({ taskName: "偷發布" }),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
+  await test("owner 可以撤銷報告", async () => {
+    await seed();
+    await seedReport(true);
+    await assertSucceeds(
+      updateDoc(doc(as(OWNER), "tasks", TASK, "reports", REPORT), { active: false })
+    );
+  });
+
+  await test("一般成員不能撤銷報告", async () => {
+    await seed();
+    await seedReport(true);
+    await assertFails(
+      updateDoc(doc(as(MEMBER), "tasks", TASK, "reports", REPORT), { active: false })
+    );
+  });
+
+  await test("未登入的人不能列出報告集合 —— 只能靠連結拿到指定的那一份", async () => {
+    await seed();
+    await seedReport(true);
+    await assertFails(getDocs(collection(anon(), "tasks", TASK, "reports")));
   });
 
   await test("admin 不能把 owner 踢出 memberIds", async () => {
