@@ -161,7 +161,8 @@ service cloud.firestore {
             && data.splits is map
             && data.splits.size() > 0
             && validPlace()
-            && validReceipt();
+            && validReceipt()
+            && validNote();
         }
 
         // 地點是選填。有填的話至少要有名稱，座標可以是 null（沒用 Google 搜尋時）。
@@ -187,6 +188,13 @@ service cloud.firestore {
               && (receipt.path == null || receipt.path is string)
               && (receipt.localId == null || receipt.localId is string)
             );
+        }
+
+        // 備註是選填，最多 500 字。
+        // 用 .get() 是因為這個功能之前建立的舊支出沒有這個欄位。
+        function validNote() {
+          let note = request.resource.data.get("note", "");
+          return note is string && note.size() <= 500;
         }
 
         function validNewParticipants() {
