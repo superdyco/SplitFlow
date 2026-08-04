@@ -18,10 +18,18 @@ export const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * 原始檔的上限。這**不是** Storage 的限制，是為了保護記憶體：
- * createImageBitmap 會把整張圖解碼進記憶體，一張 50MB 的 RAW 在手機上會直接當掉。
- * 壓縮前就要擋。
+ * createImageBitmap 會把整張圖解碼進記憶體，超大圖在手機上會直接當掉。
+ *
+ * 為什麼是 12MB 而不是更寬鬆的值：檔案大小其實是記憶體用量的爛代理指標。
+ * 一張壓縮率高的 24MB HEIC 可能是 48MP，解碼成點陣圖要 190MB，iOS Safari
+ * 會直接砍掉分頁 —— 而那時候連錯誤訊息都來不及顯示。真正的解法是解碼時就
+ * 降採樣，但那需要先知道長寬是直式還橫式，而知道長寬就得先解碼，是雞生蛋。
+ *
+ * 所以改用「把門檻壓低」來繞過：iPhone 相機拍的 12MP HEIC 通常是 2–4MB，
+ * 12MB 這個值對正常使用完全沒有影響，卻能擋掉 ProRAW 與超長全景那些
+ * 真正會把記憶體吃爆的東西。這是一個收據拍照功能，沒有理由收更大的原始檔。
  */
-export const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
+export const MAX_SOURCE_BYTES = 12 * 1024 * 1024;
 
 /**
  * 壓縮後的上限。**必須跟 storage.rules 的數字一致**，否則會傳出去才被規則拒絕，
@@ -49,7 +57,7 @@ export type SizeStage = "source" | "upload";
 export function sizeRejection(stage: SizeStage, bytes: number): string | null {
   if (stage === "source") {
     if (bytes <= MAX_SOURCE_BYTES) return null;
-    return `這張照片 ${formatBytes(bytes)} 太大了（上限 ${formatBytes(MAX_SOURCE_BYTES)}），請改用相機拍一張，或先用手機的編輯功能縮小。`;
+    return `這張照片 ${formatBytes(bytes)} 太大了（上限 ${formatBytes(MAX_SOURCE_BYTES)}）。如果是 ProRAW 或全景照，請改用一般模式拍一張收據就好。`;
   }
 
   if (bytes <= MAX_UPLOAD_BYTES) return null;

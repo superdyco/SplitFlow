@@ -60,6 +60,15 @@ describe("sizeRejection", () => {
     expect(sizeRejection("source", MAX_SOURCE_BYTES + 1)).toContain("太大");
   });
 
+  it("iPhone 相機拍的一般照片（2–4MB）不能被擋，那是最主要的使用路徑", () => {
+    expect(sizeRejection("source", 2 * 1024 * 1024)).toBeNull();
+    expect(sizeRejection("source", 4 * 1024 * 1024)).toBeNull();
+  });
+
+  it("ProRAW 等級的原始檔要擋掉 —— 解碼成點陣圖會讓 iOS Safari 砍掉分頁", () => {
+    expect(sizeRejection("source", 30 * 1024 * 1024)).not.toBeNull();
+  });
+
   it("壓縮後仍然超過 Storage 上限也要擋，不能傳出去才被規則拒絕", () => {
     expect(sizeRejection("upload", MAX_UPLOAD_BYTES + 1)).toContain("2.0 MB");
   });
