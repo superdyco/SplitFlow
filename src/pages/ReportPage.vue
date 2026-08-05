@@ -12,6 +12,8 @@ import type { TripReport } from "@/types/report";
 import { getPublicReport } from "@/services/reportService";
 import { categoryMeta } from "@/types/expense";
 import { formatAmount } from "@/utils/currency";
+import { visiblePlaces } from "@/utils/reportPlaces";
+import ReportBar from "@/components/report/ReportBar.vue";
 
 const route = useRoute();
 const taskId = String(route.params.taskId || "");
@@ -34,6 +36,18 @@ const dateRange = computed(() => {
   const value = report.value;
   if (!value?.startDate || !value.endDate) return "";
   return `${value.startDate} – ${value.endDate}`;
+});
+
+const places = computed(() => visiblePlaces(report.value?.places ?? []));
+
+/**
+ * `updatedAt` 是 serverTimestamp，寫入當下的本機快照可能還沒解析成 Timestamp。
+ * 公開頁是從伺服器讀的所以正常都有，但拿不到時不該讓整頁掛掉。
+ */
+const generatedAt = computed(() => {
+  const value = report.value?.updatedAt;
+  if (!value?.toDate) return "";
+  return value.toDate().toLocaleDateString("zh-TW");
 });
 
 async function load() {
@@ -77,40 +91,50 @@ onMounted(load);
         {{ report.memberCount }} 人
       </p>
 
-      <section class="card headline">
+      <section class="card hero">
         <p class="tiny">每人平均</p>
         <strong class="figure">
           {{ report.currency }} {{ formatAmount(report.perPerson, report.currency) }}
         </strong>
         <p class="tiny">
           總花費 {{ report.currency }} {{ formatAmount(report.total, report.currency) }} ·
-          {{ report.expenseCount }} 筆
+          {{ report.expenseCount }} 筆 · {{ report.places.length }} 個地點
         </p>
-      </section>
-
-      <img v-if="mapUrl" :src="mapUrl" alt="去過的地方" class="map" />
-
-      <section v-if="report.places.length" class="card stack">
-        <strong class="section-title">去過的地方</strong>
-        <div v-for="place in report.places" :key="place.name" class="line">
-          <span class="name">{{ place.name }}</span>
-          <span class="tiny count">{{ place.expenseCount }} 筆</span>
-          <span class="amount">{{ formatAmount(place.total, report.currency) }}</span>
-        </div>
       </section>
 
       <section v-if="report.categories.length" class="card stack">
         <strong class="section-title">花在哪</strong>
-        <div v-for="item in report.categories" :key="item.category" class="line">
-          <span class="name">
-            {{ categoryMeta(item.category).icon }} {{ categoryMeta(item.category).label }}
-          </span>
-          <span class="tiny count">{{ Math.round(item.share) }}%</span>
-          <span class="amount">{{ formatAmount(item.total, report.currency) }}</span>
+        <div v-for="item in report.categories" :key="item.category" class="entry">
+          <div class="line">
+            <span class="name">
+              {{ categoryMeta(item.category).icon }} {{ categoryMeta(item.category).label }}
+            </span>
+            <span class="tiny count">{{ Math.round(item.share) }}%</span>
+            <span class="amount">{{ formatAmount(item.total, report.currency) }}</span>
+          </div>
+          <ReportBar :value="item.share / 100" />
         </div>
       </section>
 
-      <p class="tiny center footer">由 <a href="/">SplitFlow</a> 產生</p>
+      <img v-if="mapUrl" :src="mapUrl" alt="去過的地方" class="map" />
+
+      <section v-if="places.rows.length" class="card stack">
+        <strong class="section-title">去過的地方</strong>
+        <div v-for="row in places.rows" :key="row.name" class="entry">
+          <div class="line">
+            <span class="name">{{ row.name }}</span>
+            <span class="tiny count">{{ row.expenseCount }} 筆</span>
+            <span class="amount">{{ formatAmount(row.total, report.currency) }}</span>
+          </div>
+          <ReportBar v-if="row.bar !== null" :value="row.bar" soft />
+        </div>
+        <p v-if="places.hiddenCount" class="tiny">還有 {{ places.hiddenCount }} 個地點</p>
+      </section>
+
+      <p class="tiny center footer">
+        <template v-if="generatedAt">產生於 {{ generatedAt }} · </template>
+        由 <a href="/">SplitFlow</a> 產生
+      </p>
     </template>
   </div>
 </template>
@@ -129,17 +153,29 @@ onMounted(load);
   text-align: center;
 }
 
-.headline {
+.hero {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  /* .page 的 gap 是 16px，這裡再加 8px 讓主角與下一張卡拉開成 24px。 */
+  margin-bottom: 8px;
+  padding: 24px 18px;
   text-align: center;
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-soft);
 }
 
 .figure {
-  font-size: 34px;
+  font-size: 46px;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
+}
+
+.entry {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .map {
