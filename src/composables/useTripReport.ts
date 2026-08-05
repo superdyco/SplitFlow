@@ -21,7 +21,8 @@ import {
   setReportActive,
   updateReport
 } from "@/services/reportService";
-import { fetchStaticMap, MAX_MAP_BYTES, reportMapPath } from "@/services/staticMap";
+import { fetchStaticMap, MAX_MAP_BYTES } from "@/services/staticMap";
+import { reportMapPath } from "@/services/reportMap";
 
 export function useTripReport(taskId: string) {
   const report = ref<TripReport | null>(null);

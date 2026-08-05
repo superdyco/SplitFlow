@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mappablePlaces, reportMapPath } from "@/services/staticMap";
+import { mappablePlaces } from "@/services/staticMap";
 import type { PlaceTotal } from "@/utils/placeTotals";
 
 function place(overrides: Partial<PlaceTotal> = {}): PlaceTotal {
@@ -40,13 +40,5 @@ describe("mappablePlaces", () => {
     expect(result).toHaveLength(20);
     // 呼叫端已經照金額排好序，所以截掉的是金額最小的那些。
     expect(result[0].name).toBe("地點0");
-  });
-});
-
-describe("reportMapPath", () => {
-  // 這個路徑必須跟 storage.rules 裡公開讀取的那條 match 對得起來，
-  // 對不上的話圖傳得上去但公開頁面讀不到。
-  it("對得上 storage.rules 的公開路徑", () => {
-    expect(reportMapPath("t1", "r1")).toBe("tasks/t1/reports/r1/map.png");
   });
 });

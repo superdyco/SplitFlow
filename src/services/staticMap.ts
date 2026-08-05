@@ -32,10 +32,6 @@ export function staticMapEnabled(): boolean {
   return !!import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 }
 
-export function reportMapPath(taskId: string, reportId: string): string {
-  return `tasks/${taskId}/reports/${reportId}/map.png`;
-}
-
 /**
  * 地圖是加分不是必要，所以失敗一律不擋報告 —— 但要講得出原因。
  *
