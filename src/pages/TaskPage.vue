@@ -298,20 +298,12 @@ onMounted(load);
 
         <section v-if="isArchived && taskState.isOwner.value" class="card stack">
           <strong class="section-title">分享這趟旅程</strong>
-          <p class="tiny">
-            產生一份公開報告，讓沒去的人知道這樣玩一趟大概要花多少錢。
-            只會顯示總花費、每人平均、分類與去過的地點 ——
-            <strong>不會有任何人名、支出名稱或誰欠誰</strong>。
-          </p>
 
           <p v-if="!expenseState.expenses.value.length" class="tiny warn">
             這個任務還沒有支出，沒有東西可以報告。
           </p>
 
           <template v-else-if="reportState.report.value">
-            <p class="tiny warn">
-              這個連結任何人都打開得了，不需要帳號。傳出去之前想清楚要給誰。
-            </p>
             <div class="row">
               <input :value="reportState.shareUrl.value" class="input grow" readonly />
               <button class="btn btn-sm" @click="copyShareUrl">
