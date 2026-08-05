@@ -304,11 +304,30 @@ onMounted(load);
           </p>
 
           <template v-else-if="reportState.report.value">
-            <div class="row">
+            <div class="row wrap">
               <input :value="reportState.shareUrl.value" class="input grow" readonly />
               <button class="btn btn-sm" @click="copyShareUrl">
                 {{ reportCopied ? "已複製" : "複製" }}
               </button>
+              <!--
+                只在連結開著時才給這顆。規則是
+                `active == true || isTaskMember(taskId)`，owner 是成員，所以連結
+                關掉之後 owner 自己還是讀得到完整報告 —— 這時給一顆「開啟」，
+                他會看到正常的頁面、以為連結還通著，但別人打開是「找不到」。
+                旁邊那句「目前已關閉，連結打不開」已經把狀態講清楚了。
+
+                用 <a> 而不是 button + window.open()：中鍵開新分頁、長按選單、
+                「複製連結網址」都會是瀏覽器原生行為，也不會被彈出視窗封鎖擋掉。
+              -->
+              <a
+                v-if="reportState.report.value.active"
+                class="btn btn-sm"
+                :href="reportState.shareUrl.value"
+                target="_blank"
+                rel="noopener"
+              >
+                開啟
+              </a>
             </div>
             <p v-if="!reportState.report.value.active" class="tiny warn">
               目前已關閉，連結打不開。
@@ -478,6 +497,15 @@ onMounted(load);
 .grow {
   flex: 1;
   min-width: 0;
+}
+
+/* 網址很長，手機寬度下輸入框佔滿一行、兩顆按鈕落到下一行，不要硬擠。 */
+.wrap {
+  flex-wrap: wrap;
+}
+
+.wrap .grow {
+  flex: 1 1 100%;
 }
 
 .warn {
