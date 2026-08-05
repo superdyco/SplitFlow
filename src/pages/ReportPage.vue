@@ -13,6 +13,7 @@ import { getPublicReport } from "@/services/reportService";
 import { categoryMeta } from "@/types/expense";
 import { formatAmount } from "@/utils/currency";
 import { visiblePlaces } from "@/utils/reportPlaces";
+import { reportMapUrl } from "@/services/reportMap";
 import ReportBar from "@/components/report/ReportBar.vue";
 
 const route = useRoute();
@@ -21,7 +22,8 @@ const reportId = String(route.params.reportId || "");
 
 const report = ref<TripReport | null>(null);
 const loading = ref(true);
-const mapUrl = ref<string | null>(null);
+const mapLoaded = ref(false);
+const mapFailed = ref(false);
 
 /**
  * 讀失敗與「不存在」在這裡是同一件事：規則會讓已撤銷的報告讀取失敗，
@@ -41,6 +43,14 @@ const dateRange = computed(() => {
 const places = computed(() => visiblePlaces(report.value?.places ?? []));
 
 /**
+ * `mapPath` 是 null 就完全不渲染地圖區塊，也不發任何請求。
+ *
+ * 網址由路由參數組出來，跟文件裡的 `mapPath` 等價 —— `useTripReport` 寫進去的
+ * 就是 `reportMapPath(taskId, reportId)`。這裡只拿 `mapPath` 當「有沒有圖」的旗標。
+ */
+const mapSrc = computed(() => (report.value?.mapPath ? reportMapUrl(taskId, reportId) : null));
+
+/**
  * `updatedAt` 是 serverTimestamp，寫入當下的本機快照可能還沒解析成 Timestamp。
  * 公開頁是從伺服器讀的所以正常都有，但拿不到時不該讓整頁掛掉。
  */
@@ -58,17 +68,6 @@ async function load() {
     report.value = null;
   } finally {
     loading.value = false;
-  }
-
-  const path = report.value?.mapPath;
-  if (!path) return;
-  try {
-    const { getDownloadURL, getStorage, ref: storageRef } = await import("firebase/storage");
-    const { app } = await import("@/firebase/config");
-    mapUrl.value = await getDownloadURL(storageRef(getStorage(app), path));
-  } catch {
-    // 沒有地圖不影響其他內容。
-    mapUrl.value = null;
   }
 }
 
@@ -116,7 +115,21 @@ onMounted(load);
         </div>
       </section>
 
-      <img v-if="mapUrl" :src="mapUrl" alt="去過的地方" class="map" />
+      <!--
+        骨架先把 8:5 的位置佔住（對應 640x400 的靜態地圖），圖載完才淡入。
+        用 v-show 而不是 v-if：v-if 會讓 <img> 在載完前不存在，等於沒開始下載。
+      -->
+      <div v-if="mapSrc && !mapFailed" class="map-slot">
+        <div v-if="!mapLoaded" class="map-skeleton" />
+        <img
+          v-show="mapLoaded"
+          :src="mapSrc"
+          alt="去過的地方"
+          class="map"
+          @load="mapLoaded = true"
+          @error="mapFailed = true"
+        />
+      </div>
 
       <section v-if="places.rows.length" class="card stack">
         <strong class="section-title">去過的地方</strong>
@@ -178,10 +191,57 @@ onMounted(load);
   gap: 6px;
 }
 
-.map {
+/*
+  骨架與圖疊在同一個固定比例的容器裡，位置從一開始就定死。
+  沒有這個容器的話，圖載完才撐出高度，下面的內容會被整塊推走。
+*/
+.map-slot {
+  position: relative;
+  aspect-ratio: 8 / 5;
+}
+
+.map,
+.map-skeleton {
+  position: absolute;
+  inset: 0;
   width: 100%;
+  height: 100%;
   border-radius: 16px;
   border: 1px solid var(--color-line);
+}
+
+.map {
+  object-fit: cover;
+  animation: fade-in 0.3s ease;
+}
+
+.map-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-line) 25%,
+    var(--color-surface) 50%,
+    var(--color-line) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .line {
