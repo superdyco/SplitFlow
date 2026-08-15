@@ -72,7 +72,17 @@ const isArchived = computed(() => props.task.status === "archived");
       <button v-else type="button" class="action" @click.prevent.stop="emit('archive', task)">
         封存
       </button>
-      <button type="button" class="action danger" @click.prevent.stop="emit('delete', task)">
+      <!--
+        封存的卡片不給刪除鈕。封存代表「收起來了、之後可能還要查」，
+        而刪除不可逆 —— 把兩顆按鈕並排放在一張已經不常看的卡上，最容易按錯的
+        就是這一顆。要刪就先解除封存，讓它回到眼前再刪。
+      -->
+      <button
+        v-if="!isArchived"
+        type="button"
+        class="action danger"
+        @click.prevent.stop="emit('delete', task)"
+      >
         刪除
       </button>
     </div>
