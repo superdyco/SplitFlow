@@ -1,12 +1,16 @@
 import type { Timestamp } from "firebase/firestore";
 import type { CategoryTotal } from "@/utils/categoryTotals";
 import type { PlaceTotal } from "@/utils/placeTotals";
+import type { ReportDay } from "@/utils/reportTimeline";
 
 /**
  * 公開的旅費報告快照。
  *
  * **這份文件任何人拿到連結都讀得到**，所以裡面絕對不能有 uid、成員暱稱、
  * 支出名稱或誰欠誰。只放算好的彙總數字。
+ *
+ * `timeline` 是這條規則唯一逐筆列出來的地方，它同樣不含名稱與人 ——
+ * 只有時間、分類、地點、金額，全都是這份文件其他欄位已經公開過的種類。
  */
 export interface TripReport {
   id: string;
@@ -23,6 +27,8 @@ export interface TripReport {
   perPerson: number;
   categories: CategoryTotal[];
   places: PlaceTotal[];
+  /** 一天一段的行程時間軸。這個功能之前產生的報告是空陣列。 */
+  timeline: ReportDay[];
   /** Storage 物件路徑。沒有地圖時是 null。 */
   mapPath: string | null;
   /** 撤銷就是這個變 false。 */

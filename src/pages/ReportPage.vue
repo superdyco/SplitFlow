@@ -42,6 +42,25 @@ const dateRange = computed(() => {
 
 const places = computed(() => visiblePlaces(report.value?.places ?? []));
 
+const timeline = computed(() => report.value?.timeline ?? []);
+
+/**
+ * 有支出就列，不要求一定有時間。
+ *
+ * 本來是「整份都沒時間就整區不渲染」，但這樣做的話時間欄位之前的旅程
+ * 永遠看不到這一區 —— 而封存的任務是唯讀的，那些支出連補時間都補不了。
+ * 沒有時間的日子照樣看得出「這天去了哪、花了多少」，那本身就值得一看。
+ */
+const showTimeline = computed(() => timeline.value.length > 0);
+
+/**
+ * 整份都沒有時間就把時間欄整欄收掉，不要留一排「—」。
+ * 只要有一筆有時間就整份都留欄位，這樣每一天的縮排才會一致。
+ */
+const showTimes = computed(() =>
+  timeline.value.some(day => day.entries.some(entry => entry.time))
+);
+
 /**
  * `mapPath` 是 null 就完全不渲染地圖區塊，也不發任何請求。
  *
@@ -54,6 +73,11 @@ const mapSrc = computed(() => (report.value?.mapPath ? reportMapUrl(taskId, repo
  * `updatedAt` 是 serverTimestamp，寫入當下的本機快照可能還沒解析成 Timestamp。
  * 公開頁是從伺服器讀的所以正常都有，但拿不到時不該讓整頁掛掉。
  */
+/** 年份在標題的日期區間就講過了，每一天再印一次太吵。 */
+function dayLabel(date: string): string {
+  return date.slice(5).replace("-", "/");
+}
+
 const generatedAt = computed(() => {
   const value = report.value?.updatedAt;
   if (!value?.toDate) return "";
@@ -142,6 +166,36 @@ onMounted(load);
           <ReportBar v-if="row.bar !== null" :value="row.bar" soft />
         </div>
         <p v-if="places.hiddenCount" class="tiny">還有 {{ places.hiddenCount }} 個地點</p>
+      </section>
+
+      <!--
+        時間軸放在最後：前面幾區回答「花了多少、花在哪」，這一區回答「怎麼過的」。
+        沒有名稱可放，所以每一列是「幾點 · 分類圖示 · 地點（沒有地點就寫分類）· 金額」。
+      -->
+      <section v-if="showTimeline" class="card stack">
+        <strong class="section-title">每天怎麼過的</strong>
+        <div v-for="day in timeline" :key="day.date" class="day">
+          <div class="line">
+            <span class="name day-head">Day {{ day.day }} · {{ dayLabel(day.date) }}</span>
+            <span class="amount">{{ formatAmount(day.total, report.currency) }}</span>
+          </div>
+          <ol class="entries">
+            <!--
+              沒有 id 可以當 key —— 報告裡刻意不存支出 id。這份清單是死的快照，
+              不會新增刪除也不會重排，用索引當 key 是安全的。
+            -->
+            <li v-for="(entry, index) in day.entries" :key="index" class="line entry-row">
+              <!-- 這份報告有時間才留這一欄；沒記時間的那幾筆用破折號佔位，
+                   時間欄才不會忽寬忽窄。 -->
+              <span v-if="showTimes" class="tiny time">{{ entry.time || "—" }}</span>
+              <span class="name">
+                {{ categoryMeta(entry.category).icon }}
+                {{ entry.place || categoryMeta(entry.category).label }}
+              </span>
+              <span class="amount">{{ formatAmount(entry.amount, report.currency) }}</span>
+            </li>
+          </ol>
+        </div>
       </section>
 
       <p class="tiny center footer">
@@ -248,6 +302,52 @@ onMounted(load);
   display: flex;
   align-items: baseline;
   gap: 10px;
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.day-head {
+  font-weight: 700;
+}
+
+/*
+  時間軸那條線：清單本身的左框線就是軸，每一列用 ::before 點在上面。
+  故意不做成每列各自的裝飾 —— 一條連續的線才看得出「這是同一天」。
+*/
+.entries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 2px 0 0;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--color-line);
+  list-style: none;
+}
+
+.entry-row {
+  position: relative;
+}
+
+/* -17px = 左內距 12 + 框線 2，再往左半顆點（4）讓它正好騎在線上。 */
+.entry-row::before {
+  content: "";
+  position: absolute;
+  left: -17px;
+  top: 0.5em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-line-strong);
+}
+
+.time {
+  flex: none;
+  width: 40px;
+  font-variant-numeric: tabular-nums;
 }
 
 .name {

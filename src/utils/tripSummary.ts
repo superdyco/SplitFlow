@@ -33,8 +33,13 @@ function parseDay(value: string): number | null {
   return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
 }
 
-/** 含頭尾，所以同一天是 1 天不是 0 天。 */
-function daysBetween(start: string, end: string): number | null {
+/**
+ * 含頭尾，所以同一天是 1 天不是 0 天。
+ *
+ * 時間軸算「第幾天」也是同一套算法（`daysBetween(第一天, 那天)`），
+ * 所以這裡 export 出去共用 —— 兩邊各寫一份日期數學遲早會對不起來。
+ */
+export function daysBetween(start: string, end: string): number | null {
   const from = parseDay(start);
   const to = parseDay(end);
   if (from === null || to === null) return null;

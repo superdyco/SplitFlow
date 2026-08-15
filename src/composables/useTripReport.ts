@@ -12,6 +12,7 @@ import type { TripReport } from "@/types/report";
 import { categoryTotals } from "@/utils/categoryTotals";
 import { placeTotals } from "@/utils/placeTotals";
 import { tripSummary } from "@/utils/tripSummary";
+import { reportTimeline } from "@/utils/reportTimeline";
 import { settleWrite } from "@/utils/offlineWrite";
 import { firebaseErrorMessage } from "@/utils/firestore";
 import {
@@ -112,6 +113,7 @@ export function useTripReport(taskId: string) {
           perPerson: summary.perPerson,
           categories: categoryTotals(expenses, currency),
           places,
+          timeline: reportTimeline(expenses, currency, task.startDate),
           mapPath: uploaded.path,
           active: true
         })

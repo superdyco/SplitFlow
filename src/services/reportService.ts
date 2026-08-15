@@ -13,13 +13,28 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  updateDoc
+  updateDoc,
+  type DocumentData
 } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import type { TripReport, TripReportInput } from "@/types/report";
+import type { ReportDay } from "@/utils/reportTimeline";
 
 function reportsRef(taskId: string) {
   return collection(db, "tasks", taskId, "reports");
+}
+
+/**
+ * 時間軸是後來才加的，之前產生的報告沒有這個欄位。補成空陣列，
+ * 頁面就只要處理一種形狀 —— 比照 `normalizeExpense` 對舊支出的做法。
+ * 那些報告重新產生一次就會真的補上。
+ */
+function toReport(id: string, data: DocumentData): TripReport {
+  return {
+    id,
+    ...data,
+    timeline: (data.timeline as ReportDay[] | undefined) ?? []
+  } as TripReport;
 }
 
 /** client 端產生的隨機 id，不需要連線。 */
@@ -36,7 +51,7 @@ export function newReportId(): string {
 export async function findReport(taskId: string): Promise<TripReport | null> {
   const snap = await getDocs(query(reportsRef(taskId), limit(1)));
   const first = snap.docs[0];
-  return first ? ({ id: first.id, ...first.data() } as TripReport) : null;
+  return first ? toReport(first.id, first.data()) : null;
 }
 
 /**
@@ -83,5 +98,5 @@ export async function getPublicReport(
   reportId: string
 ): Promise<TripReport | null> {
   const snap = await getDoc(doc(db, "tasks", taskId, "reports", reportId));
-  return snap.exists() ? ({ id: snap.id, ...snap.data() } as TripReport) : null;
+  return snap.exists() ? toReport(snap.id, snap.data()) : null;
 }

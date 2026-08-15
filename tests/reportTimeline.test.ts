@@ -1,0 +1,136 @@
+import { describe, expect, it } from "vitest";
+import { reportTimeline } from "@/utils/reportTimeline";
+import type { Expense } from "@/types/expense";
+
+/** 模擬 Firestore Timestamp：只要有 toDate 就夠了。 */
+function at(day: number, hour = 12): Expense["createdAt"] {
+  const value = new Date(2026, 2, day, hour);
+  return { toDate: () => value } as Expense["createdAt"];
+}
+
+function expense(overrides: Partial<Expense> = {}): Expense {
+  return {
+    id: "e1",
+    title: "晚餐",
+    category: "food",
+    amount: 10000,
+    currency: "TWD",
+    rate: 1,
+    baseAmount: 10000,
+    paidBy: "u1",
+    splitMode: "even",
+    splits: { u1: 10000 },
+    place: null,
+    receipt: null,
+    note: "",
+    date: "2026-03-01",
+    time: "",
+    createdBy: "u1",
+    createdAt: at(1),
+    ...overrides
+  } as Expense;
+}
+
+describe("reportTimeline", () => {
+  it("一天一段，日期由早到晚", () => {
+    const result = reportTimeline(
+      [expense({ date: "2026-03-03" }), expense({ date: "2026-03-01" })],
+      "TWD"
+    );
+    expect(result.map(day => day.date)).toEqual(["2026-03-01", "2026-03-03"]);
+  });
+
+  it("同一天照時間由早到晚排", () => {
+    const result = reportTimeline(
+      [
+        expense({ id: "dinner", time: "19:30" }),
+        expense({ id: "breakfast", time: "08:00" }),
+        expense({ id: "lunch", time: "12:15" })
+      ],
+      "TWD"
+    );
+    expect(result[0].entries.map(entry => entry.time)).toEqual(["08:00", "12:15", "19:30"]);
+  });
+
+  it("沒記時間的排在當天最後，不會被猜到中間去", () => {
+    const result = reportTimeline(
+      [expense({ id: "unknown" }), expense({ id: "dinner", time: "19:30" })],
+      "TWD"
+    );
+    expect(result[0].entries.map(entry => entry.time)).toEqual(["19:30", ""]);
+  });
+
+  it("都沒記時間時照記帳先後排，先記的在前", () => {
+    const result = reportTimeline(
+      [expense({ id: "second", createdAt: at(1, 20) }), expense({ id: "first", createdAt: at(1, 9) })],
+      "TWD"
+    );
+    expect(result[0].entries.map(entry => entry.amount)).toHaveLength(2);
+    // 兩筆金額一樣分不出來，改用地點驗順序。
+    const named = reportTimeline(
+      [
+        expense({ createdAt: at(1, 20), place: { name: "晚上那家", address: null, lat: null, lng: null, placeId: null } }),
+        expense({ createdAt: at(1, 9), place: { name: "早上那家", address: null, lat: null, lng: null, placeId: null } })
+      ],
+      "TWD"
+    );
+    expect(named[0].entries.map(entry => entry.place)).toEqual(["早上那家", "晚上那家"]);
+  });
+
+  it("每天有小計，加起來就是那天的花費", () => {
+    const result = reportTimeline(
+      [expense({ baseAmount: 12000 }), expense({ baseAmount: 3000 }), expense({ date: "2026-03-02", baseAmount: 500 })],
+      "TWD"
+    );
+    expect(result[0].total).toBe(15000);
+    expect(result[1].total).toBe(500);
+  });
+
+  it("缺匯率換算不出來的支出不進時間軸 —— 進去的話每日小計會跟總額對不起來", () => {
+    const result = reportTimeline(
+      [expense({ currency: "THB", baseAmount: null }), expense({ baseAmount: 3000 })],
+      "TWD"
+    );
+    expect(result[0].entries).toHaveLength(1);
+    expect(result[0].total).toBe(3000);
+  });
+
+  it("連日期都沒有的支出放不上時間軸", () => {
+    const result = reportTimeline([expense({ date: null, createdAt: null })], "TWD");
+    expect(result).toEqual([]);
+  });
+
+  it("Day 從任務起始日算起，含頭尾", () => {
+    const result = reportTimeline(
+      [expense({ date: "2026-03-01" }), expense({ date: "2026-03-05" })],
+      "TWD",
+      "2026-03-01"
+    );
+    expect(result.map(day => day.day)).toEqual([1, 5]);
+  });
+
+  it("沒有起始日就用最早的那天當 Day 1", () => {
+    const result = reportTimeline(
+      [expense({ date: "2026-03-03" }), expense({ date: "2026-03-04" })],
+      "TWD"
+    );
+    expect(result.map(day => day.day)).toEqual([1, 2]);
+  });
+
+  it("支出早於起始日時改用那天當原點，不會出現 Day 0 或負數", () => {
+    // 提前買的機票之類。
+    const result = reportTimeline(
+      [expense({ date: "2026-02-20" }), expense({ date: "2026-03-01" })],
+      "TWD",
+      "2026-03-01"
+    );
+    expect(result[0].day).toBe(1);
+    expect(result[1].day).toBe(10);
+  });
+
+  it("只放公開得起的欄位 —— 沒有名稱、沒有 uid、沒有 id", () => {
+    // 這份資料會寫進任何人拿到連結都讀得到的文件裡，欄位跑進來就是外洩。
+    const [entry] = reportTimeline([expense({ title: "阿明的點心", time: "15:00" })], "TWD")[0].entries;
+    expect(Object.keys(entry).sort()).toEqual(["amount", "category", "place", "time"]);
+  });
+});
