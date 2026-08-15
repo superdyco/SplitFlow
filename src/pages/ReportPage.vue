@@ -7,7 +7,7 @@
  * 也不帶任何 API 金鑰 —— 連結會被到處轉傳，不能把金鑰跟著送出去。
  */
 import { computed, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import type { TripReport } from "@/types/report";
 import { getPublicReport } from "@/services/reportService";
 import { categoryMeta } from "@/types/expense";
@@ -17,6 +17,7 @@ import { reportMapUrl } from "@/services/reportMap";
 import ReportBar from "@/components/report/ReportBar.vue";
 
 const route = useRoute();
+const router = useRouter();
 const taskId = String(route.params.taskId || "");
 const reportId = String(route.params.reportId || "");
 
@@ -33,6 +34,18 @@ const mapFailed = ref(false);
  * 「這個 ID 是真的，只是被關起來」，那是不必要的資訊洩漏。
  */
 const notFound = computed(() => !loading.value && !report.value);
+
+/**
+ * 只有從 app 裡面點進來的人才給返回鍵。
+ *
+ * 這頁刻意沒有導覽列，裝成 App 的時候連瀏覽器的上一頁都沒有 —— 發起人自己
+ * 按「開啟」進來就會卡在這裡，只剩頁尾那行 SplitFlow 能回首頁。
+ *
+ * 判斷用 `history.state.back`：那是 vue-router 記的上一個站內位置，整頁重新
+ * 載入會是 null。所以從 LINE 點連結開新分頁的訪客不會看到這顆 —— 他的上一頁
+ * 不是這個 app，把他丟回去只會回到不相干的地方。
+ */
+const cameFromApp = ref(Boolean(window.history.state?.back));
 
 const dateRange = computed(() => {
   const value = report.value;
@@ -100,6 +113,10 @@ onMounted(load);
 
 <template>
   <div class="page">
+    <button v-if="cameFromApp" type="button" class="back" @click="router.back()">
+      ← 返回
+    </button>
+
     <p v-if="loading" class="tiny center">讀取中...</p>
 
     <p v-else-if="notFound" class="center">
@@ -218,6 +235,20 @@ onMounted(load);
 
 .center {
   text-align: center;
+}
+
+/*
+  靠左、不撐滿：.page 是 flex column，不寫 align-self 按鈕會被拉成整行寬。
+  `.link` 在這個專案是各頁自己寫的 scoped 樣式，不是全域類別，所以這裡要有自己的一份。
+*/
+.back {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .hero {

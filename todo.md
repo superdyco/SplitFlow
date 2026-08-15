@@ -292,6 +292,11 @@ owner 的成員文件在同一個 batch，`get()` 那當下讀不到任務，會
   （`src/services/reportMap.ts`），省掉一次 `firebase/storage` 的 chunk 下載
   與一次 API 往返，三段串行變兩段。載入期間用 8:5 骨架佔位，圖載完淡入 ——
   本來圖沒好之前那塊不存在，好了才把下面的內容整塊推走。
+- **「開啟」在裝成 App 時走站內導航，不開新分頁。** standalone 沒有分頁列也沒有
+  上一頁，`target="_blank"` 開出來的報告頁是一條死路 —— 只剩頁尾那行 SplitFlow
+  能回首頁。改成 RouterLink 後在瀏覽器裡照舊開新分頁（`target="_blank"` 時
+  vue-router 會整個放手），裝起來則留下 history，報告頁自己給一顆返回。
+  返回鍵看 `history.state.back`，整頁載入進來是 null，所以訪客不會看到它。
 - **`reportMapPath` 搬進 `reportMap.ts`，`staticMap.ts` 不留 re-export。**
   `staticMap.ts` 有 `VITE_GOOGLE_MAPS_API_KEY`，Vite 會在 build 時字面內嵌進 chunk，
   公開頁碰不得。留 re-export 的話這條界線就只是口頭約定。

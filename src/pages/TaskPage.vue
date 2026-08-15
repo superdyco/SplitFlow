@@ -67,6 +67,22 @@ const canGenerateReport = computed(
   () => isArchived.value && taskState.isOwner.value && expenseState.expenses.value.length > 0
 );
 
+/**
+ * 裝成 App 之後沒有分頁列也沒有上一頁 —— 用 `_blank` 開出來的報告頁是一條
+ * 死路，使用者按不回任務頁。所以只有真的有瀏覽器介面時才開新分頁；
+ * 裝起來的話走站內導航，讓報告頁自己給一顆返回（它會看 history 有沒有上一頁）。
+ *
+ * `undefined` 而不是 `_self`：vue-router 的 RouterLink 看到 `target="_blank"`
+ * 就整個放手交給瀏覽器，其餘值才走站內導航 —— 站內導航才會留下 history 記錄。
+ */
+const newTabTarget = computed(() => (isInstalledApp() ? undefined : "_blank"));
+
+function isInstalledApp(): boolean {
+  // iOS 的 Safari 到現在還是只認 navigator.standalone，不吃 display-mode。
+  const iosStandalone = (window.navigator as { standalone?: boolean }).standalone === true;
+  return iosStandalone || window.matchMedia("(display-mode: standalone)").matches;
+}
+
 async function copyShareUrl() {
   await navigator.clipboard.writeText(reportState.shareUrl.value);
   reportCopied.value = true;
@@ -316,18 +332,19 @@ onMounted(load);
                 他會看到正常的頁面、以為連結還通著，但別人打開是「找不到」。
                 旁邊那句「目前已關閉，連結打不開」已經把狀態講清楚了。
 
-                用 <a> 而不是 button + window.open()：中鍵開新分頁、長按選單、
+                用連結而不是 button + window.open()：中鍵開新分頁、長按選單、
                 「複製連結網址」都會是瀏覽器原生行為，也不會被彈出視窗封鎖擋掉。
+                RouterLink 一樣是渲染成 <a href>，這些行為都還在。
               -->
-              <a
+              <RouterLink
                 v-if="reportState.report.value.active"
                 class="btn btn-sm"
-                :href="reportState.shareUrl.value"
-                target="_blank"
+                :to="reportState.sharePath.value"
+                :target="newTabTarget"
                 rel="noopener"
               >
                 開啟
-              </a>
+              </RouterLink>
             </div>
             <p v-if="!reportState.report.value.active" class="tiny warn">
               目前已關閉，連結打不開。

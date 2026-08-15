@@ -36,8 +36,11 @@ export function useTripReport(taskId: string) {
    */
   const mapWarning = ref<string | null>(null);
 
+  /** 站內路徑。要傳出去的是 shareUrl，這條是給 RouterLink 用的。 */
+  const sharePath = computed(() => (report.value ? `/r/${taskId}/${report.value.id}` : ""));
+
   const shareUrl = computed(() =>
-    report.value ? `${window.location.origin}/r/${taskId}/${report.value.id}` : ""
+    sharePath.value ? `${window.location.origin}${sharePath.value}` : ""
   );
 
   async function load() {
@@ -141,5 +144,16 @@ export function useTripReport(taskId: string) {
     }
   }
 
-  return { report, loading, busy, error, mapWarning, shareUrl, load, generate, setActive };
+  return {
+    report,
+    loading,
+    busy,
+    error,
+    mapWarning,
+    sharePath,
+    shareUrl,
+    load,
+    generate,
+    setActive
+  };
 }
