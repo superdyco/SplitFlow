@@ -390,6 +390,16 @@ async function load() {
       loadError.value = taskState.error.value || "讀取任務失敗";
       return;
     }
+    /*
+      封存的任務唯讀，規則（taskIsActive）會擋掉新增、修改與刪除。
+      任務頁本來就不給進來的入口，但網址還在 —— 直接開的話會看到一張
+      填得完、送不出去的表單，連「刪除支出」都還在。與其讓人白填一輪
+      再撞上看不懂的 unauthorized，不如在這裡就講清楚。
+    */
+    if (taskState.task.value?.status === "archived") {
+      loadError.value = "這個任務已封存，目前唯讀。到「我的分帳」解除封存後才能繼續記帳。";
+      return;
+    }
     await memberState.load();
 
     currency.value = baseCurrency.value;

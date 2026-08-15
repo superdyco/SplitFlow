@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory, type RouteLocationNormalized } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
-import { getTaskMember } from "@/services/memberService";
 
 const LoginPage = () => import("@/pages/LoginPage.vue");
 const OnboardingPage = () => import("@/pages/OnboardingPage.vue");
@@ -43,9 +42,9 @@ export const router = createRouter({
     { path: "/onboarding", component: OnboardingPage, meta: { requiresAuth: true } },
     { path: "/tasks", component: TaskListPage, meta: { requiresAuth: true, requiresProfile: true } },
     { path: "/tasks/new", component: CreateTaskPage, meta: { requiresAuth: true, requiresProfile: true } },
-    { path: "/tasks/:taskId", component: TaskPage, meta: { requiresAuth: true, requiresProfile: true, requiresTaskMember: true } },
-    { path: "/tasks/:taskId/expenses/new", component: ExpenseFormPage, meta: { requiresAuth: true, requiresProfile: true, requiresTaskMember: true } },
-    { path: "/tasks/:taskId/expenses/:expenseId/edit", component: ExpenseFormPage, meta: { requiresAuth: true, requiresProfile: true, requiresTaskMember: true } },
+    { path: "/tasks/:taskId", component: TaskPage, meta: { requiresAuth: true, requiresProfile: true } },
+    { path: "/tasks/:taskId/expenses/new", component: ExpenseFormPage, meta: { requiresAuth: true, requiresProfile: true } },
+    { path: "/tasks/:taskId/expenses/:expenseId/edit", component: ExpenseFormPage, meta: { requiresAuth: true, requiresProfile: true } },
     { path: "/join/:inviteCode", component: JoinTaskPage, meta: { public: true } },
     // 公開的旅費報告：不需要帳號，守衛在 `if (!user) return true` 就放行了。
     { path: "/r/:taskId/:reportId", component: ReportPage, meta: { public: true } },
@@ -80,16 +79,18 @@ router.beforeEach(async to => {
     return redirect === "/login" ? "/tasks" : redirect;
   }
 
-  if (to.meta.requiresTaskMember) {
-    if (to.query.denied === "1") return true;
-    const taskId = String(to.params.taskId || "");
-    try {
-      const member = await getTaskMember(taskId, user.uid);
-      if (!member?.active) return `/tasks/${taskId}?denied=1`;
-    } catch {
-      return `/tasks/${taskId}?denied=1`;
-    }
-  }
+  /*
+    這裡本來還有一段 `requiresTaskMember`：進任務頁或支出頁之前先讀一次
+    成員文件，不是成員就導去 `?denied=1`。拿掉了，因為它是**重複的**：
 
+      - 真正的防線是 Firestore rules，不是這裡。
+      - 任務頁與支出頁自己就會處理 —— `useTask.load()` 讀不到就設 denied，
+        兩頁都渲染 <AccessDenied />。行為完全一樣。
+
+    代價卻很實在：守衛是 await 的，這一趟往返擋在導航前面，**畫面還停在上一頁**，
+    連「讀取中」都還沒出現；接著頁面自己又會把同一份成員文件再讀一次。
+    也就是每次進任務頁／支出頁都要三趟串行往返，其中一趟純屬重複。
+    手機網路上那一趟就是使用者說的「按下去之後卡了一下才有反應」。
+  */
   return true;
 });

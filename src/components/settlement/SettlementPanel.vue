@@ -19,6 +19,15 @@ const props = defineProps<{
   defaultCurrency: string;
   currentUid: string;
   isAdmin: boolean;
+  /**
+   * 這個任務還收不收寫入（封存之後就是 false）。
+   *
+   * 跟 `isAdmin` 分開是因為它們擋的是不同的事：`isAdmin` 決定「能不能代別人動」，
+   * `canWrite` 決定「現在還能不能動」。少了它，封存的任務上每個人仍然看得到
+   * 自己那筆付款的「刪除」與「確認收到」，按下去才被規則擋掉 ——
+   * 前端不該給出規則不會放行的按鈕。
+   */
+  canWrite: boolean;
   busy: boolean;
 }>();
 
@@ -59,7 +68,7 @@ function transferKey(from: string, to: string) {
 
 /** 付款人自己記，或 admin 代記。 */
 function canRecord(from: string) {
-  return props.currentUid === from || props.isAdmin;
+  return props.canWrite && (props.currentUid === from || props.isAdmin);
 }
 
 function openRecord(from: string, to: string, amount: number) {
@@ -84,10 +93,12 @@ function submitRecord(from: string, to: string) {
 }
 
 function canDelete(payment: Payment) {
+  if (!props.canWrite) return false;
   return props.currentUid === payment.from || props.currentUid === payment.to || props.isAdmin;
 }
 
 function canConfirm(payment: Payment) {
+  if (!props.canWrite) return false;
   return payment.status === "pending" && (props.currentUid === payment.to || props.isAdmin);
 }
 
