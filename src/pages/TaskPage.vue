@@ -29,6 +29,7 @@ import { removeMember, setMemberRole } from "@/services/memberService";
 import { confirmPayment, createPayment, deletePayment } from "@/services/paymentService";
 import { buildInviteUrl, firebaseErrorMessage } from "@/utils/firestore";
 import { removeMemberMessage } from "@/utils/memberRemoval";
+import { isInstalledApp } from "@/utils/platform";
 
 type Tab = "expenses" | "members" | "settlement";
 
@@ -76,12 +77,6 @@ const canGenerateReport = computed(
  * 就整個放手交給瀏覽器，其餘值才走站內導航 —— 站內導航才會留下 history 記錄。
  */
 const newTabTarget = computed(() => (isInstalledApp() ? undefined : "_blank"));
-
-function isInstalledApp(): boolean {
-  // iOS 的 Safari 到現在還是只認 navigator.standalone，不吃 display-mode。
-  const iosStandalone = (window.navigator as { standalone?: boolean }).standalone === true;
-  return iosStandalone || window.matchMedia("(display-mode: standalone)").matches;
-}
 
 async function copyShareUrl() {
   await navigator.clipboard.writeText(reportState.shareUrl.value);

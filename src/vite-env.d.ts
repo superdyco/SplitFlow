@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+/** build 時由 vite.config.js 的 define 內嵌：commit 短碼 + 建置時間。 */
+declare const __APP_VERSION__: string;
+
 interface ImportMetaEnv {
   readonly VITE_FIREBASE_API_KEY: string;
   readonly VITE_FIREBASE_AUTH_DOMAIN: string;

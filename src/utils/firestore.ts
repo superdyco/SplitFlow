@@ -1,6 +1,15 @@
 import type { FirestoreError } from "firebase/firestore";
+import { logError } from "@/utils/debugLog";
 
+/**
+ * 畫面上每一個錯誤訊息都經過這裡（四十幾個呼叫點），所以順手把它留進錯誤清單。
+ *
+ * 一個格式化函式帶副作用不漂亮，但這是全 app 唯一收得齊的位置 —— 換成每個
+ * catch 各自呼叫一次 `logError`，漏掉的那幾個就是之後查不到的那幾個。
+ * 而且這樣一來，使用者看到的訊息與診斷資訊裡的那一筆一定對得起來。
+ */
 export function firebaseErrorMessage(error: unknown): string {
+  logError("firebase", error);
   if (error && typeof error === "object" && "message" in error) {
     const maybe = error as FirestoreError;
     return maybe.message || String(error);

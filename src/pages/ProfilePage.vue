@@ -4,9 +4,14 @@ import { useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import { logout, providerLabel } from "@/services/authService";
+import { listQueued } from "@/services/receiptQueue";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
+import { useCopy } from "@/composables/useCopy";
+import { recentErrors } from "@/utils/debugLog";
+import { buildDiagnosticsText } from "@/utils/diagnostics";
 import { firebaseErrorMessage, required, textFieldError } from "@/utils/firestore";
+import { isInstalledApp } from "@/utils/platform";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -43,6 +48,47 @@ async function save() {
     error.value = firebaseErrorMessage(err);
   } finally {
     loading.value = false;
+  }
+}
+
+/**
+ * 診斷資訊。**預設收起來**：這一頁是給使用者改暱稱的，不是儀表板。
+ *
+ * 收據佇列要開 IndexedDB，所以等使用者真的展開才去讀 —— 每次進個人設定
+ * 都開一次資料庫，只為了一段大部分時候沒人看的文字，不划算。
+ */
+const showDiagnostics = ref(false);
+const queuedReceipts = ref<number[] | null>(null);
+const errors = ref(recentErrors());
+const { copied: diagnosticsCopied, copy } = useCopy();
+
+const diagnosticsText = computed(() =>
+  buildDiagnosticsText({
+    version: __APP_VERSION__,
+    uid: authStore.user?.uid || "",
+    loginMethod: loginMethod.value,
+    online: navigator.onLine,
+    installed: isInstalledApp(),
+    queuedReceipts: queuedReceipts.value,
+    placesKey: !!(
+      import.meta.env.VITE_GOOGLE_PLACES_API_KEY || import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    ),
+    mapsKey: !!import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    userAgent: navigator.userAgent,
+    errors: errors.value
+  })
+);
+
+async function toggleDiagnostics() {
+  showDiagnostics.value = !showDiagnostics.value;
+  if (!showDiagnostics.value) return;
+  // 每次展開都重新抓一次，不然使用者照著指示重現問題之後看到的還是舊的那份。
+  errors.value = recentErrors();
+  try {
+    queuedReceipts.value = (await listQueued()).map(item => item.attempts);
+  } catch {
+    // 讀不到佇列本身就是一條線索，buildDiagnosticsText 會把 null 講成人話。
+    queuedReceipts.value = null;
   }
 }
 
@@ -83,6 +129,23 @@ async function signOut() {
         {{ loading ? "儲存中..." : saved ? "已儲存" : "儲存變更" }}
       </button>
       <button class="btn btn-danger btn-block" @click="signOut">登出</button>
+
+      <!--
+        擺在登出下面、樣式刻意最輕：這是「出事了才會被叫來按」的東西，
+        平常不該跟暱稱與登出搶注意力。
+      -->
+      <div class="stack diagnostics">
+        <button class="link" @click="toggleDiagnostics">
+          {{ showDiagnostics ? "收起診斷資訊" : "診斷資訊" }}
+        </button>
+        <template v-if="showDiagnostics">
+          <p class="tiny">遇到問題時，把下面這段複製給開發者，通常就查得出原因。</p>
+          <pre class="report">{{ diagnosticsText }}</pre>
+          <button class="btn btn-block" @click="copy(diagnosticsText)">
+            {{ diagnosticsCopied ? "已複製" : "複製診斷資訊" }}
+          </button>
+        </template>
+      </div>
     </div>
   </AppLayout>
 </template>
@@ -90,5 +153,38 @@ async function signOut() {
 <style scoped>
 .warn {
   color: var(--color-danger);
+}
+
+.diagnostics {
+  margin-top: 8px;
+  align-items: flex-start;
+}
+
+.link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/*
+  等寬字加保留換行：這段是要被整段複製走的純文字，畫面上長什麼樣就複製到什麼。
+  `overflow-x: auto` 是給 userAgent 那種長到爆的行用的，不能讓它把整頁撐寬。
+*/
+.report {
+  width: 100%;
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-x: auto;
 }
 </style>

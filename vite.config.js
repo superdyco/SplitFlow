@@ -1,9 +1,41 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import { execSync } from "node:child_process";
 import { fileURLToPath, URL } from "node:url";
+
+/**
+ * 使用者回報問題時第一個要問的是「你跑的是哪一版」。
+ *
+ * 這個問題在這裡特別重要：index.html 有一小時快取而且刻意不做 service worker，
+ * 所以「他在跑舊版」是真的會發生、而且從外面完全看不出來的狀況。
+ * commit 短碼加上建置時間，貼在診斷資訊的第一行。
+ */
+function buildVersion() {
+  let sha = "unknown";
+  try {
+    sha = execSync("git rev-parse --short HEAD", {
+      stdio: ["ignore", "pipe", "ignore"]
+    })
+      .toString()
+      .trim();
+  } catch {
+    // 沒有 git、或從 tarball 解出來的環境照樣要建得起來，版本就寫 unknown。
+  }
+
+  // 本機時間而不是 UTC：讀這個字串的是剛剛按下 deploy 的人，差八小時只會讓他
+  // 懷疑自己看到的是舊的那一版。
+  const now = new Date();
+  const pad = value => String(value).padStart(2, "0");
+  const at = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  return `${sha} ${at}`;
+}
 
 export default defineConfig({
   plugins: [vue()],
+  define: {
+    __APP_VERSION__: JSON.stringify(buildVersion())
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url))
