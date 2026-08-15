@@ -15,6 +15,8 @@ describe("minorUnits", () => {
   it("沒有小數的幣別是 0 位", () => {
     expect(minorUnits("VND")).toBe(0);
     expect(minorUnits("KRW")).toBe(0);
+    // 日圓最容易被誤當成 2 位 —— 它跟美元一樣有「元」的感覺，但 1 円就是最小單位。
+    expect(minorUnits("JPY")).toBe(0);
   });
 
   it("其他幣別預設 2 位", () => {

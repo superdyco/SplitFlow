@@ -49,6 +49,7 @@ function normalizeExpense(id: string, data: DocumentData): Expense {
     receipt: (data.receipt as Expense["receipt"] | undefined) ?? null,
     note: (data.note as string | undefined) ?? "",
     date: (data.date as string | undefined) ?? null,
+    time: (data.time as string | undefined) ?? "",
     createdBy: data.createdBy,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt

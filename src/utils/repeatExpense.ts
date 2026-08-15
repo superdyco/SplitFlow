@@ -21,7 +21,7 @@ export interface RepeatFields {
 /**
  * 刻意不帶的三樣：
  * - `amount`：那正是每次要改的東西
- * - `date`：再記一筆是記今天的
+ * - `date` / `time`：再記一筆是記現在的，不是原本那天那個時間的
  * - `rate` / `baseAmount`：匯率是記帳當下鎖定的，新的一筆要重新查今天的
  */
 export function repeatFieldsOf(expense: Expense): RepeatFields {

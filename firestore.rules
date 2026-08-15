@@ -162,12 +162,18 @@ service cloud.firestore {
             && data.splits.size() > 0
             && validPlace()
             && validReceipt()
-            && validNote();
+            && validNote()
+            && validTime();
         }
 
         // 地點是選填。有填的話至少要有名稱，座標可以是 null（沒用 Google 搜尋時）。
+        //
+        // 用 .get() 而不是直接讀欄位：地點是後來才加的，之前建立的支出根本沒有這個 key，
+        // 直接讀會是 evaluation error（不是 false），整條規則當場中斷。
+        // 症狀是「只改收據路徑」這種局部更新在舊支出上會被擋 —— update 的
+        // request.resource.data 是合併後的結果，缺的欄位不會憑空長出來。
         function validPlace() {
-          let place = request.resource.data.place;
+          let place = request.resource.data.get("place", null);
           return place == null
             || (
               place is map
@@ -195,6 +201,14 @@ service cloud.firestore {
         function validNote() {
           let note = request.resource.data.get("note", "");
           return note is string && note.size() <= 500;
+        }
+
+        // 時間是選填的 "HH:MM"（24 小時制），空字串代表沒記。
+        // 比照 note 用 .get()：這個功能之前建立的支出沒有這個欄位。
+        function validTime() {
+          let time = request.resource.data.get("time", "");
+          return time is string
+            && (time == "" || time.matches("([01][0-9]|2[0-3]):[0-5][0-9]"));
         }
 
         function validNewParticipants() {

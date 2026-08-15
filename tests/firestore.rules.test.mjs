@@ -204,6 +204,7 @@ function newExpense(overrides = {}) {
     place: null,
     receipt: null,
     note: "",
+    time: "",
     createdBy: MEMBER,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -225,6 +226,7 @@ function editedExpense(overrides = {}) {
     place: null,
     receipt: null,
     note: "",
+    time: "",
     updatedAt: serverTimestamp(),
     ...overrides
   };
@@ -723,6 +725,45 @@ async function main() {
     delete withoutNote.note;
     await assertSucceeds(
       updateDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "legacy"), withoutNote)
+    );
+  });
+
+  await test("時間可以留空，也可以是 HH:MM", async () => {
+    await seed();
+    await assertSucceeds(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e2"), newExpense({ time: "" }))
+    );
+    await assertSucceeds(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e3"), newExpense({ time: "00:00" }))
+    );
+    await assertSucceeds(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e4"), newExpense({ time: "23:59" }))
+    );
+  });
+
+  await test("不是 HH:MM 的時間要被擋", async () => {
+    await seed();
+    await assertFails(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e2"), newExpense({ time: "24:00" }))
+    );
+    await assertFails(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e3"), newExpense({ time: "7:5" }))
+    );
+    await assertFails(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e4"), newExpense({ time: "晚上八點" }))
+    );
+    await assertFails(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e5"), newExpense({ time: 2030 }))
+    );
+  });
+
+  // validTime 也用 .get()，理由跟 note 一樣。
+  await test("沒有 time 欄位的舊格式支出仍然編輯得動", async () => {
+    await seed();
+    const withoutTime = editedExpense();
+    delete withoutTime.time;
+    await assertSucceeds(
+      updateDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "legacy"), withoutTime)
     );
   });
 

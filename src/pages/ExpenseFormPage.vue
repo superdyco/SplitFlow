@@ -21,9 +21,10 @@ import {
   rememberPlaceBias,
   type PlaceSuggestion
 } from "@/services/placeService";
+import { geolocationAvailable, getCurrentLatLng } from "@/services/geolocation";
 import { biasFromPlaces, type LatLng } from "@/utils/placeBias";
 import { mapsEnabled } from "@/services/mapsLoader";
-import PlaceMap from "@/components/map/PlaceMap.vue";
+import PlaceMap, { type MapMarker } from "@/components/map/PlaceMap.vue";
 import {
   CURRENCIES,
   allocate,
@@ -37,12 +38,13 @@ import {
   rateInputError
 } from "@/utils/currency";
 import { firebaseErrorMessage, required } from "@/utils/firestore";
-import { expenseDate, todayInput } from "@/utils/expenseDate";
+import { expenseDate, expenseTime, nowTimeInput, todayInput } from "@/utils/expenseDate";
 import { repeatFieldsOf } from "@/utils/repeatExpense";
 import { settleWrite } from "@/utils/offlineWrite";
 import ReceiptField from "@/components/expense/ReceiptField.vue";
 import ReceiptViewer from "@/components/expense/ReceiptViewer.vue";
 import { useReceipt } from "@/composables/useReceipt";
+import { useDictation } from "@/composables/useDictation";
 import { deleteReceipt, flushReceipts } from "@/services/receiptService";
 import { removeQueued } from "@/services/receiptQueue";
 
@@ -82,11 +84,24 @@ const error = ref<string | null>(null);
 const queuedNotice = ref(false);
 
 const title = ref("");
+/**
+ * 支出名稱的語音輸入。講出來的內容直接取代欄位內容，不是接在後面 ——
+ * 「晚」加上聽到的「晚餐」會變成「晚晚餐」，那種結果比重打一次還煩。
+ * 名稱本來就短，講錯再講一次就好。
+ */
+const titleVoice = useDictation(text => {
+  title.value = text.slice(0, 60);
+});
 const category = ref<ExpenseCategory>(DEFAULT_CATEGORY);
 const amount = ref("");
 const currency = ref("TWD");
 /** 消費發生的日期。新增預設今天，用本地時區組字串，不要走 toISOString（那是 UTC）。 */
 const date = ref(todayInput());
+/**
+ * 消費發生的時間，選填。新增時預設「現在」—— 多數人是當場記帳，
+ * 而且看得到預設值才知道有這個欄位；補記昨天的人自己改掉或清空就好。
+ */
+const time = ref(nowTimeInput());
 const paidBy = ref(uid);
 const splitMode = ref<SplitMode>("even");
 const splitMemberIds = ref<string[]>([]);
@@ -104,22 +119,42 @@ const placeQuery = ref("");
 const selectedPlace = ref<ExpensePlace | null>(null);
 const suggestions = ref<PlaceSuggestion[]>([]);
 const placeLoading = ref(false);
+const locating = ref(false);
 const placeError = ref<string | null>(null);
 const placeSearchable = placesEnabled();
+/** 按下定位鍵抓到的座標。只用來在地圖上標出「你在這」，不會存進支出裡。 */
+const myLocation = ref<LatLng | null>(null);
 /**
  * 搜尋的位置偏好。沒有它的話「星巴克」會回傳全世界的分店 ——
  * 人在曼谷卻搜到台北那間。第一筆支出還沒有參考點，就退回原本的全球搜尋。
  */
 const placeBias = ref<LatLng | null>(recallPlaceBias(taskId));
 const mapAvailable = mapsEnabled();
+/**
+ * 定位鍵的用途就是把「你在這」畫在下面那張地圖上，沒有地圖金鑰就沒有地圖可畫，
+ * 按了不會有任何反應 —— 那種按鈕不如不要出現。
+ */
+const canLocate = mapAvailable && geolocationAvailable();
 let placeSession = newSessionToken();
 let placeTimer: number | undefined;
 
-/** 有座標才畫得出地圖，純文字地點就沒有。 */
-const placeMarkers = computed(() => {
+/**
+ * 地圖上永遠只有一個標記，而且選好的地點優先。
+ *
+ * 定位只是還沒決定地點時的參考 —— 一旦選了店，地圖要標的就是那家店。
+ * 兩個一起畫的話，地圖上兩顆紅點誰是誰看不出來，存進支出的又只有其中一個。
+ *
+ * 目前位置是「隱藏」不是「清掉」：把地點欄位清空或改字之後，
+ * 那個參考點會自己回來，不用再按一次定位。
+ * 只打名字沒選建議的地點沒有座標，畫不出來，那時也是回頭標目前位置。
+ */
+const placeMarkers = computed<MapMarker[]>(() => {
   const place = selectedPlace.value;
-  if (!place || place.lat === null || place.lng === null) return [];
-  return [{ id: place.placeId ?? "place", lat: place.lat, lng: place.lng, title: place.name }];
+  if (place && place.lat !== null && place.lng !== null) {
+    return [{ id: place.placeId ?? "place", lat: place.lat, lng: place.lng, title: place.name }];
+  }
+  const here = myLocation.value;
+  return here ? [{ id: "me", lat: here.lat, lng: here.lng, title: "你目前的位置" }] : [];
 });
 
 const baseCurrency = computed(() => taskState.task.value?.defaultCurrency || "TWD");
@@ -269,12 +304,34 @@ async function pickPlace(suggestion: PlaceSuggestion) {
   }
 }
 
+/**
+ * 定位鍵：抓現在的座標，標在下面那張地圖上。
+ *
+ * 刻意不去查附近有什麼店、也不動地點欄位 —— 這顆鍵只回答「我在哪」。
+ * 順帶把搜尋的位置偏好換成這裡：人就在這，比上一筆支出的座標更準，
+ * 而且這是 autocomplete 請求上的一個欄位，不會多花錢。
+ */
+async function useCurrentLocation() {
+  locating.value = true;
+  placeError.value = null;
+  try {
+    const here = await getCurrentLatLng();
+    myLocation.value = here;
+    placeBias.value = here;
+  } catch (err) {
+    placeError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    locating.value = false;
+  }
+}
+
 function clearPlace() {
   window.clearTimeout(placeTimer);
   placeQuery.value = "";
   selectedPlace.value = null;
   suggestions.value = [];
   placeError.value = null;
+  // 目前位置不清掉：那是「我在哪」，跟這一格填了什麼地點無關。
 }
 
 async function loadRate() {
@@ -376,6 +433,9 @@ async function load() {
     placeBias.value = biasFromPlaces([expense.place]) ?? placeBias.value;
     // 舊支出沒存日期，帶出 createdAt 換算的那天當預設，存回去就補上了。
     date.value = expenseDate(expense);
+    // 時間沒有這種退路（見 expenseTime 的說明）：原本沒記就維持空白，
+    // 不要拿「現在」去填，那會把編輯的當下寫成消費時間。
+    time.value = expenseTime(expense);
     note.value = expense.note;
     await receiptState.loadExisting(expense.receipt);
 
@@ -450,7 +510,9 @@ async function submit() {
       // 先寫既有的值；新選的照片要等下面拿到 id 之後才處理。
       receipt: receiptState.receipt.value,
       note: note.value.trim(),
-      date: date.value || todayInput()
+      date: date.value || todayInput(),
+      // 清空的話就是空字串（沒記時間），不要補上現在幾點。
+      time: time.value
     };
 
     let outcome: Awaited<ReturnType<typeof settleWrite>>;
@@ -531,11 +593,7 @@ onMounted(load);
         <h1 class="title">{{ isEdit ? "編輯支出" : "新增支出" }}</h1>
 
         <div class="card stack">
-          <label class="field">
-            <span class="label">支出名稱</span>
-            <input v-model="title" class="input" maxlength="60" placeholder="例如：晚餐" />
-          </label>
-
+          <!-- 分類排在名稱前面：先按一下分類，名稱要打什麼通常也就想好了。 -->
           <div class="field">
             <span class="label">分類</span>
             <div class="chips">
@@ -553,6 +611,45 @@ onMounted(load);
             </div>
           </div>
 
+          <div class="field">
+            <label class="label" for="expense-title">支出名稱</label>
+            <div class="row">
+              <input
+                id="expense-title"
+                v-model="title"
+                class="input grow"
+                maxlength="60"
+                placeholder="例如：晚餐"
+              />
+              <!--
+                只有一個圖示，所以 aria-label 是它唯一的名字，不能省。
+                聽的時候換成「停止」，因為按下去就是停。
+              -->
+              <button
+                v-if="titleVoice.available"
+                type="button"
+                class="btn icon-btn"
+                :class="{ working: titleVoice.listening.value }"
+                :aria-label="titleVoice.listening.value ? '停止語音輸入' : '用說的輸入支出名稱'"
+                :title="titleVoice.listening.value ? '停止語音輸入' : '用說的輸入支出名稱'"
+                @click="titleVoice.toggle"
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+                  <rect x="9" y="2.5" width="6" height="11" rx="3" fill="currentColor" />
+                  <path
+                    d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </button>
+            </div>
+            <span v-if="titleVoice.listening.value" class="tiny">請說話...</span>
+            <span v-else-if="titleVoice.error.value" class="tiny warn">{{ titleVoice.error.value }}</span>
+          </div>
+
           <div class="row">
             <label class="field grow">
               <span class="label">金額</span>
@@ -567,11 +664,22 @@ onMounted(load);
             </label>
           </div>
 
-          <label class="field">
-            <span class="label">日期</span>
-            <input v-model="date" type="date" class="input" />
-            <span class="tiny">隔天才補記的話改成消費當天，結算與排序都看這個日期。</span>
-          </label>
+          <div class="field">
+            <div class="row">
+              <label class="field grow">
+                <span class="label">日期</span>
+                <input v-model="date" type="date" class="input" />
+              </label>
+              <label class="field time">
+                <span class="label">時間（選填）</span>
+                <input v-model="time" type="time" class="input" />
+              </label>
+            </div>
+            <span class="tiny">
+              隔天才補記的話改成消費當天，結算與排序都看這個日期。
+              時間只影響同一天的排序與顯示，不確定就清空。
+            </span>
+          </div>
 
           <div v-if="needsRate" class="field">
             <span class="label">匯率（1 {{ currency }} = ? {{ baseCurrency }}）</span>
@@ -595,13 +703,40 @@ onMounted(load);
               <button v-if="placeQuery" type="button" class="link" @click="clearPlace">清除</button>
             </div>
             <div class="place">
-              <input
-                :value="placeQuery"
-                class="input"
-                :placeholder="placeSearchable ? '輸入店名或地址，從清單選一個' : '輸入地點名稱'"
-                autocomplete="off"
-                @input="onPlaceInput(($event.target as HTMLInputElement).value)"
-              />
+              <div class="row">
+                <input
+                  :value="placeQuery"
+                  class="input grow"
+                  :placeholder="placeSearchable ? '輸入店名或地址，從清單選一個' : '輸入地點名稱'"
+                  autocomplete="off"
+                  @input="onPlaceInput(($event.target as HTMLInputElement).value)"
+                />
+                <!--
+                  只有一個圖示，所以 aria-label 是它唯一的名字，不能省。
+                  title 讓滑鼠停著也看得到說明。
+                -->
+                <button
+                  v-if="canLocate"
+                  type="button"
+                  class="btn icon-btn"
+                  :class="{ working: locating }"
+                  :disabled="locating"
+                  aria-label="標出我目前的位置"
+                  title="標出我目前的位置"
+                  @click="useCurrentLocation"
+                >
+                  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+                    <circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="2" />
+                    <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+                    <path
+                      d="M12 1.5v3.5M12 19v3.5M1.5 12h3.5M19 12h3.5"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </button>
+              </div>
               <ul v-if="suggestions.length" class="suggestions">
                 <li v-for="item in suggestions" :key="item.placeId">
                   <button type="button" class="suggestion" @click="pickPlace(item)">
@@ -611,7 +746,8 @@ onMounted(load);
                 </li>
               </ul>
             </div>
-            <span v-if="placeLoading" class="tiny">搜尋中...</span>
+            <span v-if="locating" class="tiny">正在取得目前位置...</span>
+            <span v-else-if="placeLoading" class="tiny">搜尋中...</span>
             <span v-else-if="placeError" class="tiny warn">{{ placeError }}</span>
             <span v-else-if="selectedPlace?.address" class="tiny">{{ selectedPlace.address }}</span>
             <span v-else-if="!placeSearchable" class="tiny">
@@ -771,6 +907,12 @@ onMounted(load);
   width: 110px;
 }
 
+/* 時間比日期短，給它固定寬度，日期那格就吃掉剩下的空間。 */
+.time {
+  flex: none;
+  width: 130px;
+}
+
 /*
   .input 是為單行輸入設計的（padding 上下是 0、固定 min-height），
   textarea 要自己補上下內距與行高，不然文字會貼著上緣。
@@ -857,6 +999,41 @@ onMounted(load);
 
 .place {
   position: relative;
+}
+
+/* 只有圖示的方形按鈕（定位、語音），高度對齊旁邊的輸入框（.input 是 52px）。 */
+.icon-btn {
+  flex: none;
+  width: 52px;
+  min-height: 52px;
+  padding: 0;
+  color: var(--color-primary);
+}
+
+/*
+  進行中的回饋：這種按鈕上沒有文字可以改成「定位中...」，只好讓圖示自己動。
+  抓 GPS 或等語音辨識動輒好幾秒，沒有任何動靜的話會被當成沒反應而一直重按。
+*/
+.icon-btn.working {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.icon-btn.working svg {
+  animation: icon-pulse 1s ease-in-out infinite;
+}
+
+@keyframes icon-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* 會暈車的人不需要這個提示，顏色的變化已經說明狀態了。 */
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn.working svg {
+    animation: none;
+  }
 }
 
 .suggestions {

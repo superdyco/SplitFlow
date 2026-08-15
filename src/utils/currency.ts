@@ -1,4 +1,4 @@
-export const CURRENCIES = ["TWD", "THB", "USD", "VND", "CNY", "EGP", "KRW", "EUR", "HKD"];
+export const CURRENCIES = ["TWD", "JPY", "THB", "USD", "VND", "CNY", "EGP", "KRW", "EUR", "HKD"];
 
 const MINOR_UNITS: Record<string, number> = {
   TWD: 2,
@@ -9,7 +9,9 @@ const MINOR_UNITS: Record<string, number> = {
   EUR: 2,
   HKD: 2,
   VND: 0,
-  KRW: 0
+  KRW: 0,
+  // 日圓沒有輔幣單位，1 円就是最小單位 —— 跟 VND、KRW 同一類。
+  JPY: 0
 };
 
 export function minorUnits(currency: string): number {

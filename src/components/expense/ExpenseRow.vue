@@ -4,7 +4,7 @@ import { RouterLink } from "vue-router";
 import type { Expense } from "@/types/expense";
 import { categoryMeta } from "@/types/expense";
 import { formatAmount } from "@/utils/currency";
-import { expenseDate } from "@/utils/expenseDate";
+import { expenseDate, expenseTime } from "@/utils/expenseDate";
 
 const props = defineProps<{
   expense: Expense;
@@ -24,8 +24,15 @@ function repeat(event: Event) {
 }
 
 const meta = computed(() => categoryMeta(props.expense.category));
-/** 只顯示月/日，年份在任務層級就知道了，列表裡每筆都印年份太吵。 */
-const shownDate = computed(() => expenseDate(props.expense).slice(5).replace("-", "/"));
+/**
+ * 只顯示月/日，年份在任務層級就知道了，列表裡每筆都印年份太吵。
+ * 有記時間就接在後面（`03/05 19:30`），沒記就只有日期。
+ */
+const shownDate = computed(() => {
+  const date = expenseDate(props.expense).slice(5).replace("-", "/");
+  const time = expenseTime(props.expense);
+  return time ? `${date} ${time}` : date;
+});
 const paidByName = computed(() => props.memberNames[props.expense.paidBy] || "已離開的成員");
 const splitCount = computed(() => Object.keys(props.expense.splits).length);
 const splitLabel = computed(() =>

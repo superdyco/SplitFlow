@@ -89,6 +89,16 @@ export interface Expense {
    * 這個欄位之前建立的舊資料是 null，顯示與排序會退回用 `createdAt`。
    */
   date: string | null;
+  /**
+   * 消費發生的時間，`"HH:MM"`（24 小時制）。空字串代表沒記時間。
+   *
+   * 跟 `date` 一樣是本地時間的字串，不是 Timestamp —— 「中午十二點吃的」
+   * 換個時區看還是中午十二點。
+   *
+   * 用空字串而不是 null，理由同 `note`：純字串的空值就是空字串。
+   * 這個欄位之前建立的舊資料讀出來也是空字串。
+   */
+  time: string;
   createdBy: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -108,4 +118,5 @@ export interface ExpenseInput {
   receipt: ExpenseReceipt | null;
   note: string;
   date: string;
+  time: string;
 }

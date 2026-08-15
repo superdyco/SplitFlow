@@ -226,23 +226,47 @@ a {
 }
 
 /*
- * iOS Safari 的原生日期輸入有自己的固有寬度，會無視 width: 100% 直接撐破容器。
- * 關掉原生外觀並解除最小寬度限制才收得回來（點下去仍然是系統的日期選擇器）。
+ * 同一個毛病的另一半：iOS Safari 的原生下拉選單有自己的固有高度，
+ * 會無視 min-height —— 手機上「幣別」就比旁邊的「金額」矮一截。
+ * 關掉原生外觀才吃得到我們的尺寸（點下去仍然是系統的選單）。
+ *
+ * 代價是原生的下拉箭頭也一起不見了，用背景圖補回來。箭頭顏色寫死成
+ * --color-muted 的值：background-image 的 data URI 拿不到 CSS 變數，
+ * 這個 app 只有一套配色，所以直接寫比繞一圈划算。
  */
-.input[type="date"] {
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 52px;
+  /* 留給箭頭的位置，不然長一點的選項會壓到它。 */
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%238a8078' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px 8px;
+}
+
+/*
+ * iOS Safari 的原生日期／時間輸入有自己的固有寬度，會無視 width: 100% 直接撐破容器。
+ * 關掉原生外觀並解除最小寬度限制才收得回來（點下去仍然是系統的選擇器）。
+ */
+.input[type="date"],
+.input[type="time"] {
   appearance: none;
   -webkit-appearance: none;
   min-width: 0;
   max-width: 100%;
 }
 
-/* iOS 會把日期文字置中，跟其他欄位的左對齊不一致。 */
-.input[type="date"]::-webkit-date-and-time-value {
+/* iOS 會把日期與時間置中，跟其他欄位的左對齊不一致。 */
+.input[type="date"]::-webkit-date-and-time-value,
+.input[type="time"]::-webkit-date-and-time-value {
   text-align: left;
 }
 
-/* 關掉原生外觀之後桌面版的日曆圖示會不見，補回來並對齊右側。 */
-.input[type="date"]::-webkit-calendar-picker-indicator {
+/* 關掉原生外觀之後桌面版的日曆／時鐘圖示會不見，補回來並對齊右側。 */
+.input[type="date"]::-webkit-calendar-picker-indicator,
+.input[type="time"]::-webkit-calendar-picker-indicator {
   margin-left: auto;
   opacity: 0.5;
   cursor: pointer;
