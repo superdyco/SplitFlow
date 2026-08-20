@@ -12,10 +12,11 @@ import type { TaskRole } from "@/types/member";
 import { useAuthStore } from "@/stores/auth";
 import { listUserTasks, setTaskStatus } from "@/services/taskService";
 import { settleWrite } from "@/utils/offlineWrite";
-import { getTaskMember, listTaskMembers } from "@/services/memberService";
+import { listTaskMembers } from "@/services/memberService";
 import { listExpenses } from "@/services/expenseService";
 import { myTripCost, sumByCurrency } from "@/utils/myCost";
 import { partitionTasks } from "@/utils/taskStatus";
+import { taskRole } from "@/utils/taskRole";
 import { formatAmount } from "@/utils/currency";
 import { firebaseErrorMessage } from "@/utils/firestore";
 
@@ -25,8 +26,9 @@ const error = ref<string | null>(null);
 const rows = ref<Array<{ task: Task; role: TaskRole }>>([]);
 
 /**
- * 讀取分兩步：先查任務清單，再逐一讀自己在該任務的角色。
- * 出錯時標明是哪一步，不然畫面只會顯示一句看不出來源的權限錯誤。
+ * 一次查詢就夠：角色從 task 文件的 ownerId / adminIds 推導，不再逐一讀
+ * members/{uid}。原本那組扇出佔掉冷啟動的 44%，而且包在 Promise.all 裡，
+ * 任何一筆卡住整份清單都不會出現。
  */
 async function load() {
   const uid = authStore.user?.uid;
@@ -37,15 +39,7 @@ async function load() {
     const tasks = await listUserTasks(uid).catch(err => {
       throw new Error(`讀取任務列表失敗：${firebaseErrorMessage(err)}`);
     });
-
-    rows.value = await Promise.all(
-      tasks.map(async task => {
-        const member = await getTaskMember(task.id, uid).catch(err => {
-          throw new Error(`讀取「${task.name}」的角色失敗：${firebaseErrorMessage(err)}`);
-        });
-        return { task, role: member?.role || ("member" as TaskRole) };
-      })
-    );
+    rows.value = tasks.map(task => ({ task, role: taskRole(task, uid) }));
   } catch (err) {
     error.value = firebaseErrorMessage(err);
   } finally {
