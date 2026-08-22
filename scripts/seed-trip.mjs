@@ -255,7 +255,7 @@ async function seed() {
   const { initializeApp, cert } = await import("firebase-admin/app");
   const { getFirestore, FieldValue, Timestamp } = await import("firebase-admin/firestore");
 
-  initializeApp({ cert: cert(JSON.parse(readFileSync(keyPath, "utf8"))) });
+  initializeApp({ credential: cert(JSON.parse(readFileSync(keyPath, "utf8"))) });
   const db = getFirestore();
 
   const taskRef = db.collection("tasks").doc();
