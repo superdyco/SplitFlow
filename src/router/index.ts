@@ -40,21 +40,42 @@ const JoinTaskPage = () => import("@/pages/JoinTaskPage.vue");
 const ProfilePage = () => import("@/pages/ProfilePage.vue");
 const ReportPage = () => import("@/pages/ReportPage.vue");
 
-function waitForAuth(authStore: ReturnType<typeof useAuthStore>) {
-  if (authStore.initialized) return Promise.resolve();
-  return new Promise<void>(resolve => {
-    const stop = authStore.$subscribe(() => {
-      if (authStore.initialized) {
-        stop();
-        resolve();
-      }
+/**
+ * 這個文件第一次還原登入狀態與讀個人資料各花了多久。
+ *
+ * 為什麼要獨立記，不能只看分段：這兩筆帳落在**第一次導航**頭上，而第一次
+ * 導航去哪是裝置決定的。桌機直接開 `/tasks`，所以 `auth` 分段量得到（實測
+ * 1,053ms）；手機的 PWA 開在 `/login`，帳算在那一次，追蹤 `/tasks` 時
+ * `auth` 永遠是 0 —— 三批樣本都被這件事騙過去，還把它當成「手機上很快」。
+ *
+ * 記成獨立的值之後，不管第一次導航去哪，數字都跟得上來。
+ */
+let authRestoreMs: number | null = null;
+let profileLoadMs: number | null = null;
+
+async function waitForAuth(authStore: ReturnType<typeof useAuthStore>) {
+  const startedAt = performance.now();
+
+  if (!authStore.initialized) {
+    await new Promise<void>(resolve => {
+      const stop = authStore.$subscribe(() => {
+        if (authStore.initialized) {
+          stop();
+          resolve();
+        }
+      });
     });
-  });
+  }
+
+  // 只記第一次。之後每次都是 0，蓋上去就把要查的數字洗掉了。
+  if (authRestoreMs === null) authRestoreMs = Math.round(performance.now() - startedAt);
 }
 
 async function ensureProfile(uid: string) {
   const userStore = useUserStore();
+  const startedAt = performance.now();
   if (userStore.loadedForUid !== uid) await userStore.load(uid);
+  if (profileLoadMs === null) profileLoadMs = Math.round(performance.now() - startedAt);
   return userStore.profile;
 }
 
@@ -105,8 +126,11 @@ router.beforeEach(async (to, from) => {
   const authStore = useAuthStore();
   authStore.init();
   await waitForAuth(authStore);
-  // 冷啟動時這一段是在等 Firebase 從 IndexedDB 還原登入狀態；之後都是 0。
+  // 冷啟動時這一段是在等 Firebase 從儲存還原登入狀態；之後都是 0。
   markPhase("auth");
+  // 分段量的是「這一次導航等了多久」，這個量的是「這個文件總共等過多久」。
+  // 手機上兩者差很多，而差的那一段正是使用者盯著空白畫面的時間。
+  traceDetail("authRestoreMs", authRestoreMs ?? 0);
 
   const user = authStore.user;
   if (to.path === "/login" && user) {
@@ -123,6 +147,7 @@ router.beforeEach(async (to, from) => {
   const profile = await ensureProfile(user.uid);
   // 第一次會真的讀一趟 users/{uid}，之後 userStore 有快取就是 0。
   markPhase("profile");
+  traceDetail("profileLoadMs", profileLoadMs ?? 0);
   if (to.meta.requiresProfile && !profile?.nickname) {
     return `/onboarding?redirect=${redirectPath(to)}`;
   }
