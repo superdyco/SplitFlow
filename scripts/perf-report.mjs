@@ -250,6 +250,69 @@ async function main() {
   // 冷啟動判斷壞掉時留下的線索：第一次導航到底跑去哪了。
   share("這個分頁第一次導航去哪", tally(samples, sample => sample.detail?.firstPath), samples.length);
 
+  /*
+    平台對照。回答的是「為什麼手機卡、桌機不卡」——同一份程式碼、同一個
+    Firestore、同一個網路，剩下的差別就是這一欄。
+
+    iOS 上的「Chrome」仍然是 WebKit（Apple 不准別的引擎），所以標籤照實寫成
+    iPhone Chrome，但判讀時要記得它跟 Mac Chrome 不是同一個引擎。
+  */
+  function platform(sample) {
+    const ua = sample.userAgent ?? "";
+    const os = /iPhone/.test(ua)
+      ? "iPhone"
+      : /iPad/.test(ua)
+        ? "iPad"
+        : /Android/.test(ua)
+          ? "Android"
+          : /Macintosh/.test(ua)
+            ? "Mac"
+            : /Windows/.test(ua)
+              ? "Windows"
+              : "其他";
+    const browser = /CriOS|Chrome\//.test(ua)
+      ? "Chrome"
+      : /Firefox|FxiOS/.test(ua)
+        ? "Firefox"
+        : /Safari/.test(ua)
+          ? "Safari"
+          : "其他";
+    return `${os} ${browser} ${sample.installed ? "PWA" : "瀏覽器"}`;
+  }
+
+  const byPlatform = new Map();
+  for (const sample of samples) {
+    const key = platform(sample);
+    if (!byPlatform.has(key)) byPlatform.set(key, []);
+    byPlatform.get(key).push(sample);
+  }
+
+  table(
+    "平台 × query",
+    [...byPlatform.entries()].map(([name, rows]) => [
+      name,
+      summarize(rows.map(sample => sample.phases?.query ?? 0))
+    ])
+  );
+  for (const [name, rows] of byPlatform) {
+    const stalled = rows.filter(sample => sample.detail?.recovered).length;
+    console.log(`  ${name}：卡住 ${stalled}/${rows.length} 次`);
+  }
+
+  // 冷啟動的開機成本也要照平台分：3.3 秒的空窗是不是只有手機才有。
+  const coldByPlatform = new Map();
+  for (const sample of coldSamples) {
+    const key = platform(sample);
+    if (!coldByPlatform.has(key)) coldByPlatform.set(key, []);
+    coldByPlatform.get(key).push(sample.sinceStart ?? 0);
+  }
+  if (coldByPlatform.size) {
+    table(
+      "平台 × 冷啟動進頁面之前",
+      [...coldByPlatform.entries()].map(([name, values]) => [name, summarize(values)])
+    );
+  }
+
   share("網路", tally(samples, sample => sample.network?.effectiveType), samples.length);
   share("裝置", tally(samples, sample => (sample.installed ? "已安裝的 App" : "瀏覽器")), samples.length);
   share("版本", tally(samples, sample => sample.version), samples.length);
