@@ -5,7 +5,6 @@ import {
   OAuthProvider,
   fetchSignInMethodsForEmail,
   onAuthStateChanged,
-  browserPopupRedirectResolver,
   signInWithPopup,
   signOut,
   type AuthProvider,
@@ -75,12 +74,7 @@ export function watchAuth(callback: (user: User | null) => void): () => void {
 
 export async function signIn(name: SignInProvider): Promise<User> {
   try {
-    /*
-      resolver 在這裡傳，不在 initializeAuth 傳 —— 它會載 gapi 並開一個跨來源
-      iframe，設在初始化就等於每次冷啟動都付一次（手機上 1.6 秒）。
-      放到這裡之後，只有真的要登入的那一次才付。
-    */
-    const credential = await signInWithPopup(auth, buildProvider(name), browserPopupRedirectResolver);
+    const credential = await signInWithPopup(auth, buildProvider(name));
     return credential.user;
   } catch (err) {
     throw await toSignInError(err, name);
