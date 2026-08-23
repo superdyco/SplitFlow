@@ -160,6 +160,10 @@ async function main() {
   const overall = [["總計", summarize(samples.map(sample => sample.total))]];
   if (coldSamples.length) {
     overall.push(
+      // 這兩個是獨立記的，不是分段 —— 第一次導航去哪是裝置決定的，
+      // 分段只看得到「這一次導航等了多久」，看不到帳算在別次導航上的部分。
+      ["冷啟動：還原登入", summarize(coldSamples.map(sample => sample.detail?.authRestoreMs ?? 0))],
+      ["冷啟動：讀個人資料", summarize(coldSamples.map(sample => sample.detail?.profileLoadMs ?? 0))],
       ["冷啟動：進頁面之前", summarize(coldSamples.map(sample => sample.sinceStart ?? 0))],
       ["冷啟動：TTFB", summarize(coldSamples.map(sample => sample.boot?.ttfb ?? 0))],
       ["冷啟動：DOM 就緒", summarize(coldSamples.map(sample => sample.boot?.dom ?? 0))]
@@ -310,6 +314,20 @@ async function main() {
     table(
       "平台 × 冷啟動進頁面之前",
       [...coldByPlatform.entries()].map(([name, values]) => [name, summarize(values)])
+    );
+  }
+
+  // 這一區是目前最大的那塊在哪裡：桌機實測 1,053ms，手機推算約 3,300ms。
+  const authByPlatform = new Map();
+  for (const sample of coldSamples) {
+    const key = platform(sample);
+    if (!authByPlatform.has(key)) authByPlatform.set(key, []);
+    authByPlatform.get(key).push(sample.detail?.authRestoreMs ?? 0);
+  }
+  if (authByPlatform.size) {
+    table(
+      "平台 × 還原登入狀態",
+      [...authByPlatform.entries()].map(([name, values]) => [name, summarize(values)])
     );
   }
 

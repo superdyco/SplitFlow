@@ -345,6 +345,13 @@ Authorized domains 清單裡，不用另外加。
 | `query` | `listUserTasks` 那一趟 Firestore | 網路或資料量 |
 | `render` | 清單真的長到 DOM 上 | 任務太多 |
 
+`auth` 與 `profile` 這兩段有個陷阱：它們量的是「**這一次導航**等了多久」，而還原
+登入狀態的帳落在**這個文件的第一次導航**頭上 —— 第一次導航去哪是裝置決定的。
+桌機直接開 `/tasks`，量得到 1,053ms；手機的 PWA 開在 `/login`（iOS 記的是安裝
+當下的網址，不看 manifest 的 start_url），帳算在那一次，`auth` 分段永遠是 0。
+前三批樣本都被這件事騙過去。所以另外獨立記了 `detail.authRestoreMs` 與
+`detail.profileLoadMs`，不管第一次導航去哪都跟得上來。
+
 另外還存 `sinceStart`（開始量測之前就花掉的時間：HTML + JS bundle + firebase
 初始化）與 `boot.ttfb` / `boot.dom`。**冷啟動時使用者感受到的慢有可能整段都在
 這裡，而上面六個分段一個都不會顯示異常** —— 所以這兩個數字要一起看。
