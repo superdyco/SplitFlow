@@ -4,6 +4,7 @@ import App from "./App.vue";
 import { router } from "./router";
 import { logError } from "./utils/debugLog";
 import { watchVisibility } from "./utils/visibility";
+import { runStorageProbe } from "./utils/storageProbe";
 import "./assets/styles.css";
 
 const app = createApp(App);
@@ -29,5 +30,8 @@ window.addEventListener("unhandledrejection", event => logError("promise", event
 
 // 要在第一次導航之前就開始聽，不然第一次進背景的時間會漏掉。
 watchVisibility();
+
+// 排在 idle，量完之後每一筆效能樣本都會帶上。見 storageProbe.ts 的說明。
+runStorageProbe();
 
 app.use(createPinia()).use(router).mount("#app");

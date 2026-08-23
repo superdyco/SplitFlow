@@ -2,6 +2,7 @@ import { Timestamp, addDoc, collection, serverTimestamp } from "firebase/firesto
 import { auth, db, localCacheMode } from "@/firebase/config";
 import { logError } from "@/utils/debugLog";
 import { isInstalledApp } from "@/utils/platform";
+import { storageProbe } from "@/utils/storageProbe";
 import { phaseMap, slowestPhase, type PerfTrace } from "@/utils/perfTrace";
 
 /**
@@ -119,6 +120,8 @@ export function reportTrace(trace: PerfTrace): void {
       online: navigator.onLine,
       network: network(),
       installed: isInstalledApp(),
+      /** 這台裝置開一個 IndexedDB 要多久。null 代表還沒量完。 */
+      probe: storageProbe(),
       /** "indexeddb" 或 "memory"。判斷 30 秒的停頓跟離線快取有沒有關係用的。 */
       cache: localCacheMode,
       userAgent: navigator.userAgent,
