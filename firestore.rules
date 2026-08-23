@@ -362,7 +362,7 @@ service cloud.firestore {
         && request.resource.data.page is string
         && request.resource.data.total is number
         && request.resource.data.phases is map
-        && request.resource.data.keys().size() <= 20;
+        && request.resource.data.keys().size() <= 24;
       allow update, delete: if false;
     }
 

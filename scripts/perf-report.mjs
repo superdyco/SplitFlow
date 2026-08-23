@@ -331,6 +331,28 @@ async function main() {
     );
   }
 
+  /*
+    平台 × IndexedDB。這一區要分辨手機冷啟動那 1.6 秒是儲存還是網路：
+    Firebase Auth 挑儲存方式時會真的開一次 IndexedDB（寫一筆再刪掉），
+    這裡量的是同一件事。差 10 倍就是它，兩邊都快就要往網路那邊查。
+
+    -1 代表量不到（無痕模式等），排除掉才不會把平均拉成負的。
+  */
+  const probeByPlatform = new Map();
+  for (const sample of samples) {
+    const ms = sample.probe?.idbMs;
+    if (ms === undefined || ms === null || ms < 0) continue;
+    const key = platform(sample);
+    if (!probeByPlatform.has(key)) probeByPlatform.set(key, []);
+    probeByPlatform.get(key).push(ms);
+  }
+  if (probeByPlatform.size) {
+    table(
+      "平台 × 開一次 IndexedDB",
+      [...probeByPlatform.entries()].map(([name, values]) => [name, summarize(values)])
+    );
+  }
+
   share("網路", tally(samples, sample => sample.network?.effectiveType), samples.length);
   share("裝置", tally(samples, sample => (sample.installed ? "已安裝的 App" : "瀏覽器")), samples.length);
   share("版本", tally(samples, sample => sample.version), samples.length);
