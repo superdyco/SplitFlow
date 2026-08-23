@@ -152,21 +152,30 @@ async function main() {
 
   table("各分段耗時（由慢到快，看 p50）", phaseRows);
 
-  table("整體", [
-    ["總計", summarize(samples.map(sample => sample.total))],
-    // 開始量測之前就花掉的時間：HTML + JS bundle + firebase 初始化。
-    // 冷啟動時這一段常常比所有分段加起來還大，而分段完全看不到它。
-    ["進頁面之前", summarize(samples.map(sample => sample.sinceStart ?? 0))],
-    ["TTFB", summarize(samples.map(sample => sample.boot?.ttfb ?? 0))],
-    ["DOM 就緒", summarize(samples.map(sample => sample.boot?.dom ?? 0))]
-  ]);
+  /*
+    sinceStart 只對冷啟動有意義。站內導航時它是「這次開啟已經多久」——
+    那不是等待成本，把它跟其他數字並排會讓人以為使用者等了兩分半。
+  */
+  const coldSamples = samples.filter(sample => sample.detail?.cold);
+  const overall = [["總計", summarize(samples.map(sample => sample.total))]];
+  if (coldSamples.length) {
+    overall.push(
+      ["冷啟動：進頁面之前", summarize(coldSamples.map(sample => sample.sinceStart ?? 0))],
+      ["冷啟動：TTFB", summarize(coldSamples.map(sample => sample.boot?.ttfb ?? 0))],
+      ["冷啟動：DOM 就緒", summarize(coldSamples.map(sample => sample.boot?.dom ?? 0))]
+    );
+  }
+  table("整體", overall);
+  if (!coldSamples.length) {
+    console.log("");
+    console.log("  （沒有冷啟動樣本。要看的話得把 App 從多工完全滑掉再開。）");
+  }
 
   share("最慢的是哪一段", tally(samples, sample => sample.slowest), samples.length);
 
-  const cold = samples.filter(sample => sample.detail?.cold);
   const warm = samples.filter(sample => !sample.detail?.cold);
   table("冷啟動 vs 站內導航（總計）", [
-    ["冷啟動", summarize(cold.map(sample => sample.total))],
+    ["冷啟動", summarize(coldSamples.map(sample => sample.total))],
     ["站內導航", summarize(warm.map(sample => sample.total))]
   ]);
 
@@ -178,6 +187,23 @@ async function main() {
       ["連伺服器", summarize(live.map(sample => sample.total))]
     ]);
   }
+
+  /*
+    本機快取模式的對照。比的是 query 那一段而不是總計 —— 總計會被其他分段稀釋，
+    而這個實驗要問的問題只有一個：換掉快取之後，等伺服器那一段有沒有變短。
+
+    舊的樣本沒有這個欄位（功能上線之前寫的），歸在「沒有記錄」，那些一律是 indexeddb。
+  */
+  const byCache = new Map();
+  for (const sample of samples) {
+    const key = sample.cache ?? "沒有記錄（indexeddb）";
+    if (!byCache.has(key)) byCache.set(key, []);
+    byCache.get(key).push(sample.phases?.query ?? 0);
+  }
+  table(
+    "本機快取模式 × query",
+    [...byCache.entries()].map(([mode, values]) => [mode, summarize(values)])
+  );
 
   share("網路", tally(samples, sample => sample.network?.effectiveType), samples.length);
   share("裝置", tally(samples, sample => (sample.installed ? "已安裝的 App" : "瀏覽器")), samples.length);
