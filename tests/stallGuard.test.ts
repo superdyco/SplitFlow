@@ -66,8 +66,8 @@ describe("guardStall", () => {
     await expect(guarded).rejects.toThrow("unavailable");
   });
 
-  it("門檻可以改，預設是 2.5 秒", async () => {
-    expect(STALL_TIMEOUT_MS).toBe(2500);
+  it("門檻可以改，預設是 1.5 秒", async () => {
+    expect(STALL_TIMEOUT_MS).toBe(1500);
 
     const onStall = vi.fn();
     void guardStall(new Promise(() => {}), onStall, 100);

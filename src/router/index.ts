@@ -11,19 +11,24 @@ import { backgroundContext } from "@/utils/visibility";
 const TRACED_PATH = "/tasks";
 
 /**
- * 這個分頁到目前為止導航過幾次，以及第一次是導到哪裡。
+ * 冷啟動 = 這個文件的第一次 `/tasks` 導航，不是第一次導航。
  *
- * 本來這裡是一個 `firstNavigation` 布林值，用來標記冷啟動 —— 結果 17 筆樣本
- * 全部標成 false，包括那兩筆明明是全新載入的（boot 時間不同、chunk 重新下載）。
- * 我讀不出它為什麼會是 false，也驗過最可能的嫌疑（`/` 的 redirect record 會不會
- * 多吃掉一次守衛 —— 不會，測出來只跑一次 `/tasks`）。
+ * 這個區別是量出來的。本來的判斷是「第一次導航」，結果 17 筆樣本全部標成
+ * 不是冷啟動，包括明明是全新載入的那幾筆。firstPath 指出了原因：這台裝置的
+ * 第一次導航是 `/login`（守衛發現已經登入才轉去 `/tasks`），所以 `/tasks`
+ * 永遠是第 1 次而不是第 0 次。
  *
- * 所以不猜了，改成記次數與第一個路徑。這比布林值多回答一個問題：如果 navIndex
- * 是 0，那 bug 在別的地方；如果不是 0，firstPath 會直接指出是誰先跑掉了。
- * 查不出來的東西就不要留一個看起來很確定的布林值在那裡騙人。
+ * 而為什麼開在 `/login` —— manifest 的 start_url 是 `/`，但 iOS 幾乎不看
+ * manifest（見 index.html 的註解），它記的是「加入主畫面」當下那個網址。
+ * 也就是說這是安裝方式造成的，別台裝置可能完全不一樣。所以判斷冷啟動不能
+ * 依賴「第一次導航去哪」這種會因人而異的東西。
+ *
+ * navIndex 與 firstPath 留著：它們花了一輪就解開這件事，成本是兩個數字。
  */
 let navigationCount = 0;
 let firstPath = "";
+/** 這個文件進過幾次 `/tasks`。0 代表現在這次是第一次，也就是冷啟動。 */
+let tracedCount = 0;
 
 const LoginPage = () => import("@/pages/LoginPage.vue");
 const OnboardingPage = () => import("@/pages/OnboardingPage.vue");
@@ -82,7 +87,8 @@ router.beforeEach(async (to, from) => {
 
   if (to.path === TRACED_PATH) {
     startTrace("tasks");
-    traceDetail("cold", navIndex === 0);
+    traceDetail("cold", tracedCount === 0);
+    tracedCount += 1;
     traceDetail("navIndex", navIndex);
     traceDetail("firstPath", firstPath);
     traceDetail("from", from.path);
