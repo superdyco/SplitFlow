@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type RouteLocationNormalized } from "vu
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { markPhase, startTrace, traceDetail } from "@/utils/perfTrace";
+import { backgroundContext } from "@/utils/visibility";
 
 /**
  * 只追這一頁。使用者說卡的是它，而每多追一頁就多一份寫入成本與雜訊 ——
@@ -10,10 +11,19 @@ import { markPhase, startTrace, traceDetail } from "@/utils/perfTrace";
 const TRACED_PATH = "/tasks";
 
 /**
- * 冷啟動與站內導航是兩種完全不同的慢法：前者要付 HTML + JS bundle +
- * firebase 初始化，後者一行都不用重載。混在一起平均，兩邊都看不出問題。
+ * 這個分頁到目前為止導航過幾次，以及第一次是導到哪裡。
+ *
+ * 本來這裡是一個 `firstNavigation` 布林值，用來標記冷啟動 —— 結果 17 筆樣本
+ * 全部標成 false，包括那兩筆明明是全新載入的（boot 時間不同、chunk 重新下載）。
+ * 我讀不出它為什麼會是 false，也驗過最可能的嫌疑（`/` 的 redirect record 會不會
+ * 多吃掉一次守衛 —— 不會，測出來只跑一次 `/tasks`）。
+ *
+ * 所以不猜了，改成記次數與第一個路徑。這比布林值多回答一個問題：如果 navIndex
+ * 是 0，那 bug 在別的地方；如果不是 0，firstPath 會直接指出是誰先跑掉了。
+ * 查不出來的東西就不要留一個看起來很確定的布林值在那裡騙人。
  */
-let firstNavigation = true;
+let navigationCount = 0;
+let firstPath = "";
 
 const LoginPage = () => import("@/pages/LoginPage.vue");
 const OnboardingPage = () => import("@/pages/OnboardingPage.vue");
@@ -66,12 +76,25 @@ export const router = createRouter({
 });
 
 router.beforeEach(async (to, from) => {
+  if (!firstPath) firstPath = to.path;
+  const navIndex = navigationCount;
+  navigationCount += 1;
+
   if (to.path === TRACED_PATH) {
     startTrace("tasks");
-    traceDetail("cold", firstNavigation);
+    traceDetail("cold", navIndex === 0);
+    traceDetail("navIndex", navIndex);
+    traceDetail("firstPath", firstPath);
     traceDetail("from", from.path);
+
+    /*
+      最可疑但一直沒量到的變數。卡 30 秒的樣本是不是都發生在剛從背景回來，
+      這兩個數字回答得了 —— 而在此之前我們只能猜。
+    */
+    const background = backgroundContext(performance.now());
+    traceDetail("hiddenMs", background.hiddenMs);
+    traceDetail("sinceVisibleMs", background.sinceVisibleMs);
   }
-  firstNavigation = false;
 
   const authStore = useAuthStore();
   authStore.init();

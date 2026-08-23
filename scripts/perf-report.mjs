@@ -221,6 +221,35 @@ async function main() {
   ]);
   console.log(`  觸發率 ${Math.round((recovered.length / samples.length) * 100)}%`);
 
+  /*
+    背景時間 × query。這一區是為了回答「卡 30 秒的是不是都剛從背景回來」——
+    在此之前這個變數根本沒被記錄過，只能猜。
+
+    分桶而不是散點，是因為要看的是「哪個區間開始出事」，不是每一筆的確切秒數。
+  */
+  function backgroundBucket(sample) {
+    const ms = sample.detail?.hiddenMs;
+    if (ms === undefined) return "沒有記錄（舊版）";
+    if (!ms) return "沒進過背景";
+    if (ms < 30_000) return "背景 <30 秒";
+    if (ms < 120_000) return "背景 30 秒–2 分";
+    return "背景 >2 分";
+  }
+
+  const byBackground = new Map();
+  for (const sample of samples) {
+    const key = backgroundBucket(sample);
+    if (!byBackground.has(key)) byBackground.set(key, []);
+    byBackground.get(key).push(sample.phases?.query ?? 0);
+  }
+  table(
+    "背景時間 × query",
+    [...byBackground.entries()].map(([bucket, values]) => [bucket, summarize(values)])
+  );
+
+  // 冷啟動判斷壞掉時留下的線索：第一次導航到底跑去哪了。
+  share("這個分頁第一次導航去哪", tally(samples, sample => sample.detail?.firstPath), samples.length);
+
   share("網路", tally(samples, sample => sample.network?.effectiveType), samples.length);
   share("裝置", tally(samples, sample => (sample.installed ? "已安裝的 App" : "瀏覽器")), samples.length);
   share("版本", tally(samples, sample => sample.version), samples.length);
@@ -232,7 +261,12 @@ async function main() {
     const phases = Object.entries(sample.phases ?? {})
       .map(([name, ms]) => `${name} ${ms}`)
       .join("　");
-    console.log(`  ${sample.total}ms　${sample.day}　${sample.detail?.cold ? "冷啟動" : "站內"}　${sample.network?.effectiveType ?? "?"}`);
+    const background = sample.detail?.hiddenMs
+      ? `背景 ${Math.round(sample.detail.hiddenMs / 1000)}s → ${Math.round((sample.detail.sinceVisibleMs ?? 0) / 1000)}s 後進頁面`
+      : "沒進過背景";
+    console.log(
+      `  ${sample.total}ms　${sample.day}　${sample.detail?.cold ? "冷啟動" : `第 ${sample.detail?.navIndex ?? "?"} 次導航`}　${background}`
+    );
     console.log(`    ${phases}`);
   }
   console.log("");
