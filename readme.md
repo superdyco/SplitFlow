@@ -162,6 +162,30 @@ Firestore rules 擋，但 Google API key 沒有對應的防線，外流等於直
 }
 ```
 
+`perf/{sampleId}`（效能樣本，只寫不讀，見「效能量測」）
+
+```ts
+{
+  uid: string,
+  page: string,            // "tasks" 或 "tasks-costs"
+  total: number,           // ms
+  sinceStart: number,      // 開始量測之前就花掉的時間（bundle + firebase 初始化）
+  phases: { [name: string]: number },   // auth / profile / chunk / mount / query / render
+  slowest: string,         // 最慢的那一段，直接拿來 group by
+  detail: { cold: boolean, fromCache: boolean, taskCount: number, ... },
+  boot: { ttfb: number, dom: number } | null,
+  version: string,
+  mode: "dev" | "prod",
+  online: boolean,
+  network: { effectiveType, downlink, rtt },  // 只有 Chromium 系有
+  installed: boolean,
+  userAgent: string,
+  day: string,             // "2026-08-23"，查詢用；精確時間在 createdAt
+  createdAt: Timestamp,
+  expiresAt: Timestamp     // 30 天後，配合 Console 的 TTL 政策自動清掉
+}
+```
+
 金額一律存最小單位整數，避免 JavaScript 浮點誤差。各幣別小數位數在 `src/utils/currency.ts`，TWD/THB/USD/CNY/EGP/EUR/HKD 是 2 位，VND/KRW 是 0 位。
 
 ### 匯率
@@ -307,6 +331,48 @@ Authorized domains 清單裡，不用另外加。
 `index.html` 則是 `no-cache`。少了這組設定，`manualChunks` 拆分出來的快取效益拿不到，
 而且部署後使用者可能還會拿到舊版的 index。
 
+## 效能量測
+
+使用者回報「手機上進『我的任務』會卡」。卡在哪一段用猜的沒有意義，所以那一頁
+（含進入它的那次導航）會量下面這幾段，每次進頁面寫一筆到 `perf` 集合：
+
+| 分段 | 量的是什麼 | 慢的話代表 |
+| --- | --- | --- |
+| `auth` | 等 Firebase 從 IndexedDB 還原登入狀態 | 幾乎只有冷啟動會有值 |
+| `profile` | 讀 `users/{uid}` | 第一次才會有值，之後 store 有快取 |
+| `chunk` | 下載並解析 `TaskListPage` 的 JS | 打包的問題，不是查詢的問題 |
+| `mount` | Vue 建版面 | 跟網路無關 |
+| `query` | `listUserTasks` 那一趟 Firestore | 網路或資料量 |
+| `render` | 清單真的長到 DOM 上 | 任務太多 |
+
+另外還存 `sinceStart`（開始量測之前就花掉的時間：HTML + JS bundle + firebase
+初始化）與 `boot.ttfb` / `boot.dom`。**冷啟動時使用者感受到的慢有可能整段都在
+這裡，而上面六個分段一個都不會顯示異常** —— 所以這兩個數字要一起看。
+
+情境值：`detail.cold`（冷啟動還是站內導航）、`detail.fromCache`（查詢是命中離線
+快取還是真的連了伺服器）、`detail.taskCount`、`network.effectiveType`、`installed`、
+`version`、`mode`。同樣是 900ms，命中快取代表慢在我們自己的程式碼，連伺服器才
+代表慢在網路 —— 少了這個布林值，那一筆讀不出結論。
+
+按「計算我的花費」另外記一筆 `page: "tasks-costs"`，因為那是「任務數 × 2 趟查詢」
+的扇出，混進列表的數字裡會讓列表本身看不出乾不乾淨。
+
+量測本身不能拖慢被量的頁面：不 await、排在 `requestIdleCallback`、失敗就算了
+（只記第一次到錯誤清單）。一次開啟最多 30 筆，取樣率在 `services/perfService.ts`
+的 `SAMPLE_RATE`，人變多的時候調小。
+
+`perf` 誰都讀不到（規則寫死 `read: if false`），也不能改不能刪 —— 裡面有 uid 與
+userAgent，而且被事後動過的量測資料沒有價值。要看的人是開發者，走 Admin SDK：
+
+```bash
+node scripts/perf-report.mjs --key <service-account.json> --days 7
+node scripts/perf-report.mjs --key <service-account.json> --page tasks-costs
+```
+
+它印的是分布（p50 / p95 / 最慢）而不是平均 —— 一筆 3 秒可能只是那個人在電梯裡，
+要看的是「p50 跟 p95 差多少」（差很多 = 只有某些情境慢）、最慢的是哪一段、
+以及冷啟動與站內導航的落差。預設只看 `mode=prod`：dev 跑在筆電上而且 vite 不打包。
+
 ## 測試
 
 單元測試（vitest，不需要任何外部服務）：
@@ -326,7 +392,8 @@ npm run test:rules
 ```
 
 涵蓋角色升降、移除成員、被移除後的讀取權限、重新加入、支出的建立與編輯權限、
-舊格式支出的相容性、付款記錄與確認、邀請連結停用。
+舊格式支出的相容性、付款記錄與確認、邀請連結停用，以及效能樣本只能建立、
+誰都讀不到、寫進去就不能改。
 需要 Java：`winget install Microsoft.OpenJDK.21`。
 
 ## Firebase Console 需手動設定
@@ -334,6 +401,8 @@ npm run test:rules
 - Authentication 啟用 Google provider。
 - Authentication 的 Authorized domains 加入 `localhost` 與正式部署網域。
 - 建立 Firestore Database。
+- Firestore → TTL，對 `perf` 集合的 `expiresAt` 欄位建 TTL 政策。沒設的話效能樣本
+  會一直累積；程式已經在每一筆寫了 30 天後的 `expiresAt`，只差這個開關。
 - 若要部署 Hosting，建立專案並確認 `.firebaserc` 指到正確 project。
 
 ### 登入供應商

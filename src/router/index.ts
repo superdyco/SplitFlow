@@ -1,6 +1,19 @@
 import { createRouter, createWebHistory, type RouteLocationNormalized } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
+import { markPhase, startTrace, traceDetail } from "@/utils/perfTrace";
+
+/**
+ * 只追這一頁。使用者說卡的是它，而每多追一頁就多一份寫入成本與雜訊 ——
+ * 之後要追別頁，把路徑加進來、頁面自己收尾就好。
+ */
+const TRACED_PATH = "/tasks";
+
+/**
+ * 冷啟動與站內導航是兩種完全不同的慢法：前者要付 HTML + JS bundle +
+ * firebase 初始化，後者一行都不用重載。混在一起平均，兩邊都看不出問題。
+ */
+let firstNavigation = true;
 
 const LoginPage = () => import("@/pages/LoginPage.vue");
 const OnboardingPage = () => import("@/pages/OnboardingPage.vue");
@@ -52,10 +65,19 @@ export const router = createRouter({
   ]
 });
 
-router.beforeEach(async to => {
+router.beforeEach(async (to, from) => {
+  if (to.path === TRACED_PATH) {
+    startTrace("tasks");
+    traceDetail("cold", firstNavigation);
+    traceDetail("from", from.path);
+  }
+  firstNavigation = false;
+
   const authStore = useAuthStore();
   authStore.init();
   await waitForAuth(authStore);
+  // 冷啟動時這一段是在等 Firebase 從 IndexedDB 還原登入狀態；之後都是 0。
+  markPhase("auth");
 
   const user = authStore.user;
   if (to.path === "/login" && user) {
@@ -70,6 +92,8 @@ router.beforeEach(async to => {
   if (!user) return true;
 
   const profile = await ensureProfile(user.uid);
+  // 第一次會真的讀一趟 users/{uid}，之後 userStore 有快取就是 0。
+  markPhase("profile");
   if (to.meta.requiresProfile && !profile?.nickname) {
     return `/onboarding?redirect=${redirectPath(to)}`;
   }
@@ -93,4 +117,14 @@ router.beforeEach(async to => {
     手機網路上那一趟就是使用者說的「按下去之後卡了一下才有反應」。
   */
   return true;
+});
+
+/**
+ * beforeResolve 跑的時候，頁面元件的 chunk 已經下載並解析完了。
+ *
+ * 這一段跟守衛是分開的兩次等待，而且它不是 Firestore 的問題而是打包的問題 ——
+ * 分不出來的話，看到「進頁面要兩秒」很容易一路往查詢那邊找，然後什麼都找不到。
+ */
+router.beforeResolve(to => {
+  if (to.path === TRACED_PATH) markPhase("chunk");
 });

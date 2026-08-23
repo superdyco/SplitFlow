@@ -13,6 +13,7 @@ import { db } from "@/firebase/config";
 import type { CreateTaskInput, Task, TaskStatus } from "@/types/task";
 import type { UserProfile } from "@/types/user";
 import { addInviteToBatch, createInviteCode } from "@/services/inviteService";
+import { traceDetail } from "@/utils/perfTrace";
 
 export async function createTask(input: CreateTaskInput, owner: UserProfile): Promise<Task> {
   const taskRef = doc(collection(db, "tasks"));
@@ -60,6 +61,17 @@ export async function getTask(taskId: string): Promise<Task | null> {
  */
 export async function listUserTasks(uid: string): Promise<Task[]> {
   const snap = await getDocs(query(collection(db, "tasks"), where("memberIds", "array-contains", uid)));
+
+  /*
+    這兩個值是耗時分段唯一解讀得了的線索。沒在追蹤時是 no-op，所以不必在這裡
+    判斷「現在有沒有在量」——那種條件散出去之後就再也收不回來了。
+
+    fromCache 尤其關鍵：同樣是 900ms，命中離線快取代表慢在我們自己的程式碼，
+    連了伺服器才代表慢在網路。差一個布林值，要改的東西完全不同。
+  */
+  traceDetail("fromCache", snap.metadata.fromCache);
+  traceDetail("taskCount", snap.size);
+
   return snap.docs.map(item => ({ id: item.id, ...item.data() }) as Task);
 }
 

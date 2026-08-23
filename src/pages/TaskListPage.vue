@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
@@ -19,6 +19,8 @@ import { partitionTasks } from "@/utils/taskStatus";
 import { taskRole } from "@/utils/taskRole";
 import { formatAmount } from "@/utils/currency";
 import { firebaseErrorMessage } from "@/utils/firestore";
+import { finishTrace, markPhase, startTrace, traceDetail } from "@/utils/perfTrace";
+import { reportTrace } from "@/services/perfService";
 
 const authStore = useAuthStore();
 const loading = ref(true);
@@ -39,6 +41,8 @@ async function load() {
     const tasks = await listUserTasks(uid).catch(err => {
       throw new Error(`讀取任務列表失敗：${firebaseErrorMessage(err)}`);
     });
+    // 只有這一趟是 Firestore 的時間。守衛與 chunk 的等待記在導航那邊。
+    markPhase("query");
     rows.value = tasks.map(task => ({ task, role: taskRole(task, uid) }));
   } catch (err) {
     error.value = firebaseErrorMessage(err);
@@ -81,6 +85,16 @@ const totals = computed(() =>
 async function loadCosts() {
   const uid = authStore.user?.uid;
   if (!uid) return;
+
+  /*
+    這裡自己開一個 trace，不併進進頁面那一個：它是使用者按了才發生的，
+    而且成本是「任務數 × 2 趟查詢」的扇出。跟列表的載入混在同一筆裡，
+    列表本身的數字就再也看不出乾不乾淨了。
+  */
+  startTrace("tasks-costs");
+  traceDetail("taskCount", costable.value.length);
+  traceDetail("expenseCount", costable.value.reduce((sum, row) => sum + row.task.expenseCount, 0));
+
   costsLoading.value = true;
   costsError.value = null;
   try {
@@ -104,9 +118,15 @@ async function loadCosts() {
     costsLoaded.value = true;
   } catch (err) {
     costsError.value = firebaseErrorMessage(err);
+    // 失敗的那一筆也要留：逾時而失敗通常就是最慢的那幾筆，濾掉它們會讓數字好看得不真實。
+    traceDetail("failed", true);
   } finally {
     costsLoading.value = false;
   }
+
+  markPhase("costs");
+  const trace = finishTrace("tasks-costs");
+  if (trace) reportTrace(trace);
 }
 
 /**
@@ -173,7 +193,21 @@ async function confirmAction() {
   }
 }
 
-onMounted(load);
+/**
+ * 收尾在這裡，因為只有頁面知道「東西真的出現在畫面上」是哪一刻 ——
+ * 導航結束時畫面還是空的，那時候回報等於少算了最後一段。
+ */
+onMounted(async () => {
+  // 導航已經完成、元件已經掛上。這一段是 Vue 建版面的時間，跟網路無關。
+  markPhase("mount");
+  await load();
+  // nextTick 之後 DOM 才真的長出來。任務多的時候這一段自己就會說話。
+  await nextTick();
+  markPhase("render");
+
+  const trace = finishTrace("tasks");
+  if (trace) reportTrace(trace);
+});
 </script>
 
 <template>
