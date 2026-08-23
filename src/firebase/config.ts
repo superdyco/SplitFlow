@@ -33,3 +33,12 @@ export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
+
+/**
+ * 寫進每一筆效能樣本。
+ *
+ * 留著是因為它已經證明過自己有用：2026-08-24 拿它比對過記憶體快取與 IndexedDB，
+ * 兩批資料靠這個欄位分開，才確定 30 秒的停頓跟持久化無關（記憶體模式照樣中）。
+ * 下次再懷疑某個全域設定時，改這一行就有對照組，不必靠人記得哪個版號是哪個設定。
+ */
+export const localCacheMode = "indexeddb";

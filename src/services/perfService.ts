@@ -1,5 +1,5 @@
 import { Timestamp, addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "@/firebase/config";
+import { auth, db, localCacheMode } from "@/firebase/config";
 import { logError } from "@/utils/debugLog";
 import { isInstalledApp } from "@/utils/platform";
 import { phaseMap, slowestPhase, type PerfTrace } from "@/utils/perfTrace";
@@ -119,6 +119,8 @@ export function reportTrace(trace: PerfTrace): void {
       online: navigator.onLine,
       network: network(),
       installed: isInstalledApp(),
+      /** "indexeddb" 或 "memory"。判斷 30 秒的停頓跟離線快取有沒有關係用的。 */
+      cache: localCacheMode,
       userAgent: navigator.userAgent,
       day: today(),
       createdAt: serverTimestamp(),
