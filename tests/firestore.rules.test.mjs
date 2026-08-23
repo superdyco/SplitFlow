@@ -1285,6 +1285,69 @@ async function main() {
     );
   });
 
+  // ---------------------------------------------------------------- perf
+
+  /** 一筆合格的效能樣本，欄位跟 perfService 送出去的那一份對齊。 */
+  const perfSample = (uid = MEMBER) => ({
+    uid,
+    page: "tasks",
+    total: 1240,
+    sinceStart: 820,
+    phases: { auth: 4, chunk: 610, mount: 12, query: 580, render: 34 },
+    slowest: "chunk",
+    detail: { cold: true, fromCache: false, taskCount: 7 },
+    boot: { ttfb: 210, dom: 640 },
+    version: "abc1234 2026-08-23 21:00",
+    mode: "prod",
+    online: true,
+    network: { effectiveType: "4g", downlink: 1.2, rtt: 300 },
+    installed: false,
+    userAgent: "test",
+    day: "2026-08-23",
+    createdAt: serverTimestamp(),
+    expiresAt: new Date()
+  });
+
+  await test("可以寫自己的效能樣本", async () => {
+    await seed();
+    await assertSucceeds(setDoc(doc(as(MEMBER), "perf", "s1"), perfSample()));
+  });
+
+  await test("不能把效能樣本掛在別人的 uid 底下", async () => {
+    await seed();
+    await assertFails(setDoc(doc(as(MEMBER), "perf", "s2"), perfSample(OWNER)));
+  });
+
+  await test("未登入不能寫效能樣本", async () => {
+    await seed();
+    await assertFails(setDoc(doc(anon(), "perf", "s3"), perfSample(MEMBER)));
+  });
+
+  await test("欄位太多的樣本會被擋 —— 這個集合沒人讀，不能變成免費的儲存空間", async () => {
+    await seed();
+    const bloated = perfSample();
+    for (let i = 0; i < 20; i += 1) bloated[`extra${i}`] = i;
+    await assertFails(setDoc(doc(as(MEMBER), "perf", "s4"), bloated));
+  });
+
+  await test("效能樣本誰都讀不到，連自己寫的也是", async () => {
+    await seed();
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "perf", "s5"), perfSample());
+    });
+    await assertFails(getDoc(doc(as(MEMBER), "perf", "s5")));
+    await assertFails(getDocs(query(collection(as(MEMBER), "perf"), where("uid", "==", MEMBER))));
+  });
+
+  await test("效能樣本寫進去就不能改也不能刪 —— 被動過的量測資料沒有價值", async () => {
+    await seed();
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "perf", "s6"), perfSample());
+    });
+    await assertFails(updateDoc(doc(as(MEMBER), "perf", "s6"), { total: 1 }));
+    await assertFails(deleteDoc(doc(as(MEMBER), "perf", "s6")));
+  });
+
   await testEnv.cleanup();
 
   console.log(`\n${passed} passed, ${failed} failed`);

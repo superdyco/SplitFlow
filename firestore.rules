@@ -343,6 +343,29 @@ service cloud.firestore {
       }
     }
 
+    /*
+      耗時分段的樣本。每次進「我的任務」寫一筆，用來回答「手機上到底卡在哪一段」。
+
+      只能建立，不能讀、不能改、不能刪：
+
+        - 不能讀，是因為這裡面有 uid 與 userAgent，而且沒有任何一個使用者需要
+          看別人的效能資料。要查的人是開發者，Console 與 Admin SDK 本來就繞過規則。
+        - 不能改也不能刪，是因為量測資料被事後動過就沒有價值了。
+
+      驗證只擋「掛在別人名下」與「塞爆一筆文件」這兩件事。欄位形狀刻意不寫死：
+      之後多量一段就要改一次規則、還要等部署，那筆帳划不來，而這個集合沒有人讀。
+    */
+    match /perf/{sampleId} {
+      allow read: if false;
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.page is string
+        && request.resource.data.total is number
+        && request.resource.data.phases is map
+        && request.resource.data.keys().size() <= 20;
+      allow update, delete: if false;
+    }
+
     match /invites/{inviteCode} {
       allow read: if resource.data.active == true;
       allow create: if signedIn()
