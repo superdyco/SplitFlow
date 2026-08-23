@@ -16,13 +16,13 @@
   "dependencies": {
     "@vitejs/plugin-vue": "^5.2.4",
     "chart.js": "^4.5.1",
-    "firebase": "^10.14.1",
+    "firebase": "^12.18.0",
     "pinia": "^2.3.1",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "^3.0.4",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/google.maps": "^3.65.4",
     "firebase-admin": "^14.3.0",
     "firebase-tools": "^15.25.1",
