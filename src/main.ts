@@ -3,6 +3,7 @@ import { createPinia } from "pinia";
 import App from "./App.vue";
 import { router } from "./router";
 import { logError } from "./utils/debugLog";
+import { watchVisibility } from "./utils/visibility";
 import "./assets/styles.css";
 
 const app = createApp(App);
@@ -25,5 +26,8 @@ app.config.errorHandler = (err, _instance, info) => {
 // event.error 在跨來源的 script 錯誤會是 null，那時退回只有訊息的版本。
 window.addEventListener("error", event => logError("window", event.error ?? event.message));
 window.addEventListener("unhandledrejection", event => logError("promise", event.reason));
+
+// 要在第一次導航之前就開始聽，不然第一次進背景的時間會漏掉。
+watchVisibility();
 
 app.use(createPinia()).use(router).mount("#app");
