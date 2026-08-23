@@ -373,6 +373,39 @@ node scripts/perf-report.mjs --key <service-account.json> --page tasks-costs
 要看的是「p50 跟 p95 差多少」（差很多 = 只有某些情境慢）、最慢的是哪一段、
 以及冷啟動與站內導航的落差。預設只看 `mode=prod`：dev 跑在筆電上而且 vite 不打包。
 
+### 卡住就重連
+
+量測的結論：進「我的任務」有 44% 的機率卡 **30 秒**，而且卡的時候一定是 30 秒
+（29.6 / 30.08 / 30.15 / 30.17，四筆聚在 0.5 秒內），健康時同一個查詢是 49～99ms。
+那是逾時的形狀，不是慢的形狀。
+
+原因不是快取 —— 換成 `memoryLocalCache` 實測過，照樣中。是 PWA 從背景回來之後
+Firestore 的連線已經死了但**沒有報錯**，SDK 以為自己還在線上，於是等一個永遠不會
+來的回應。而 `getDocs` 內部是「開一個暫時的監聽器等伺服器同步」，它帶著
+`waitForSyncWhenOnline: true`，只要 SDK 認為在線上就壓著本機快取不發：
+
+```js
+if (this.options.waitForSyncWhenOnline && maybeOnline) {
+    return false;   // 有答案也不給
+}
+```
+
+所以那 30 秒是**偵測成本**（發現自己該重連），不是重連成本。判斷「死了」的唯一
+方法就是等，SDK 等 30 秒，我們等 2.5 秒：
+
+- `utils/stallGuard.ts` —— 純函式，只管「多久算卡住」
+- `services/networkRecovery.ts` —— 卡住時 `disableNetwork()` + `enableNetwork()`
+
+`disableNetwork()` 會把線上狀態設成 Offline，SDK 自己的註解是
+`// Set the OnlineState to Offline so get()s return from cache, etc.` ——
+所以一個動作同時做了兩件事：卡住的讀取立刻從快取回來（畫面有東西了），連線也重建。
+
+門檻選 2.5 秒是因為健康時是 49～99ms（25 倍餘裕，慢網路不會誤判），而所有失敗
+樣本都落在 30 秒那一群，中間完全沒有樣本。補救是全域的（整個 app 的 Firestore
+一起切離線再接回來），所以只在真的卡住時才跑，而且同一時間只跑一輪。
+
+驗收看報告的「卡住補救 × query」與觸發率。
+
 ## 測試
 
 單元測試（vitest，不需要任何外部服務）：
@@ -380,6 +413,9 @@ node scripts/perf-report.mjs --key <service-account.json> --page tasks-costs
 ```bash
 npm test
 ```
+
+`tests/stallGuard.test.ts` 釘住卡住補救的行為：正常回來不驚動任何人、超過門檻叫一次、
+補救之後交出去的仍是原本那個讀取的結果而不是替代品、錯誤原樣往外丟。
 
 `tests/currency.test.ts` 與 `tests/settlement.test.ts` 蓋掉金額解析與格式化、`allocate`
 的餘數分配、幣別換算、均分與自訂分攤的結算、多幣別合併，以及「每種情境 balance 加總都是 0」

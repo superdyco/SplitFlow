@@ -205,6 +205,22 @@ async function main() {
     [...byCache.entries()].map(([mode, values]) => [mode, summarize(values)])
   );
 
+  /*
+    卡住補救（切斷再重連）的成效。這是驗收那個修法唯一的依據：
+
+      - 觸發率 = 連線多常是死的
+      - 觸發那一群的 query = 修法把 30 秒壓到多少（目標是門檻 + 重連的時間）
+
+    沒觸發那一群本來就快，拿來當對照組。
+  */
+  const recovered = samples.filter(sample => sample.detail?.recovered);
+  const untouched = samples.filter(sample => !sample.detail?.recovered);
+  table("卡住補救 × query", [
+    ["有觸發", summarize(recovered.map(sample => sample.phases?.query ?? 0))],
+    ["沒觸發", summarize(untouched.map(sample => sample.phases?.query ?? 0))]
+  ]);
+  console.log(`  觸發率 ${Math.round((recovered.length / samples.length) * 100)}%`);
+
   share("網路", tally(samples, sample => sample.network?.effectiveType), samples.length);
   share("裝置", tally(samples, sample => (sample.installed ? "已安裝的 App" : "瀏覽器")), samples.length);
   share("版本", tally(samples, sample => sample.version), samples.length);
