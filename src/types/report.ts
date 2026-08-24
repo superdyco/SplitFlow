@@ -31,8 +31,18 @@ export interface TripReport {
   timeline: ReportDay[];
   /** Storage 物件路徑。沒有地圖時是 null。 */
   mapPath: string | null;
-  /** 撤銷就是這個變 false。 */
+  /** 撤銷就是這個變 false。拿到連結的人讀不讀得到，看這個。 */
   active: boolean;
+  /**
+   * 要不要列進「探索」那一頁讓所有人瀏覽得到。
+   *
+   * 跟 `active` 是兩件事：`active` 是「拿到連結的人看不看得到」，這個是
+   * 「陌生人找不找得到」。只想傳給朋友的人，連結開著但這個不勾。
+   *
+   * 這個功能之前產生的報告沒有這個欄位，讀取時補成 false —— 沒有人被迫
+   * 在不知情的狀況下公開自己的旅程。
+   */
+  listed: boolean;
   /** 第一次產生的時間，重新產生時保留不動。 */
   createdAt: Timestamp;
   /** 最後一次重新產生的時間，報告上顯示這個。 */
@@ -40,3 +50,13 @@ export interface TripReport {
 }
 
 export type TripReportInput = Omit<TripReport, "id" | "createdAt" | "updatedAt">;
+
+/**
+ * 探索頁列出來的報告。
+ *
+ * 多一個 taskId 是因為報告文件本身不存自己的任務 id —— 它藏在路徑裡，
+ * 而 collection group 查詢回來之後路徑就散了。連結要靠它才組得出來。
+ */
+export interface PublicReport extends TripReport {
+  taskId: string;
+}

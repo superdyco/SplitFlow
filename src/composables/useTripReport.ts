@@ -20,6 +20,7 @@ import {
   findReport,
   newReportId,
   setReportActive,
+  setReportListed,
   updateReport
 } from "@/services/reportService";
 import { fetchStaticMap, MAX_MAP_BYTES } from "@/services/staticMap";
@@ -118,7 +119,9 @@ export function useTripReport(taskId: string) {
           places,
           timeline: reportTimeline(expenses, currency, task.startDate),
           mapPath: uploaded.path,
-          active: true
+          active: true,
+          // 重新產生不該偷偷改變公開狀態：本來公開的維持公開，本來沒有的維持沒有。
+          listed: existing?.listed ?? false
         })
       );
 
@@ -144,6 +147,22 @@ export function useTripReport(taskId: string) {
     }
   }
 
+  /** 連結是關的就不能公開 —— 列出去只會是一張點進去讀不到的卡片。 */
+  async function setListed(listed: boolean) {
+    const current = report.value;
+    if (!current || (listed && !current.active)) return;
+    busy.value = true;
+    error.value = null;
+    try {
+      await settleWrite(setReportListed(taskId, current.id, listed));
+      await load();
+    } catch (err) {
+      error.value = firebaseErrorMessage(err);
+    } finally {
+      busy.value = false;
+    }
+  }
+
   return {
     report,
     loading,
@@ -154,6 +173,7 @@ export function useTripReport(taskId: string) {
     shareUrl,
     load,
     generate,
-    setActive
+    setActive,
+    setListed
   };
 }

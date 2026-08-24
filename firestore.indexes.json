@@ -1,0 +1,15 @@
+{
+  "indexes": [
+    {
+      "//": "探索頁：跨所有任務找公開的報告。collection group 加上兩個等值條件與排序，這個組合不會自動建立，要明確宣告。",
+      "collectionGroup": "reports",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "listed", "order": "ASCENDING" },
+        { "fieldPath": "active", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

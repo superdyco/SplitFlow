@@ -263,6 +263,25 @@ function removeTaskMember(targetUid: string) {
   return runMemberAction(targetUid, () => removeMember(taskId.value, targetUid));
 }
 
+/**
+ * 點標題觸發的重新載入。
+ *
+ * 跟 `load` 分開只為了一件事：`taskState.load()` 會把 loading 打開，整頁
+ * 會退回「讀取任務中」的骨架 —— 手動重整時畫面整個閃掉，比不重整還糟。
+ * 這裡自己記一個旗標，畫面留在原地，只在標題旁邊講一句「重新載入中」。
+ */
+const reloading = ref(false);
+
+async function reload() {
+  if (reloading.value) return;
+  reloading.value = true;
+  try {
+    await load();
+  } finally {
+    reloading.value = false;
+  }
+}
+
 onMounted(load);
 </script>
 
@@ -291,11 +310,22 @@ onMounted(load);
       <template v-else-if="taskState.task.value">
         <div class="spread">
           <div>
-            <h1 class="title">{{ taskState.task.value.name }}</h1>
+            <!--
+              點標題重新載入。這一頁沒有別的地方可以重讀 —— 別人剛加了一筆
+              支出、或自己在別的分頁改過，只能整頁重整才看得到。
+
+              做成標題而不是另外擺一顆按鈕，是因為「點標題回到這一頁的最新狀態」
+              本來就是很多 App 的習慣，而這裡的版面已經夠擠了。
+              用 button 而不是在 h1 上掛 @click：鍵盤 Tab 到得了、Enter 按得下去。
+            -->
+            <button class="title-reload" :disabled="reloading" @click="reload">
+              <h1 class="title">{{ taskState.task.value.name }}</h1>
+            </button>
             <p class="tiny">
               {{ taskState.task.value.defaultCurrency }} ·
               {{ taskState.task.value.memberCount }} 位成員 ·
               {{ taskState.task.value.expenseCount }} 筆支出
+              <span v-if="reloading"> · 重新載入中...</span>
             </p>
           </div>
           <button v-if="canWrite" class="btn btn-ghost" @click="copyInvite">
@@ -344,6 +374,32 @@ onMounted(load);
             <p v-if="!reportState.report.value.active" class="tiny warn">
               目前已關閉，連結打不開。
             </p>
+            <!--
+              兩層是兩件事：連結是「拿到網址的人看不看得到」，公開是「陌生人
+              在探索頁找不找得到」。只想傳給朋友的人，連結開著但這個不勾。
+
+              連結關掉時整條停用並取消勾選 —— 列出去只會是一張點進去讀不到的
+              卡片，而那比沒列出去更糟。
+            -->
+            <label class="listed" :class="{ off: !reportState.report.value.active }">
+              <input
+                type="checkbox"
+                :checked="reportState.report.value.listed"
+                :disabled="!reportState.report.value.active || reportState.busy.value"
+                @change="reportState.setListed(!reportState.report.value.listed)"
+              />
+              <span>
+                列入公開頁
+                <span class="tiny muted block">
+                  {{
+                    reportState.report.value.active
+                      ? "讓所有 SplitFlow 使用者在「探索」找得到這趟旅程"
+                      : "連結關著的時候不能公開"
+                  }}
+                </span>
+              </span>
+            </label>
+
             <div class="row">
               <button class="btn btn-sm" :disabled="reportState.busy.value" @click="generateReport">
                 重新產生
@@ -501,6 +557,43 @@ onMounted(load);
 </template>
 
 <style scoped>
+/* 標題本身就是按鈕，但看起來要跟原本的標題一模一樣。 */
+.title-reload {
+  display: block;
+  margin: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.title-reload:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.listed {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+
+.listed input {
+  margin-top: 3px;
+  flex: none;
+}
+
+/* 連結關著時整條淡掉，才看得出來為什麼點不動。 */
+.listed.off {
+  opacity: 0.55;
+}
+
+.block {
+  display: block;
+}
+
 .archived-banner {
   border-left: 3px solid var(--color-muted);
   color: var(--color-muted);

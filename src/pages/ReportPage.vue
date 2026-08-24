@@ -7,7 +7,7 @@
  * 也不帶任何 API 金鑰 —— 連結會被到處轉傳，不能把金鑰跟著送出去。
  */
 import { computed, onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import type { TripReport } from "@/types/report";
 import { getPublicReport } from "@/services/reportService";
 import { categoryMeta } from "@/types/expense";
@@ -15,6 +15,10 @@ import { formatAmount } from "@/utils/currency";
 import { visiblePlaces } from "@/utils/reportPlaces";
 import { reportMapUrl } from "@/services/reportMap";
 import ReportBar from "@/components/report/ReportBar.vue";
+import { addFavorite, isFavorited, removeFavorite } from "@/services/favoriteService";
+import { useAuthStore } from "@/stores/auth";
+import { toFavoriteInput } from "@/utils/favorites";
+import { firebaseErrorMessage } from "@/utils/firestore";
 
 const route = useRoute();
 const router = useRouter();
@@ -97,6 +101,46 @@ const generatedAt = computed(() => {
   return value.toDate().toLocaleDateString("zh-TW");
 });
 
+/*
+  收藏。
+
+  這一頁不需要帳號就看得到，所以按鈕只給登入的人 —— 沒登入的看到的是一句
+  「登入後可以收藏」加一條連結，帶著 redirect 回來。不做成「按了才發現要登入」，
+  那會讓人白按一次還跳走。
+
+  刻意不在這裡放整組導覽列（見檔案開頭的說明）：訪客是從 LINE 之類的地方
+  點進來的，這一頁的工作是把旅程講清楚，不是把他推去註冊。
+*/
+const authStore = useAuthStore();
+const saved = ref(false);
+const favoriteBusy = ref(false);
+const favoriteError = ref<string | null>(null);
+const loginPath = computed(
+  () => `/login?redirect=${encodeURIComponent(`/r/${taskId}/${reportId}`)}`
+);
+
+async function toggleFavorite() {
+  const user = authStore.user;
+  const current = report.value;
+  if (!user || !current || favoriteBusy.value) return;
+
+  favoriteBusy.value = true;
+  favoriteError.value = null;
+  const wasSaved = saved.value;
+  // 樂觀更新：這顆按鈕的回饋要立即，不然會被連按。失敗再改回去。
+  saved.value = !wasSaved;
+
+  try {
+    if (wasSaved) await removeFavorite(user.uid, taskId, reportId);
+    else await addFavorite(user.uid, toFavoriteInput(taskId, reportId, current));
+  } catch (err) {
+    saved.value = wasSaved;
+    favoriteError.value = firebaseErrorMessage(err);
+  } finally {
+    favoriteBusy.value = false;
+  }
+}
+
 async function load() {
   loading.value = true;
   try {
@@ -105,6 +149,16 @@ async function load() {
     report.value = null;
   } finally {
     loading.value = false;
+  }
+
+  // 報告讀不到就不必問收藏了 —— 那個連結已經沒有意義。
+  const user = authStore.user;
+  if (!user || !report.value) return;
+  try {
+    saved.value = await isFavorited(user.uid, taskId, reportId);
+  } catch {
+    // 問不到就當作沒收藏。按下去會蓋寫同一個 id，不會變成兩筆。
+    saved.value = false;
   }
 }
 
@@ -130,6 +184,23 @@ onMounted(load);
         <template v-if="report.days">{{ report.days }} 天 · </template>
         {{ report.memberCount }} 人
       </p>
+
+      <div class="favorite">
+        <button
+          v-if="authStore.user"
+          type="button"
+          class="btn btn-sm"
+          :class="{ 'btn-primary': !saved }"
+          :disabled="favoriteBusy"
+          @click="toggleFavorite"
+        >
+          {{ saved ? "已收藏" : "收藏這趟旅程" }}
+        </button>
+        <p v-else class="tiny">
+          <RouterLink :to="loginPath">登入</RouterLink> 之後可以把這趟旅程收藏起來。
+        </p>
+        <p v-if="favoriteError" class="tiny warn">{{ favoriteError }}</p>
+      </div>
 
       <section class="card hero">
         <p class="tiny">每人平均</p>
@@ -224,6 +295,16 @@ onMounted(load);
 </template>
 
 <style scoped>
+/* 收藏放在標題與數字之間：看到是誰的旅程之後、還沒往下捲之前。 */
+.favorite {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  text-align: center;
+}
+
 .page {
   display: flex;
   flex-direction: column;

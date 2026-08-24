@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import { logout, providerLabel } from "@/services/authService";
@@ -124,6 +124,18 @@ async function signOut() {
       <p class="tiny">
         下次請用同一種方式登入。換一個供應商會被視為另一個帳號，看不到現在的任務。
       </p>
+
+      <!--
+        收藏與探索擺在帳號資訊之後、儲存按鈕之前。
+
+        這兩個是「去別的地方」而不是「改這一頁的東西」，跟下面那顆儲存不同性質，
+        所以自成一張卡而不是混進表單裡。
+      -->
+      <div class="card stack">
+        <strong class="section-title">旅程</strong>
+        <RouterLink to="/favorites" class="btn btn-block">我的收藏</RouterLink>
+        <RouterLink to="/explore" class="btn btn-block">探索公開旅程</RouterLink>
+      </div>
       <ErrorState :message="error" />
       <button class="btn btn-primary btn-block" :disabled="loading || !canSubmit" @click="save">
         {{ loading ? "儲存中..." : saved ? "已儲存" : "儲存變更" }}
