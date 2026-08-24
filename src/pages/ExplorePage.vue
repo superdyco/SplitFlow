@@ -130,13 +130,14 @@ onMounted(load);
           :path="`/r/${report.taskId}/${report.id}`"
         >
           <template #actions>
+            <!-- 顏色與符號一起換：只靠顏色的話色覺障礙的人分不出兩個狀態。 -->
             <button
               class="btn btn-sm"
-              :class="{ 'btn-primary': !isSaved(report) }"
+              :class="isSaved(report) ? 'btn-saved' : 'btn-primary'"
               :disabled="busyId === favoriteId(report.taskId, report.id)"
               @click="toggle(report)"
             >
-              {{ isSaved(report) ? "已收藏" : "收藏" }}
+              {{ isSaved(report) ? "♥ 已收藏" : "♡ 收藏" }}
             </button>
           </template>
         </ReportCard>

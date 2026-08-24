@@ -190,11 +190,11 @@ onMounted(load);
           v-if="authStore.user"
           type="button"
           class="btn btn-sm"
-          :class="{ 'btn-primary': !saved }"
+          :class="saved ? 'btn-saved' : 'btn-primary'"
           :disabled="favoriteBusy"
           @click="toggleFavorite"
         >
-          {{ saved ? "已收藏" : "收藏這趟旅程" }}
+          {{ saved ? "♥ 已收藏" : "♡ 收藏這趟旅程" }}
         </button>
         <p v-else class="tiny">
           <RouterLink :to="loginPath">登入</RouterLink> 之後可以把這趟旅程收藏起來。

@@ -12,6 +12,7 @@
   --color-primary-soft: #fff0e4;
   --color-danger: #d63939;
   --color-success: #0e9f6e;
+  --color-success-soft: #e6f6ef;
   --shadow-card: 0 18px 44px -30px rgba(26, 22, 19, 0.5);
   font-family: "Noto Sans TC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--color-ink);
@@ -172,6 +173,21 @@ a {
   background: var(--color-primary-soft);
   border-color: var(--color-primary-soft);
   color: var(--color-primary);
+}
+
+/*
+  已收藏。刻意不是主色：主色在這個 app 裡代表「可以按的動作」，而這顆是
+  「已經完成的狀態」——兩者用同一個顏色的話，畫面上會有一排看起來都在
+  等你按的按鈕。
+
+  換成綠色系而不是只把主色拿掉，是因為「沒有顏色」在一排卡片裡看起來像
+  被停用了。而且形狀（實心／空心愛心）也跟著換 —— 只靠顏色的話，色覺
+  障礙的人分不出這兩個狀態。
+*/
+.btn-saved {
+  border-color: var(--color-success-soft);
+  background: var(--color-success-soft);
+  color: var(--color-success);
 }
 
 .btn-danger {
