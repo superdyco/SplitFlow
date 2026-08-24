@@ -8,11 +8,29 @@ import { logError } from "@/utils/debugLog";
  * catch 各自呼叫一次 `logError`，漏掉的那幾個就是之後查不到的那幾個。
  * 而且這樣一來，使用者看到的訊息與診斷資訊裡的那一筆一定對得起來。
  */
+/**
+ * 少數幾個「Firebase 的原文完全不能給使用者看」的 code。
+ *
+ * 判斷 code 而不是比對訊息 —— 訊息會隨 SDK 版本改寫，code 不會（這也是
+ * debugLog 一定要留 code 的理由）。
+ *
+ * failed-precondition 幾乎都是缺索引，而那則原文會附上 Firebase Console 的
+ * 網址、專案 id 與一段編碼過的索引定義。那是給開發者看的東西，使用者只會
+ * 覺得壞掉了 —— 而且他什麼都做不了，只能等。原文照樣進錯誤清單，診斷資訊
+ * 撈得到，開發者不會因此少掉線索。
+ */
+const FRIENDLY: Record<string, string> = {
+  "failed-precondition": "這一頁還在準備中，請稍後再試一次。",
+  unavailable: "連不上伺服器。檢查一下網路，或稍後再試。"
+};
+
 export function firebaseErrorMessage(error: unknown): string {
   logError("firebase", error);
-  if (error && typeof error === "object" && "message" in error) {
+  if (error && typeof error === "object") {
     const maybe = error as FirestoreError;
-    return maybe.message || String(error);
+    const friendly = typeof maybe.code === "string" ? FRIENDLY[maybe.code] : undefined;
+    if (friendly) return friendly;
+    if ("message" in error) return maybe.message || String(error);
   }
   return String(error);
 }

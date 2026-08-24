@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateRangeError, required, textFieldError } from "@/utils/firestore";
+import { dateRangeError, firebaseErrorMessage, required, textFieldError } from "@/utils/firestore";
 
 describe("required", () => {
   it("去掉前後空白後回傳", () => {
@@ -54,5 +54,33 @@ describe("dateRangeError", () => {
   it("跨年比較也正確", () => {
     expect(dateRangeError("2026-12-31", "2027-01-01")).toBeNull();
     expect(dateRangeError("2027-01-01", "2026-12-31")).toBe("結束日期不能早於開始日期");
+  });
+});
+
+describe("firebaseErrorMessage", () => {
+  it("缺索引的原文不能給使用者看 —— 那裡面有 Console 網址與專案 id", () => {
+    const raw =
+      "The query requires an index. That index is currently building and cannot be used yet. " +
+      "See its status here: https://console.firebase.google.com/v1/r/project/splitflow-e39c0/firestore/indexes?create_composite=Clpwcm9q";
+    const message = firebaseErrorMessage({ code: "failed-precondition", message: raw });
+
+    expect(message).not.toContain("console.firebase.google.com");
+    expect(message).not.toContain("splitflow-e39c0");
+    expect(message).toBe("這一頁還在準備中，請稍後再試一次。");
+  });
+
+  it("認的是 code 不是訊息 —— 訊息會隨 SDK 版本改寫", () => {
+    expect(firebaseErrorMessage({ code: "unavailable", message: "whatever the SDK says today" }))
+      .toBe("連不上伺服器。檢查一下網路，或稍後再試。");
+  });
+
+  it("沒有對應的 code 就照原樣傳出去，不要憑空發明訊息", () => {
+    expect(firebaseErrorMessage({ code: "permission-denied", message: "Missing or insufficient permissions." }))
+      .toBe("Missing or insufficient permissions.");
+  });
+
+  it("不是 Firebase 錯誤的東西也不能讓它爆掉", () => {
+    expect(firebaseErrorMessage("壞掉了")).toBe("壞掉了");
+    expect(firebaseErrorMessage(null)).toBe("null");
   });
 });

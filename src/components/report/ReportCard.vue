@@ -53,7 +53,7 @@ const facts = computed(() => {
     </div>
 
     <div class="row wrap actions">
-      <RouterLink :to="path" class="btn btn-sm">看報告</RouterLink>
+      <RouterLink :to="path" class="btn btn-sm">看旅程</RouterLink>
       <slot name="actions" />
     </div>
   </article>
