@@ -39,6 +39,8 @@ const ExpenseFormPage = () => import("@/pages/ExpenseFormPage.vue");
 const JoinTaskPage = () => import("@/pages/JoinTaskPage.vue");
 const ProfilePage = () => import("@/pages/ProfilePage.vue");
 const ReportPage = () => import("@/pages/ReportPage.vue");
+const FavoritesPage = () => import("@/pages/FavoritesPage.vue");
+const ExplorePage = () => import("@/pages/ExplorePage.vue");
 
 /**
  * 這個文件第一次還原登入狀態與讀個人資料各花了多久。
@@ -97,7 +99,16 @@ export const router = createRouter({
     { path: "/join/:inviteCode", component: JoinTaskPage, meta: { public: true } },
     // 公開的旅費報告：不需要帳號，守衛在 `if (!user) return true` 就放行了。
     { path: "/r/:taskId/:reportId", component: ReportPage, meta: { public: true } },
-    { path: "/profile", component: ProfilePage, meta: { requiresAuth: true, requiresProfile: true } }
+    { path: "/profile", component: ProfilePage, meta: { requiresAuth: true, requiresProfile: true } },
+    /*
+      收藏與探索都要登入。
+
+      單一份報告的連結（上面那條 /r/...）不需要帳號，傳給誰誰就看得到；
+      但「一次列出所有人公開的旅程」是另一回事，那份名單只給這個 app 的
+      使用者。規則那邊也是這樣寫的，不是只有這裡擋。
+    */
+    { path: "/favorites", component: FavoritesPage, meta: { requiresAuth: true, requiresProfile: true } },
+    { path: "/explore", component: ExplorePage, meta: { requiresAuth: true, requiresProfile: true } }
   ]
 });
 

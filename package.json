@@ -10,8 +10,8 @@
     "check": "vue-tsc --noEmit",
     "test": "vitest run",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-splitflow \"node tests/firestore.rules.test.mjs && node tests/storage.rules.test.mjs\"",
-    "deploy": "npm run build && firebase deploy --only hosting,firestore:rules,storage",
-    "deploy:rules": "firebase deploy --only firestore:rules"
+    "deploy": "npm run build && firebase deploy --only hosting,firestore:rules,firestore:indexes,storage",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "^5.2.4",

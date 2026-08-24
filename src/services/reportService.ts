@@ -6,18 +6,21 @@
  */
 import {
   collection,
+  collectionGroup,
   doc,
   getDoc,
   getDocs,
   limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   type DocumentData
 } from "firebase/firestore";
 import { db } from "@/firebase/config";
-import type { TripReport, TripReportInput } from "@/types/report";
+import type { PublicReport, TripReport, TripReportInput } from "@/types/report";
 import type { ReportDay } from "@/utils/reportTimeline";
 
 function reportsRef(taskId: string) {
@@ -33,7 +36,9 @@ function toReport(id: string, data: DocumentData): TripReport {
   return {
     id,
     ...data,
-    timeline: (data.timeline as ReportDay[] | undefined) ?? []
+    timeline: (data.timeline as ReportDay[] | undefined) ?? [],
+    // 沒有這個欄位的舊報告一律當成沒公開 —— 補值的方向要偏向不外洩。
+    listed: data.listed === true
   } as TripReport;
 }
 
@@ -85,11 +90,54 @@ export function updateReport(
   });
 }
 
+/**
+ * 關掉連結時一併取消公開。
+ *
+ * 少了這一步，「關閉連結 → 之後又重新開啟」會把當初的公開狀態靜悄悄地
+ * 一起帶回來，而使用者以為自己早就撤下來了。要重新公開就再勾一次。
+ */
 export function setReportActive(taskId: string, reportId: string, active: boolean): Promise<void> {
   return updateDoc(doc(db, "tasks", taskId, "reports", reportId), {
     active,
+    ...(active ? {} : { listed: false }),
     updatedAt: serverTimestamp()
   });
+}
+
+/** 列進探索頁與否。連結是關的就不該列 —— 呼叫端負責擋，這裡只寫欄位。 */
+export function setReportListed(taskId: string, reportId: string, listed: boolean): Promise<void> {
+  return updateDoc(doc(db, "tasks", taskId, "reports", reportId), {
+    listed,
+    updatedAt: serverTimestamp()
+  });
+}
+
+/**
+ * 探索頁的清單。跨所有任務找公開的報告，所以走 collection group 查詢。
+ *
+ * 兩個條件都要：`listed` 是作者願意被瀏覽，`active` 是連結還開著。
+ * 少了後者，作者撤下連結之後這裡還會列出一張點進去是「找不到」的卡片。
+ *
+ * 這個查詢需要 collection group 的複合索引，宣告在 firestore.indexes.json。
+ * 規則那邊也要對應的遞迴萬用字元 match —— 單一集合的 list 規則蓋不到
+ * collection group 查詢。
+ */
+export async function listPublicReports(max = 50): Promise<PublicReport[]> {
+  const snap = await getDocs(
+    query(
+      collectionGroup(db, "reports"),
+      where("listed", "==", true),
+      where("active", "==", true),
+      orderBy("updatedAt", "desc"),
+      limit(max)
+    )
+  );
+
+  return snap.docs.map(item => ({
+    ...toReport(item.id, item.data()),
+    // reports 是 tasks/{taskId}/reports 的子集合，parent.parent 就是那個任務。
+    taskId: item.ref.parent.parent?.id ?? ""
+  }));
 }
 
 /** 公開頁面用。讀不到就是連結錯了或報告已關閉，兩者都回傳 null。 */

@@ -186,6 +186,28 @@ Firestore rules 擋，但 Google API key 沒有對應的防線，外流等於直
 }
 ```
 
+`users/{uid}/favorites/{taskId}_{reportId}`（收藏，純私人）
+
+```ts
+{
+  taskId: string,
+  reportId: string,
+  taskName: string,        // 以下是收藏當下的快照
+  currency: string,
+  startDate: string | null,
+  endDate: string | null,
+  days: number | null,
+  memberCount: number,
+  total: number,
+  savedAt: Timestamp
+}
+```
+
+id 是算出來的 `taskId_reportId`，所以同一份報告收藏兩次只會蓋寫同一筆。存快照
+而不是只存兩個 id，是為了讓收藏頁一次查詢就畫得完 —— 只存 id 的話每一列都要
+多讀一次報告。代價是原作者重新產生報告後數字會停在收藏當下；點進去看到的
+永遠是最新版。
+
 金額一律存最小單位整數，避免 JavaScript 浮點誤差。各幣別小數位數在 `src/utils/currency.ts`，TWD/THB/USD/CNY/EGP/EUR/HKD 是 2 位，VND/KRW 是 0 位。
 
 ### 匯率
@@ -330,6 +352,33 @@ Authorized domains 清單裡，不用另外加。
 `firebase.json` 的 headers 讓 `/assets/**` 永久快取（檔名帶 hash，內容變檔名就變），
 `index.html` 則是 `no-cache`。少了這組設定，`manualChunks` 拆分出來的快取效益拿不到，
 而且部署後使用者可能還會拿到舊版的 index。
+
+## 分享與收藏
+
+報告有**兩層**開關，兩件不同的事：
+
+| 欄位 | 意思 | 誰看得到 |
+| --- | --- | --- |
+| `active` | 連結通不通 | 拿到網址的任何人，**不需要帳號** |
+| `listed` | 列不列進「探索」頁 | 所有登入的使用者都找得到 |
+
+只想傳給朋友的人，連結開著但不勾公開。關掉連結時 `listed` 會一併清成 false ——
+少了這一步，「關閉 → 之後重新開啟」會把當初的公開狀態靜悄悄帶回來。
+
+- `/explore` 探索頁 —— 要登入。單一份報告的連結不需要帳號（傳給誰誰就看得到），
+  但「一次列出所有人的旅程」是另一回事，那份名單只給這個 app 的使用者。
+- `/favorites` 收藏頁 —— 從個人設定進去，或探索頁右上角。
+- 收藏按鈕在公開報告頁上；未登入時顯示的是一條帶 redirect 的登入連結，
+  而不是一顆按了才發現要登入的按鈕。
+
+探索頁走 collection group 查詢（跨所有任務找 `reports`），這帶來兩個要注意的地方：
+
+1. **索引**：`listed` + `active` + `updatedAt` 的 collection group 複合索引不會自動
+   建立，宣告在 `firestore.indexes.json`，跟著 `npm run deploy` 一起上。
+2. **規則**：collection group 查詢**不會**命中 `/tasks/{taskId}/reports/{reportId}`，
+   要另外一條遞迴萬用字元的 `match /{path=**}/reports/{reportId}`。條件跟查詢的
+   where 完全對齊 —— Firestore 逐筆檢查回傳的文件，只要有一筆不符整個查詢就失敗，
+   所以「少寫一個 where 就把全部撈出來」這條路是通不了的（rules 測試釘住了）。
 
 ## 效能量測
 

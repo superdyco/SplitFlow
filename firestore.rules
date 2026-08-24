@@ -84,6 +84,21 @@ service cloud.firestore {
       return taskData(taskId).status == "active";
     }
 
+    /*
+      收藏起來的公開報告。**純私人資料** —— 別人不該知道你存了誰的旅程，
+      所以這裡沒有任何一條規則讓別人讀得到。
+
+      欄位形狀不寫死，只擋兩件事：掛在別人名下、以及把文件塞爆。
+      裡面的內容是使用者自己抄下來的報告摘要，寫壞了只會壞掉他自己的收藏頁。
+    */
+    match /users/{uid}/favorites/{favoriteId} {
+      allow read, delete: if isSelf(uid);
+      allow create, update: if isSelf(uid)
+        && request.resource.data.taskId is string
+        && request.resource.data.reportId is string
+        && request.resource.data.keys().size() <= 16;
+    }
+
     match /users/{uid} {
       allow read: if isSelf(uid);
       allow create: if isSelf(uid)
@@ -364,6 +379,29 @@ service cloud.firestore {
         && request.resource.data.phases is map
         && request.resource.data.keys().size() <= 24;
       allow update, delete: if false;
+    }
+
+    /*
+      探索頁的清單查詢。
+
+      這條非得用遞迴萬用字元不可：底下那條 /tasks/{taskId}/reports/{reportId}
+      只管「某一個任務裡的報告」，collection group 查詢（跨所有任務找 reports）
+      不會命中它。
+
+      條件跟查詢的 where 完全對齊，這是 Firestore 的「安全查詢」寫法 ——
+      規則逐筆檢查回傳的文件，只要有一筆不符整個查詢就失敗，所以查詢
+      本身必須把範圍縮到規則允許的那些。
+
+      listed 用 .get() 是因為這個功能之前產生的報告根本沒有這個 key，
+      直接讀會是 evaluation error（不是 false），整條規則當場中斷。
+
+      注意這條只給 list。單一份報告的讀取仍然走底下那條 —— 那裡才是
+      「拿到連結就看得到」的判斷，跟有沒有公開無關。
+    */
+    match /{path=**}/reports/{reportId} {
+      allow list: if signedIn()
+        && resource.data.get("listed", false) == true
+        && resource.data.active == true;
     }
 
     match /invites/{inviteCode} {

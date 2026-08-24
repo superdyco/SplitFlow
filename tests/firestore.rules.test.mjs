@@ -10,6 +10,7 @@ import {
   arrayRemove,
   arrayUnion,
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
   getDoc,
@@ -160,14 +161,23 @@ function reportData(overrides = {}) {
 }
 
 /** 直接塞一份報告進資料庫，不經過 rules。 */
-async function seedReport(active = true) {
+async function seedReport(active = true, extra = {}) {
   await testEnv.withSecurityRulesDisabled(async ctx => {
     await setDoc(doc(ctx.firestore(), "tasks", TASK, "reports", REPORT), {
-      ...reportData({ active }),
+      ...reportData({ active, ...extra }),
       createdAt: new Date(),
       updatedAt: new Date()
     });
   });
+}
+
+/** 探索頁的查詢：跨所有任務找公開的報告。 */
+function publicReportsQuery(db) {
+  return query(
+    collectionGroup(db, "reports"),
+    where("listed", "==", true),
+    where("active", "==", true)
+  );
 }
 
 /** 直接改資料庫做出「已封存」的狀態，不經過 rules。 */
@@ -1282,6 +1292,99 @@ async function main() {
         active: true,
         createdAt: serverTimestamp()
       })
+    );
+  });
+
+  // ---------------------------------------------------------------- 探索與收藏
+
+  await test("公開的報告，登入的人列得出來", async () => {
+    await seed();
+    await seedReport(true, { listed: true });
+    await assertSucceeds(getDocs(publicReportsQuery(as(OUTSIDER))));
+  });
+
+  await test("沒公開的報告不會出現在探索頁 —— 連結開著也一樣", async () => {
+    await seed();
+    await seedReport(true, { listed: false });
+    // 查詢條件是 listed == true，所以這一筆不在結果裡；空結果本身是允許的。
+    const snap = await assertSucceeds(getDocs(publicReportsQuery(as(OUTSIDER))));
+    if (snap.size !== 0) throw new Error(`不該列出任何東西，卻拿到 ${snap.size} 筆`);
+  });
+
+  await test("未登入的人列不出探索頁 —— 單一連結公開，名單不公開", async () => {
+    await seed();
+    await seedReport(true, { listed: true });
+    await assertFails(getDocs(publicReportsQuery(anon())));
+  });
+
+  await test("不能繞過條件把所有報告撈出來", async () => {
+    await seed();
+    await seedReport(true, { listed: true });
+    // 少了 listed 條件，結果會含到沒公開的報告，規則要整個擋掉。
+    await assertFails(getDocs(collectionGroup(as(OUTSIDER), "reports")));
+    await assertFails(
+      getDocs(query(collectionGroup(as(OUTSIDER), "reports"), where("active", "==", true)))
+    );
+  });
+
+  await test("關掉連結的報告即使 listed 還在也列不出來", async () => {
+    await seed();
+    await seedReport(false, { listed: true });
+    const snap = await assertSucceeds(getDocs(publicReportsQuery(as(OUTSIDER))));
+    if (snap.size !== 0) throw new Error(`連結關了卻還列得出來，拿到 ${snap.size} 筆`);
+  });
+
+  const favorite = {
+    taskId: TASK,
+    reportId: REPORT,
+    taskName: "曼谷旅行",
+    currency: "TWD",
+    startDate: null,
+    endDate: null,
+    days: 5,
+    memberCount: 4,
+    total: 10000,
+    savedAt: serverTimestamp()
+  };
+
+  await test("可以收藏，也讀得到自己的收藏", async () => {
+    await seed();
+    const ref = doc(as(MEMBER), "users", MEMBER, "favorites", `${TASK}_${REPORT}`);
+    await assertSucceeds(setDoc(ref, favorite));
+    await assertSucceeds(getDoc(ref));
+    await assertSucceeds(deleteDoc(ref));
+  });
+
+  await test("收藏是私人的 —— 別人讀不到也列不出來", async () => {
+    await seed();
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "users", MEMBER, "favorites", "f1"), {
+        ...favorite,
+        savedAt: new Date()
+      });
+    });
+    await assertFails(getDoc(doc(as(OTHER), "users", MEMBER, "favorites", "f1")));
+    await assertFails(getDocs(collection(as(OTHER), "users", MEMBER, "favorites")));
+  });
+
+  await test("不能把收藏寫進別人的帳號底下", async () => {
+    await seed();
+    await assertFails(
+      setDoc(doc(as(OTHER), "users", MEMBER, "favorites", "f2"), favorite)
+    );
+  });
+
+  await test("未登入不能收藏", async () => {
+    await seed();
+    await assertFails(setDoc(doc(anon(), "users", MEMBER, "favorites", "f3"), favorite));
+  });
+
+  await test("塞爆的收藏文件會被擋 —— 這是私人空間，不是免費儲存", async () => {
+    await seed();
+    const bloated = { ...favorite };
+    for (let i = 0; i < 20; i += 1) bloated[`extra${i}`] = i;
+    await assertFails(
+      setDoc(doc(as(MEMBER), "users", MEMBER, "favorites", "f4"), bloated)
     );
   });
 
