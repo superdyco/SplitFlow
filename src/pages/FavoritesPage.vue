@@ -104,7 +104,8 @@ onMounted(load);
           :path="`/r/${item.taskId}/${item.reportId}`"
         >
           <template #actions>
-            <button class="btn btn-sm" @click="pending = item">移除</button>
+            <!-- 紅色，跟成員移除、刪結算同一套：破壞性的動作在這個 app 裡一律是紅的。 -->
+            <button class="btn btn-danger btn-sm" @click="pending = item">移除</button>
           </template>
         </ReportCard>
       </div>
@@ -116,6 +117,7 @@ onMounted(load);
         title="移除這個收藏？"
         :message="`「${pending?.taskName ?? ''}」會從收藏清單消失。原本的報告不受影響，但你得重新拿到連結才找得回來。`"
         confirm-label="移除"
+        danger
         @confirm="confirmRemove"
         @cancel="pending = null"
       />
