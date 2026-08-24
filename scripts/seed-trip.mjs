@@ -16,80 +16,19 @@
  * 刪除（子集合要分開刪，Firestore 沒有 cascade delete）：
  *   npx firebase firestore:delete tasks/<taskId> --recursive --force
  */
-import { readFileSync } from "node:fs";
-
-// ---------------------------------------------------------------- 參數
-
-function arg(name) {
-  const index = process.argv.indexOf(`--${name}`);
-  return index === -1 ? null : process.argv[index + 1];
-}
+import { parseSeedArgs, runSeed } from "./seed-lib.mjs";
 
 /**
  * --dry-run 完全不碰 Firebase：驗算每一筆的分攤與換算後把結果印出來。
- *
- * 有這個模式是因為金鑰跟寫入權限是兩件不同的事 —— 資料本身對不對，
- * 不該等到有服務帳戶金鑰才知道。也讓你在真的寫進正式資料庫之前先看一眼。
+ * 組裝、驗證、寫入的機制都在 seed-lib.mjs，這個檔案只剩這趟旅程的資料。
  */
-const dryRun = process.argv.includes("--dry-run");
-const keyPath = arg("key") ?? process.env.GOOGLE_APPLICATION_CREDENTIALS;
-const ownerUid = arg("uid") ?? (dryRun ? "dry-run-owner" : null);
-const ownerNickname = arg("nickname") ?? "我";
+const args = parseSeedArgs("seed-trip.mjs");
+const { ownerUid, ownerNickname } = args;
 
-if ((!keyPath && !dryRun) || !ownerUid) {
-  console.error(`
-需要兩個參數：
-
-  --key   服務帳戶金鑰的路徑
-          Firebase Console → 專案設定 → 服務帳戶 → 產生新的私密金鑰
-          ** 不要放進 repo，這把金鑰可以讀寫整個專案 **
-
-  --uid   你的 Firebase Auth uid，示範任務會掛在這個帳號下
-          Firebase Console → Authentication → 使用者，複製「使用者 UID」
-
-例：
-  node scripts/seed-trip.mjs --key C:/keys/splitflow.json --uid abc123... --nickname 阿德
-
-先看資料長什麼樣（不需要金鑰、不寫入任何東西）：
-  node scripts/seed-trip.mjs --dry-run
-`);
-  process.exit(1);
-}
 
 // ---------------------------------------------------------------- 金額工具
 
-/**
- * `src/utils/currency.ts` 的 allocate 複製過來。
- *
- * 種子腳本是 .mjs、那邊是 TypeScript，不轉譯就 import 不了。複製的代價是
- * 兩份會漂移，但這裡只在建立資料時用一次，而且真的漂了也只是示範資料的
- * 尾數差一塊，不影響 App 本身的正確性。
- */
-function allocate(total, weights) {
-  if (!weights.length) return [];
-  const sum = weights.reduce((acc, w) => acc + w, 0);
-  if (sum <= 0) return allocate(total, weights.map(() => 1));
-
-  const exact = weights.map(w => (total * w) / sum);
-  const result = exact.map(Math.floor);
-  const remainder = total - result.reduce((acc, v) => acc + v, 0);
-
-  const order = exact
-    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
-    .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
-
-  for (let i = 0; i < remainder; i += 1) result[order[i % order.length].index] += 1;
-  return result;
-}
-
 const MINOR_UNITS = { TWD: 2, JPY: 0 };
-const minorUnits = currency => MINOR_UNITS[currency] ?? 2;
-
-/** rate 是「1 單位 from 等於多少 to」，兩邊小數位數不同要各自換算。 */
-function convertAmount(amount, from, to, rate) {
-  if (from === to) return amount;
-  return Math.round((amount / 10 ** minorUnits(from)) * rate * 10 ** minorUnits(to));
-}
 
 // ---------------------------------------------------------------- 成員
 
@@ -215,239 +154,15 @@ const PAYMENTS = [
   { from: AJIE, to: ownerUid, amount: 200000, status: "pending", createdBy: AJIE }
 ];
 
-// ---------------------------------------------------------------- 組裝
-
-function buildSplits(spec, amount) {
-  if (spec && !Array.isArray(spec) && typeof spec === "object") {
-    const total = Object.values(spec).reduce((acc, v) => acc + v, 0);
-    if (total !== amount) {
-      throw new Error(`自訂分攤合計 ${total} 不等於金額 ${amount}`);
-    }
-    return { splitMode: "custom", splits: spec };
-  }
-
-  const uids = spec === "all" ? ALL : spec;
-  const shares = allocate(amount, uids.map(() => 1));
-  return {
-    splitMode: "even",
-    splits: Object.fromEntries(uids.map((uid, i) => [uid, shares[i]]))
-  };
-}
-
-/**
- * createdAt 用消費當天的時間，不是現在。
- * 支出列表在同一天內是按 createdAt 排序的，全部設成同一個「現在」的話，
- * 一天之內的順序會變成隨機的，時間軸就看不出行程的先後。
- */
-function dateFor(date, time, index) {
-  const [hh, mm] = (time || "23:59").split(":").map(Number);
-  const at = new Date(`${date}T00:00:00+09:00`);
-  at.setUTCHours(at.getUTCHours() + hh - 9, mm + (index % 60), 0, 0);
-  return at;
-}
-
-const inviteCode = Array.from({ length: 16 }, () =>
-  Math.floor(Math.random() * 256).toString(16).padStart(2, "0")
-).join("");
-
-async function seed() {
-  // 動態 import：--dry-run 不該因為沒裝 firebase-admin 就跑不起來。
-  const { initializeApp, cert } = await import("firebase-admin/app");
-  const { getFirestore, FieldValue, Timestamp } = await import("firebase-admin/firestore");
-
-  initializeApp({ credential: cert(JSON.parse(readFileSync(keyPath, "utf8"))) });
-  const db = getFirestore();
-
-  const taskRef = db.collection("tasks").doc();
-  const now = FieldValue.serverTimestamp();
-
-  const batch = db.batch();
-
-  batch.set(taskRef, {
-    name: TASK.name,
-    ownerId: ownerUid,
-    adminIds: [ownerUid, AMEI],
-    memberIds: ALL,
-    defaultCurrency: TASK.defaultCurrency,
-    startDate: TASK.startDate,
-    endDate: TASK.endDate,
-    status: "active",
-    inviteCode,
-    memberCount: MEMBERS.length,
-    expenseCount: EXPENSES.length,
-    createdAt: now,
-    updatedAt: now
-  });
-
-  batch.set(db.collection("invites").doc(inviteCode), {
-    taskId: taskRef.id,
-    taskName: TASK.name,
-    defaultCurrency: TASK.defaultCurrency,
-    startDate: TASK.startDate,
-    endDate: TASK.endDate,
-    createdBy: ownerUid,
-    active: true,
-    createdAt: now
-  });
-
-  for (const member of MEMBERS) {
-    batch.set(taskRef.collection("members").doc(member.uid), {
-      uid: member.uid,
-      nickname: member.nickname,
-      role: member.role,
-      joinedAt: now,
-      active: true
-    });
-  }
-
-  EXPENSES.forEach((item, index) => {
-    const { splitMode, splits } = buildSplits(item.split, item.amount);
-    const baseAmount = convertAmount(item.amount, item.currency, TASK.defaultCurrency, item.rate);
-    const at = Timestamp.fromDate(dateFor(item.date, item.time, index));
-
-    batch.set(taskRef.collection("expenses").doc(), {
-      title: item.title,
-      category: item.category,
-      amount: item.amount,
-      currency: item.currency,
-      rate: item.rate,
-      baseAmount,
-      paidBy: item.paidBy,
-      splitMode,
-      splits,
-      place: item.place ? { ...item.place, placeId: null } : null,
-      receipt: null,
-      note: item.note ?? "",
-      date: item.date,
-      time: item.time,
-      createdBy: item.paidBy,
-      createdAt: at,
-      updatedAt: at
-    });
-  });
-
-  for (const payment of PAYMENTS) {
-    batch.set(taskRef.collection("payments").doc(), {
-      from: payment.from,
-      to: payment.to,
-      amount: payment.amount,
-      currency: TASK.defaultCurrency,
-      status: payment.status,
-      createdBy: payment.createdBy,
-      createdAt: now,
-      confirmedAt: payment.status === "confirmed" ? now : null,
-      updatedAt: now
-    });
-  }
-
-  await batch.commit();
-  return taskRef.id;
-}
-
 // ---------------------------------------------------------------- 執行
 
-const jpyTotal = EXPENSES.filter(e => e.currency === "JPY").reduce((a, e) => a + e.amount, 0);
-const twdTotal = EXPENSES.reduce(
-  (a, e) => a + convertAmount(e.amount, e.currency, "TWD", e.rate),
-  0
-);
-
-/**
- * 逐筆比對 `firestore.rules` 的 validExpenseShape()。
- *
- * Admin SDK 會繞過 Security Rules，所以不驗的話，寫得進去但 App 改不動的
- * 支出會安靜地產生 —— 而那正是這份資料最沒有價值的失敗方式。
- */
-function validate() {
-  const problems = [];
-  const known = new Set(ALL);
-
-  EXPENSES.forEach((item, index) => {
-    const where = `#${index + 1} ${item.date} ${item.title}`;
-
-    if (item.title.length > 60) problems.push(`${where}：標題超過 60 字`);
-    if (!Number.isInteger(item.amount) || item.amount <= 0) problems.push(`${where}：金額必須是正整數`);
-    if (!(item.rate > 0)) problems.push(`${where}：匯率必須大於 0`);
-    if ((item.note ?? "").length > 500) problems.push(`${where}：備註超過 500 字`);
-    if (item.time !== "" && !/^([01]\d|2[0-3]):[0-5]\d$/.test(item.time)) {
-      problems.push(`${where}：時間格式不是 HH:MM`);
-    }
-    if (!known.has(item.paidBy)) problems.push(`${where}：先付的人不在成員名單裡`);
-
-    const base = convertAmount(item.amount, item.currency, TASK.defaultCurrency, item.rate);
-    if (!Number.isInteger(base) || base <= 0) problems.push(`${where}：換算後金額必須是正整數`);
-
-    try {
-      const { splits } = buildSplits(item.split, item.amount);
-      const keys = Object.keys(splits);
-      if (!keys.length) problems.push(`${where}：分攤名單是空的`);
-      for (const uid of keys) {
-        if (!known.has(uid)) problems.push(`${where}：分攤名單有不存在的成員 ${uid}`);
-      }
-      const sum = Object.values(splits).reduce((a, v) => a + v, 0);
-      if (sum !== item.amount) problems.push(`${where}：分攤合計 ${sum} 不等於金額 ${item.amount}`);
-    } catch (err) {
-      problems.push(`${where}：${err.message}`);
-    }
-  });
-
-  return problems;
-}
-
-const problems = validate();
-if (problems.length) {
-  console.error(`資料有 ${problems.length} 個問題，沒有寫入任何東西：\n`);
-  problems.forEach(p => console.error("  " + p));
-  process.exit(1);
-}
-
-if (dryRun) {
-  const byDate = new Map();
-  EXPENSES.forEach(item => {
-    const base = convertAmount(item.amount, item.currency, TASK.defaultCurrency, item.rate);
-    byDate.set(item.date, (byDate.get(item.date) ?? 0) + base);
-  });
-
-  console.log(`\n${TASK.name}　${TASK.startDate} ～ ${TASK.endDate}\n`);
-  console.log(`  ${EXPENSES.length} 筆支出全部通過 validExpenseShape() 的檢查\n`);
-  for (const [date, total] of [...byDate].sort()) {
-    const count = EXPENSES.filter(e => e.date === date).length;
-    const label = date < TASK.startDate ? "出發前" : `Day ${Math.round((Date.parse(date) - Date.parse(TASK.startDate)) / 86400000) + 1}`;
-    console.log(`  ${date}  ${label.padEnd(7)} ${String(count).padStart(2)} 筆   TWD ${(total / 100).toLocaleString().padStart(9)}`);
-  }
-  console.log(`\n  總額      TWD ${(twdTotal / 100).toLocaleString()}`);
-  console.log(`  每人平均  TWD ${Math.round(twdTotal / 100 / MEMBERS.length).toLocaleString()}`);
-  console.log(`  JPY 小計  ¥${jpyTotal.toLocaleString()}`);
-  console.log(`  有座標    ${EXPENSES.filter(e => e.place).length} 筆（地圖與報告用）`);
-  console.log(`  自訂分攤  ${EXPENSES.filter(e => e.split && !Array.isArray(e.split) && typeof e.split === "object").length} 筆`);
-  console.log(`  沒記時間  ${EXPENSES.filter(e => e.time === "").length} 筆（時間軸要排在當天最後）\n`);
-  console.log("  這是 --dry-run，沒有寫入任何資料。\n");
-  process.exit(0);
-}
-
-seed()
-  .then(taskId => {
-    console.log(`
-建立完成
-
-  任務      ${TASK.name}
-  taskId    ${taskId}
-  成員      ${MEMBERS.map(m => m.nickname).join("、")}
-  支出      ${EXPENSES.length} 筆（JPY ${jpyTotal.toLocaleString()} + 事前 TWD）
-  總額      TWD ${(twdTotal / 100).toLocaleString()}
-  每人平均  TWD ${Math.round(twdTotal / 100 / MEMBERS.length).toLocaleString()}
-  付款      ${PAYMENTS.length} 筆（1 已確認、1 待確認）
-
-  開啟      /tasks/${taskId}
-  邀請連結  /join/${inviteCode}
-
-要刪掉的話（子集合要一起，Firestore 沒有 cascade delete）：
-  npx firebase firestore:delete tasks/${taskId} --recursive --force
-  npx firebase firestore:delete invites/${inviteCode} --force
-`);
-    process.exit(0);
-  })
-  .catch(err => {
-    console.error("建立失敗：", err.message);
-    process.exit(1);
-  });
+await runSeed({
+  args,
+  task: TASK,
+  members: MEMBERS,
+  expenses: EXPENSES,
+  payments: PAYMENTS,
+  minorUnits: MINOR_UNITS,
+  // 日本是 UTC+9：createdAt 要落在消費當天的當地時間
+  utcOffsetHours: 9
+});
