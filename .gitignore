@@ -10,3 +10,9 @@ firestore-debug.log
 firebase-debug.log
 ui-debug.log
 .firebase/
+
+# Flutter（flutter_app/）
+flutter_app/.dart_tool/
+flutter_app/build/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
