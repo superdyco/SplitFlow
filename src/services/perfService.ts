@@ -27,7 +27,7 @@ import { phaseMap, slowestPhase, type PerfTrace } from "@/utils/perfTrace";
  * 調回 1（全收）或 0.1（抽樣）再部署即可，整條管線都還在：
  * 量測、上報、rules、scripts/perf-report.mjs 一個都沒拆。
  */
-const SAMPLE_RATE = 0;
+const SAMPLE_RATE = 1;
 
 /**
  * 一次開啟最多回報幾筆。防的是「某個 effect 意外重跑」這種迴圈 ——
