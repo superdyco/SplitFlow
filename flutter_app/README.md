@@ -4,7 +4,7 @@
 
 ## 現在的狀態
 
-**領域層已經移植完成並且驗證過：`dart test` 73 項全過。**
+**領域層移植中，目前 `dart test` 100 項全過、`dart analyze` 乾淨。**
 
 還沒有的東西：
 
@@ -52,16 +52,16 @@ SDK 裝在 `C:devlutter`（Flutter 3.47.1 / Dart 3.13.1），不在 PATH 裡，
 
 ```
 lib/domain/
-  currency.dart      ← src/utils/currency.ts
-  models.dart        ← src/types/ 裡結算會用到的部分
-  settlement.dart    ← src/utils/settlement.ts
-  my_cost.dart       ← src/utils/myCost.ts
-  task_status.dart   ← src/utils/taskStatus.ts + taskRole.ts
-test/                （73 項，全過）
-  currency_test.dart
-  settlement_test.dart
-  my_cost_test.dart
-  task_status_test.dart
+  currency.dart         ← src/utils/currency.ts
+  models.dart           ← src/types/expense.ts、payment.ts、settlement.ts
+  settlement.dart       ← src/utils/settlement.ts
+  my_cost.dart          ← src/utils/myCost.ts
+  task_status.dart      ← src/utils/taskStatus.ts + taskRole.ts
+  expense_date.dart     ← src/utils/expenseDate.ts
+  expense_groups.dart   ← src/utils/expenseGroups.ts
+  category_totals.dart  ← src/utils/categoryTotals.ts
+  expense_actions.dart  ← src/utils/repeatExpense.ts + memberRemoval.ts
+test/                   （100 項，全過）
 ```
 
 測試案例是**一比一搬過來的，不是重寫的**。兩邊跑出來只要有一個對不上，
@@ -75,11 +75,33 @@ test/                （73 項，全過）
 
 個案會隨產品改，這兩條不會。破了就是算錯錢。
 
-## 還沒搬的
+## 還沒搬的純邏輯
+
+| 檔案 | 用在哪 |
+| --- | --- |
+| `settlementText.ts` | 結算結果的分享文字 |
+| `receiptPolicy.ts` | 收據的大小與格式規則 |
+| `placeBias.ts` | 地點搜尋的位置偏好 |
+| `authError.ts` | 登入錯誤訊息與供應商標籤 |
+| `firestore.ts` 的驗證函式 | `required`、`textFieldError`、`dateRangeError` |
+
+## 刻意不搬的
+
+**報告相關**（`placeTotals`、`tripSummary`、`reportTimeline`、`reportPlaces`、
+`favorites`）—— 公開報告與探索頁留在網頁版，見上面的範圍決定。
+
+**網頁平台專屬**（`platform`、`visibility`、`storageProbe`、`perfTrace`、
+`stallGuard`）—— 這些是 2026-08-24 那次效能調查留下的工具，而那個 30 秒卡頓
+是 WebKit 特有的（桌機 0/13 次、iPhone 7/69 次）。原生的 Firestore 不走
+WebChannel，這組東西在這裡沒有對應的問題要解。
+
+**需要重寫而不是移植**（`imageCompress` 用 canvas、`offlineWrite` 針對
+Firestore JS SDK 的離線語意）—— 原生有自己的做法。
+
+## 還沒開始的
 
 | | 網頁版位置 | 備註 |
 | --- | --- | --- |
-| 其餘純邏輯 | `src/utils/` 另外 12 個檔 | 時間軸、分類統計、地點統計、收據政策… |
 | 資料存取 | `src/services/` | FlutterFire 的 API 幾乎 1:1 |
 | 狀態管理 | `src/composables/`、`src/stores/` | 改成 Riverpod |
 | 畫面 | `src/pages/`、`src/components/` | 整個重寫，量最大的一塊 |

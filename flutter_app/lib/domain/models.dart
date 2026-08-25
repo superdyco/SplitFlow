@@ -4,6 +4,68 @@
 /// 屬於資料存取，會隨 Firestore SDK 走。這裡是純值物件，讓 settlement.dart
 /// 可以完全不知道資料從哪來。
 
+enum ExpenseCategory { food, transport, stay, ticket, shopping, other }
+
+/// 分類的顯示資料。順序就是選單的順序，也是金額相同時的次要排序依據。
+class CategoryMeta {
+  final ExpenseCategory value;
+  final String label;
+  final String icon;
+  const CategoryMeta(this.value, this.label, this.icon);
+}
+
+const List<CategoryMeta> expenseCategories = [
+  CategoryMeta(ExpenseCategory.food, '餐飲', '🍽'),
+  CategoryMeta(ExpenseCategory.transport, '交通', '🚗'),
+  CategoryMeta(ExpenseCategory.stay, '住宿', '🏨'),
+  CategoryMeta(ExpenseCategory.ticket, '門票', '🎟'),
+  CategoryMeta(ExpenseCategory.shopping, '購物', '🛍'),
+  CategoryMeta(ExpenseCategory.other, '其他', '📦'),
+];
+
+const ExpenseCategory defaultCategory = ExpenseCategory.food;
+
+CategoryMeta categoryMeta(ExpenseCategory value) =>
+    expenseCategories.firstWhere((item) => item.value == value);
+
+/// Firestore 存的是字串。認不得的一律歸「其他」—— 不能讓一筆支出因為
+/// 分類是新的就整個消失。
+ExpenseCategory categoryFrom(String? value) {
+  for (final meta in expenseCategories) {
+    if (meta.value.name == value) return meta.value;
+  }
+  return ExpenseCategory.other;
+}
+
+/// even：所有參與者均分。custom：每個人的金額由使用者自己填。
+enum SplitMode { even, custom }
+
+/// 支出發生的地點。用 Google Places 選的會有完整資訊，
+/// 只打名稱時其餘欄位是 null。
+class ExpensePlace {
+  final String name;
+  final String? address;
+  final double? lat;
+  final double? lng;
+  final String? placeId;
+
+  const ExpensePlace({
+    required this.name,
+    this.address,
+    this.lat,
+    this.lng,
+    this.placeId,
+  });
+
+  ExpensePlace copy() => ExpensePlace(
+        name: name,
+        address: address,
+        lat: lat,
+        lng: lng,
+        placeId: placeId,
+      );
+}
+
 /// 一筆支出。
 class Expense {
   final String id;
@@ -25,6 +87,26 @@ class Expense {
   /// 誰分攤多少，**原幣別**的金額。總和等於 amount。
   final Map<String, int> splits;
 
+  final ExpenseCategory category;
+  final SplitMode splitMode;
+
+  /// 消費發生的日期 `"YYYY-MM-DD"`。
+  ///
+  /// 是字串而不是 DateTime，因為日期不該有時區：在曼谷凌晨一點買的東西，
+  /// 存成帶時區的時間之後換個地方看就變成前一天了。
+  ///
+  /// 舊資料沒有這個欄位，是 null，那時退回用 createdAt 的日期。
+  final String? date;
+
+  /// 消費發生的時間 `"HH:MM"`，選填。空字串或 null 代表沒記時間 ——
+  /// 那種支出只知道是哪一天。
+  final String? time;
+
+  /// 離線新增時伺服器時間還沒回來，這裡會是 null。
+  final DateTime? createdAt;
+
+  final ExpensePlace? place;
+
   const Expense({
     required this.id,
     required this.title,
@@ -33,6 +115,12 @@ class Expense {
     required this.baseAmount,
     required this.paidBy,
     required this.splits,
+    this.category = ExpenseCategory.other,
+    this.splitMode = SplitMode.even,
+    this.date,
+    this.time,
+    this.createdAt,
+    this.place,
   });
 }
 
