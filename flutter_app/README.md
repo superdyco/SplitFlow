@@ -4,10 +4,14 @@
 
 ## 現在的狀態
 
-**純邏輯層移植完成：`dart test` 132 項全過、`dart analyze` 乾淨。**
+**純邏輯層 + 資料存取層已寫完：`dart test` 151 項全過、`dart analyze` 乾淨。**
 
-下一步是資料存取層（Firestore），性質不一樣 —— 從這裡開始需要真的連線或
-mock，不再是「純函式跑一跑就知道對不對」。
+⚠️ 但要講清楚**測試涵蓋到哪裡**：151 項全部是純函式與文件轉換。
+repository 那一層（真的打 Firestore 的部分）**一行都還沒被執行過** ——
+這台機器上沒有模擬器也沒有實機，`flutter run` 跑不起來。
+
+平台資料夾、Firebase 註冊、`firebase_options.dart` 都齊了，缺的只是一個
+跑得起來的裝置。
 
 還沒有的東西：
 
@@ -69,8 +73,20 @@ lib/domain/
   receipt_policy.dart   ← src/utils/receiptPolicy.ts
   place_bias.dart       ← src/utils/placeBias.ts
   validation.dart       ← src/utils/firestore.ts 的驗證函式
-test/                   （132 項，全過）
+  offline_write.dart    ← src/utils/offlineWrite.ts
+lib/data/
+  mappers.dart          ← expenseService.ts 的 normalizeExpense 等
+  firestore_refs.dart   ← 集中所有 Firestore 路徑
+  task_repository.dart  ← taskService.ts + memberService.ts
+  expense_repository.dart ← expenseService.ts + paymentService.ts
+  auth_repository.dart  ← authService.ts + userService.ts
+test/                   （151 項，全過）
 ```
+
+**測試涵蓋率不平均，而且是刻意的。** `lib/domain/` 與 `mappers.dart`
+測得很密（那裡是算錢與吞舊資料的地方）；repository 一項都沒有，因為那需要
+模擬器或實機。等有裝置之後，這個 repo 已經有 Firestore 模擬器的設定
+（根目錄 `firebase.json`），現有的 137 條安全規則測試也是跑在同一個模擬器上。
 
 **記帳需要的純邏輯到此搬完。** 網頁版剩下沒搬的，理由都在下一節。
 
@@ -95,8 +111,11 @@ test/                   （132 項，全過）
 是 WebKit 特有的（桌機 0/13 次、iPhone 7/69 次）。原生的 Firestore 不走
 WebChannel，這組東西在這裡沒有對應的問題要解。
 
-**需要重寫而不是移植**（`imageCompress` 用 canvas、`offlineWrite` 針對
-Firestore JS SDK 的離線語意）—— 原生有自己的做法。
+**需要重寫而不是移植**（`imageCompress` 用 canvas）—— 原生要換成 Dart 的
+影像套件。
+
+（`offlineWrite` 本來也在這一組，查過之後發現判斷錯了：FlutterFire 的寫入
+Future 跟 JS SDK 一樣，離線時不會完成，所以那支直接移植就對了。已搬。）
 
 **錯誤格式化**（`firestore.ts` 的 `firebaseErrorMessage`）—— 它要認 Firestore
 的錯誤碼，屬於資料存取層，而且原生的錯誤形狀跟 JS SDK 不一樣。只搬了同一個

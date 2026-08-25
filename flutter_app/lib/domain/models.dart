@@ -218,3 +218,72 @@ class SettlementSnapshotInput {
     required this.note,
   });
 }
+
+/// 一個分帳任務。
+class Task {
+  final String id;
+  final String name;
+  final String ownerId;
+  final List<String> adminIds;
+
+  /// Security Rules 靠這個欄位判斷成員身分，所以它跟 members 子集合永遠一起改。
+  final List<String> memberIds;
+  final String defaultCurrency;
+  final String? startDate;
+  final String? endDate;
+  final String status;
+  final String inviteCode;
+  final int memberCount;
+  final int expenseCount;
+
+  const Task({
+    required this.id,
+    required this.name,
+    required this.ownerId,
+    required this.adminIds,
+    required this.memberIds,
+    required this.defaultCurrency,
+    required this.startDate,
+    required this.endDate,
+    required this.status,
+    required this.inviteCode,
+    required this.memberCount,
+    required this.expenseCount,
+  });
+}
+
+/// 任務裡的一位成員。
+///
+/// 被移除的人 `active` 是 false 但文件留著 —— 既有支出還查得到他的暱稱，
+/// 但因為已經從 `task.memberIds` 拿掉，Security Rules 不再讓他讀這個任務。
+class TaskMember {
+  final String uid;
+  final String nickname;
+
+  /// owner / admin / member。
+  final String role;
+  final bool active;
+
+  const TaskMember({
+    required this.uid,
+    required this.nickname,
+    required this.role,
+    required this.active,
+  });
+}
+
+class UserProfile {
+  final String uid;
+  final String nickname;
+  final String email;
+  final String? photoUrl;
+  final String provider;
+
+  const UserProfile({
+    required this.uid,
+    required this.nickname,
+    required this.email,
+    required this.photoUrl,
+    required this.provider,
+  });
+}
