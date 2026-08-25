@@ -4,7 +4,10 @@
 
 ## 現在的狀態
 
-**領域層移植中，目前 `dart test` 100 項全過、`dart analyze` 乾淨。**
+**純邏輯層移植完成：`dart test` 132 項全過、`dart analyze` 乾淨。**
+
+下一步是資料存取層（Firestore），性質不一樣 —— 從這裡開始需要真的連線或
+mock，不再是「純函式跑一跑就知道對不對」。
 
 還沒有的東西：
 
@@ -61,8 +64,15 @@ lib/domain/
   expense_groups.dart   ← src/utils/expenseGroups.ts
   category_totals.dart  ← src/utils/categoryTotals.ts
   expense_actions.dart  ← src/utils/repeatExpense.ts + memberRemoval.ts
-test/                   （100 項，全過）
+  settlement_text.dart  ← src/utils/settlementText.ts
+  auth_error.dart       ← src/utils/authError.ts
+  receipt_policy.dart   ← src/utils/receiptPolicy.ts
+  place_bias.dart       ← src/utils/placeBias.ts
+  validation.dart       ← src/utils/firestore.ts 的驗證函式
+test/                   （132 項，全過）
 ```
+
+**記帳需要的純邏輯到此搬完。** 網頁版剩下沒搬的，理由都在下一節。
 
 測試案例是**一比一搬過來的，不是重寫的**。兩邊跑出來只要有一個對不上，
 就是移植出了問題，而不是「本來就在測不同的東西」。
@@ -74,16 +84,6 @@ test/                   （100 項，全過）
 - 建議轉帳的金額加總等於應付總額
 
 個案會隨產品改，這兩條不會。破了就是算錯錢。
-
-## 還沒搬的純邏輯
-
-| 檔案 | 用在哪 |
-| --- | --- |
-| `settlementText.ts` | 結算結果的分享文字 |
-| `receiptPolicy.ts` | 收據的大小與格式規則 |
-| `placeBias.ts` | 地點搜尋的位置偏好 |
-| `authError.ts` | 登入錯誤訊息與供應商標籤 |
-| `firestore.ts` 的驗證函式 | `required`、`textFieldError`、`dateRangeError` |
 
 ## 刻意不搬的
 
@@ -97,6 +97,21 @@ WebChannel，這組東西在這裡沒有對應的問題要解。
 
 **需要重寫而不是移植**（`imageCompress` 用 canvas、`offlineWrite` 針對
 Firestore JS SDK 的離線語意）—— 原生有自己的做法。
+
+**錯誤格式化**（`firestore.ts` 的 `firebaseErrorMessage`）—— 它要認 Firestore
+的錯誤碼，屬於資料存取層，而且原生的錯誤形狀跟 JS SDK 不一樣。只搬了同一個
+檔案裡跟 Firebase 無關的驗證函式。
+
+## 移植時處理掉的平台差異
+
+除了前面三條，這一批又多兩個：
+
+**4. Firebase 的錯誤碼有兩種寫法。** JS SDK 給 `auth/popup-closed-by-user`，
+FlutterFire 給 `popup-closed-by-user`。`normalizeAuthCode` 統一剝掉前綴，
+呼叫端不用管自己拿到的是哪一種，測試兩種都釘住。
+
+**5. `enabledProviders` 在原生版可能要改。** 目前跟網頁版一樣只開 Google，
+但 iOS 上架時 Apple 會要求提供 Apple 登入。真的要送 App Store 時記得回來看。
 
 ## 還沒開始的
 
