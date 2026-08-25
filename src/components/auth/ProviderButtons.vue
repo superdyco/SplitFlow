@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { warmSignIn, type SignInProvider } from "@/services/authService";
+import { computed } from "vue";
+import type { SignInProvider } from "@/services/authService";
 import { ENABLED_PROVIDERS, PROVIDER_LABELS } from "@/utils/authError";
 
 defineProps<{
@@ -19,27 +19,6 @@ const emit = defineEmits<{ (e: "select", provider: SignInProvider): void }>();
 const providers = computed(() =>
   ENABLED_PROVIDERS.map(id => ({ id, label: PROVIDER_LABELS[id] }))
 );
-
-/**
- * 暖好之前不讓按。
- *
- * 這是這個元件存在的第二個理由，也是它比「各頁自己記得暖機」可靠的地方：
- * 只要畫面上出現這幾顆按鈕，暖機就一定跑過，沒有哪一頁會忘記。
- *
- * 為什麼一定要擋：resolver 沒暖過的話，`signInWithPopup` 會在開彈窗**之前**
- * 先 await 一次初始化（手機上 1.6 秒），iOS 會因此把使用者手勢作廢，彈窗被擋掉，
- * 登入無聲卡死。這個坑踩過一次（2026-08-24），而「按鈕暖好前按不下去」正是
- * 從結構上把那個失敗模式關掉 —— 不存在「按了之後才開始慢慢載」這件事。
- *
- * 不怕永遠鎖住：`warmSignIn` 不會 reject，而它底下的 `loadGapi` 自己帶
- * timeout 與 ontimeout，一定會結束。
- */
-const ready = ref(false);
-
-onMounted(async () => {
-  await warmSignIn();
-  ready.value = true;
-});
 </script>
 
 <template>
@@ -49,7 +28,7 @@ onMounted(async () => {
       :key="provider.id"
       class="btn btn-block provider"
       :class="provider.id"
-      :disabled="!ready || pending === provider.id"
+      :disabled="pending === provider.id"
       @click="emit('select', provider.id)"
     >
       <span class="icon" aria-hidden="true">
@@ -70,22 +49,12 @@ onMounted(async () => {
         {{ pending === provider.id ? `${provider.label} ${action}中...` : `使用 ${provider.label} ${action}` }}
       </span>
     </button>
-    <!--
-      連線正常時這行大概閃 0.3 秒，不會有人注意到；手機或慢網路才看得到。
-      沒有這一行的話，使用者只會看到一排按不動的按鈕，不知道在等什麼。
-    -->
-    <p v-if="!ready" class="tiny prep">登入服務準備中...</p>
   </div>
 </template>
 
 <style scoped>
 .providers {
   gap: 10px;
-}
-
-.prep {
-  margin: 0;
-  text-align: center;
 }
 
 .provider {
