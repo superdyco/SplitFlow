@@ -4,6 +4,8 @@
 /// 屬於資料存取，會隨 Firestore SDK 走。這裡是純值物件，讓 settlement.dart
 /// 可以完全不知道資料從哪來。
 
+library;
+
 enum ExpenseCategory { food, transport, stay, ticket, shopping, other }
 
 /// 分類的顯示資料。順序就是選單的順序，也是金額相同時的次要排序依據。

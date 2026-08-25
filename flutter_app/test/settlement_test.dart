@@ -50,7 +50,7 @@ void main() {
     });
 
     test('舊資料同幣別時沿用原金額', () {
-      final e = Expense(
+      const e = Expense(
         id: 'e1',
         title: '舊支出',
         amount: 45000,
@@ -63,7 +63,7 @@ void main() {
     });
 
     test('舊資料是外幣又沒有換算金額就算不出來', () {
-      final e = Expense(
+      const e = Expense(
         id: 'e1',
         title: '舊外幣支出',
         amount: 12400,
@@ -155,7 +155,7 @@ void main() {
     });
 
     test('缺換算金額的舊外幣支出被排除並列出來', () {
-      final broken = Expense(
+      const broken = Expense(
         id: 'bad',
         title: '沒有匯率的舊支出',
         amount: 12400,

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "816128125030",
+    "project_id": "splitflow-e39c0",
+    "storage_bucket": "splitflow-e39c0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:816128125030:android:44a4914a86d3617fa065a7",
+        "android_client_info": {
+          "package_name": "com.dyco.splitflow"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "816128125030-tinjkkds5qmqqmfbldrhivdc217tmqpa.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDkn3_e9mQnvJotVEJs9TDfbz6lA3iOips"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "816128125030-tinjkkds5qmqqmfbldrhivdc217tmqpa.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

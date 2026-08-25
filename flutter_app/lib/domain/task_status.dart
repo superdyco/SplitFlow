@@ -3,10 +3,13 @@
 /// 分堆放在這裡而不是散在畫面的條件判斷，是因為「已刪除的絕對不能出現」是一條
 /// 需要被測試釘住的規則 —— 漏在任何一個地方，使用者就會看到本來刪掉的東西。
 
+library;
+
 /// active 進行中、archived 封存唯讀、deleted 軟刪除（前端一律濾掉）。
 ///
 /// 用軟刪除是因為 Firestore 沒有 cascade delete —— 刪掉任務文件會讓底下的
 /// members / expenses / payments / settlements 變成永遠的孤兒。
+
 enum TaskStatus { active, archived, deleted }
 
 const Map<TaskStatus, String> statusLabels = {

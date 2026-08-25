@@ -3,6 +3,8 @@
 /// 刻意不 import Firebase：純函式才測得動，不用為了跑字串測試去初始化整個
 /// Firebase App。錯誤碼是字串，由資料存取層傳進來。
 
+library;
+
 enum SignInProvider { google, apple, facebook }
 
 const Map<SignInProvider, String> providerLabels = {

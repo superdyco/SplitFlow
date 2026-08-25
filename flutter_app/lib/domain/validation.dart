@@ -3,7 +3,10 @@
 /// 只搬驗證，不搬 `firebaseErrorMessage` —— 那支要認 Firestore 的錯誤碼，
 /// 屬於資料存取層，而且原生的錯誤形狀跟 JS SDK 不一樣。
 
+library;
+
 /// 送出前的把關：空白就丟例外，有值就回傳去掉頭尾空白的版本。
+
 String required(String value, String label) {
   final trimmed = value.trim();
   if (trimmed.isEmpty) throw FormatException('$label為必填');

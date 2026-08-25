@@ -13,10 +13,10 @@ void main() {
     const names = {'a': '阿明', 'b': '小美'};
 
     test('列出每一筆轉帳，用暱稱不是 uid', () {
-      final text = buildSettlementText(SettlementTextInput(
+      final text = buildSettlementText(const SettlementTextInput(
         taskName: '曼谷旅行',
         currency: 'TWD',
-        transfers: const [Transfer(from: 'b', to: 'a', amount: 50000)],
+        transfers: [Transfer(from: 'b', to: 'a', amount: 50000)],
         memberNames: names,
         expenseCount: 3,
         total: 150000,
@@ -29,10 +29,10 @@ void main() {
     });
 
     test('沒有轉帳時說已結清，而不是留一片空白', () {
-      final text = buildSettlementText(SettlementTextInput(
+      final text = buildSettlementText(const SettlementTextInput(
         taskName: '曼谷旅行',
         currency: 'TWD',
-        transfers: const [],
+        transfers: [],
         memberNames: names,
         expenseCount: 1,
         total: 30000,
@@ -41,10 +41,10 @@ void main() {
     });
 
     test('查不到暱稱的人有備用稱呼', () {
-      final text = buildSettlementText(SettlementTextInput(
+      final text = buildSettlementText(const SettlementTextInput(
         taskName: '曼谷旅行',
         currency: 'TWD',
-        transfers: const [Transfer(from: 'zz', to: 'a', amount: 10000)],
+        transfers: [Transfer(from: 'zz', to: 'a', amount: 10000)],
         memberNames: names,
         expenseCount: 1,
         total: 10000,
@@ -53,10 +53,10 @@ void main() {
     });
 
     test('缺匯率的支出要警告 —— 不講就是散播錯的數字', () {
-      final text = buildSettlementText(SettlementTextInput(
+      final text = buildSettlementText(const SettlementTextInput(
         taskName: '曼谷旅行',
         currency: 'TWD',
-        transfers: const [],
+        transfers: [],
         memberNames: names,
         expenseCount: 2,
         total: 30000,
@@ -66,10 +66,10 @@ void main() {
     });
 
     test('待確認的付款也要警告', () {
-      final text = buildSettlementText(SettlementTextInput(
+      final text = buildSettlementText(const SettlementTextInput(
         taskName: '曼谷旅行',
         currency: 'TWD',
-        transfers: const [],
+        transfers: [],
         memberNames: names,
         expenseCount: 2,
         total: 30000,
@@ -79,10 +79,10 @@ void main() {
     });
 
     test('沒有警告時不留多餘的空行', () {
-      final text = buildSettlementText(SettlementTextInput(
+      final text = buildSettlementText(const SettlementTextInput(
         taskName: '曼谷旅行',
         currency: 'TWD',
-        transfers: const [],
+        transfers: [],
         memberNames: names,
         expenseCount: 1,
         total: 30000,
@@ -92,10 +92,10 @@ void main() {
     });
 
     test('快照多帶日期與備註', () {
-      final text = buildSettlementText(SettlementTextInput(
+      final text = buildSettlementText(const SettlementTextInput(
         taskName: '曼谷旅行',
         currency: 'TWD',
-        transfers: const [],
+        transfers: [],
         memberNames: names,
         expenseCount: 1,
         total: 30000,
@@ -107,10 +107,10 @@ void main() {
     });
 
     test('備註只有空白時不輸出', () {
-      final text = buildSettlementText(SettlementTextInput(
+      final text = buildSettlementText(const SettlementTextInput(
         taskName: '曼谷旅行',
         currency: 'TWD',
-        transfers: const [],
+        transfers: [],
         memberNames: names,
         expenseCount: 1,
         total: 30000,

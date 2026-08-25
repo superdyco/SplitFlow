@@ -16,3 +16,14 @@ flutter_app/.dart_tool/
 flutter_app/build/
 flutter_app/.flutter-plugins
 flutter_app/.flutter-plugins-dependencies
+
+# Flutter 的 Firebase 設定檔**要進版控**，跟網頁版的 .env 相反。
+#
+# 兩個理由。一是安全性上沒有差別：Firebase 的 client 設定本來就是公開的，
+# 網頁版那把金鑰現在就躺在 splitflow-e39c0.web.app 的 JS bundle 裡，任何人
+# 都讀得到；APK 裡的也一樣拆得出來。真正的防線是 Security Rules，不是藏金鑰。
+#
+# 二是代價不對稱：.env 缺了網頁版照樣編得起來（import.meta.env 是執行期），
+# 但 firebase_options.dart 缺了是編譯錯誤，clone 下來的人連 analyze 都跑不動。
+#
+# 真的遇到有人濫用配額時，解法是開 App Check，不是把設定檔藏起來。
