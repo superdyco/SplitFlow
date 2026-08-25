@@ -1,4 +1,4 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:splitflow/domain/models.dart';
 import 'package:splitflow/domain/settlement.dart';
 

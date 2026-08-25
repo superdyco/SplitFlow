@@ -1,4 +1,4 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:splitflow/domain/currency.dart';
 
 /// `tests/currency.test.ts` 的 Dart 版。
