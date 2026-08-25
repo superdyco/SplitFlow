@@ -2,32 +2,31 @@
 
 網頁版的移植。**目前只有領域邏輯這一層，而且還沒有編譯過。**
 
-## ⚠️ 現在的狀態
+## 現在的狀態
 
-寫這些檔案的時候，這台機器上**沒有安裝 Flutter / Dart SDK**，所以：
+**領域層已經移植完成並且驗證過：`dart test` 73 項全過。**
 
-- 沒有 `flutter create` 產生的平台資料夾（`android/`、`ios/`、`web/`…）
-- 沒有 `pubspec.lock`
-- **這裡的 Dart 程式碼一行都沒有編譯過，測試也一次都沒跑過**
+還沒有的東西：
 
-把它當成「已經想清楚、但還沒驗證」的草稿。第一件事一定是讓它跑起來，
-而不是繼續往上加東西。
+- 平台資料夾（`android/`、`ios/`…）—— 需要時跑 `flutter create .` 補上，
+  不會蓋掉 `lib/` 與 `test/`
+- 資料存取層（Firestore）、狀態管理、任何畫面
 
-## 接手時的第一步
+## 跑測試
 
 ```bash
-winget install --id=Google.Flutter    # 或自己下載 SDK
 cd flutter_app
-flutter create .                      # 補上平台資料夾，不會蓋掉 lib/ 與 test/
 flutter pub get
-dart test                             # ← 這一步才是真正的驗收
+dart test
 ```
 
-領域層的測試用純 Dart 的 `package:test`，所以 `dart test` 就跑得動，
-不需要 widget 環境。這讓「`lib/domain/` 不准 import Flutter」變成編譯器
-會抓的事，而不是靠自律。
+SDK 裝在 `C:devlutter`（Flutter 3.47.1 / Dart 3.13.1），不在 PATH 裡，
+所以要嘛把 `C:devlutterin` 加進 PATH，要嘛在指令前面設一次。
 
-全綠之前，不要動 UI。理由在下一節。
+領域層的測試用純 Dart 的 `package:test`，不需要 widget 環境。這讓
+「`lib/domain/` 不准 import Flutter」變成編譯器會抓的事，而不是靠自律。
+
+**在測試全綠的前提下才往上加東西。** 理由在下一節。
 
 ## 為什麼先搬這一層
 
@@ -53,16 +52,37 @@ dart test                             # ← 這一步才是真正的驗收
 
 ```
 lib/domain/
-  currency.dart     ← src/utils/currency.ts
-  models.dart       ← src/types/ 裡結算會用到的部分
-  settlement.dart   ← src/utils/settlement.ts
-test/
-  currency_test.dart    ← tests/currency.test.ts
-  settlement_test.dart  ← tests/settlement.test.ts
+  currency.dart      ← src/utils/currency.ts
+  models.dart        ← src/types/ 裡結算會用到的部分
+  settlement.dart    ← src/utils/settlement.ts
+  my_cost.dart       ← src/utils/myCost.ts
+  task_status.dart   ← src/utils/taskStatus.ts + taskRole.ts
+test/                （73 項，全過）
+  currency_test.dart
+  settlement_test.dart
+  my_cost_test.dart
+  task_status_test.dart
 ```
 
 測試案例是**一比一搬過來的，不是重寫的**。兩邊跑出來只要有一個對不上，
 就是移植出了問題，而不是「本來就在測不同的東西」。
+
+其中兩條是**不變條件**而不是個案，六種情境（均分、除不盡、自訂、外幣、
+含付款、15 人）都要成立：
+
+- 每個人的 balance 加總是 0 —— 錢不會憑空出現或消失
+- 建議轉帳的金額加總等於應付總額
+
+個案會隨產品改，這兩條不會。破了就是算錯錢。
+
+## 還沒搬的
+
+| | 網頁版位置 | 備註 |
+| --- | --- | --- |
+| 其餘純邏輯 | `src/utils/` 另外 12 個檔 | 時間軸、分類統計、地點統計、收據政策… |
+| 資料存取 | `src/services/` | FlutterFire 的 API 幾乎 1:1 |
+| 狀態管理 | `src/composables/`、`src/stores/` | 改成 Riverpod |
+| 畫面 | `src/pages/`、`src/components/` | 整個重寫，量最大的一塊 |
 
 ## 移植時特別小心的三個地方
 
