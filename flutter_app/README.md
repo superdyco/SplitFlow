@@ -19,16 +19,67 @@ repository 那一層（真的打 Firestore 的部分）**一行都還沒被執�
   不會蓋掉 `lib/` 與 `test/`
 - 資料存取層（Firestore）、狀態管理、任何畫面
 
+## 開發環境
+
+**都不在 PATH 裡**，每個 shell 要先設一次：
+
+```bash
+export ANDROID_HOME=/c/dev/android-sdk
+export PATH="/c/dev/flutter/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+```
+
+| | 位置 | 版本 |
+| --- | --- | --- |
+| Flutter | `C:devlutter` | 3.47.1 / Dart 3.13.1 |
+| Android SDK | `C:devandroid-sdk` | platform 36、build-tools 36.0.0、NDK 28.2 |
+| 模擬器 AVD | `splitflow` | android-36 google_apis x86_64 |
+
+用命令列工具裝的，不是 Android Studio —— 整個過程可以自動化，不用點 GUI 精靈。
+
+### ⚠️ Android CLI 的套件路徑有兩種格式，而且互相衝突
+
+新版把 `平台;版本` 改成 `平台/版本`，但**改得不徹底**：
+
+| 工具 | 要的格式 | 從哪裡呼叫 |
+| --- | --- | --- |
+| `sdkmanager` | `platforms/android-36` | bash 就行 |
+| `avdmanager` | `system-images;android-36;...` | **必須用 PowerShell** |
+
+因為 `;` 在 Windows 的 `.bat` 裡是參數分隔符，從 bash 傳過去會被切掉，
+錯誤訊息是「Package 36.0.0 not found」這種看不出原因的東西。
+
+**Gradle 自己也踩這個坑**：它想自動裝 NDK 時用的是舊格式，所以會失敗成
+`NTSTATUS 0xC0000409`。解法是先手動裝好：
+
+```bash
+sdkmanager.bat --sdk_root=C:/dev/android-sdk "ndk/28.2.13676358"
+```
+
 ## 跑測試
 
 ```bash
-cd flutter_app
-flutter pub get
-dart test
+cd flutter_app && flutter pub get && dart test
 ```
 
-SDK 裝在 `C:devlutter`（Flutter 3.47.1 / Dart 3.13.1），不在 PATH 裡，
-所以要嘛把 `C:devlutterin` 加進 PATH，要嘛在指令前面設一次。
+## 跑起來
+
+```bash
+emulator.exe -avd splitflow -no-snapshot-load -gpu swiftshader_indirect &
+flutter run
+```
+
+Google 登入需要 debug 憑證的 SHA-1 註冊在 Firebase，**已經設好了**
+（`76:EE:77:...`）。換一台機器開發的話要重做一次：
+
+```bash
+keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android
+npx firebase apps:android:sha:create <androidAppId> <sha1> --project splitflow-e39c0
+rm android/app/google-services.json
+npx firebase apps:sdkconfig ANDROID <androidAppId> --out android/app/google-services.json
+```
+
+沒做的話登入會失敗成 `ApiException: 10`（DEVELOPER_ERROR），
+訊息完全看不出跟憑證有關。
 
 領域層的測試用純 Dart 的 `package:test`，不需要 widget 環境。這讓
 「`lib/domain/` 不准 import Flutter」變成編譯器會抓的事，而不是靠自律。
