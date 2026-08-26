@@ -21,8 +21,31 @@ class SignInCancelled implements Exception {
   const SignInCancelled();
 }
 
+/// Google 登入用的 **web** OAuth client id。
+///
+/// 名字很容易誤導：Android 上要傳的是 `google-services.json` 裡
+/// `client_type: 3`（web）那一個，不是 `client_type: 1`（android）。
+/// 傳錯或不傳的話 `google_sign_in` 7.x 會直接丟
+/// `clientConfigurationError: serverClientId must be provided on Android`。
+///
+/// 為什麼是 web 的：Android 那組只是拿來比對 APK 簽章，真正要換 Firebase
+/// 憑證的是後端這一組。
+///
+/// 這不是秘密 —— 它就在版控裡的 google-services.json 中。
+const String _serverClientId =
+    '816128125030-tinjkkds5qmqqmfbldrhivdc217tmqpa.apps.googleusercontent.com';
+
 class AuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  /// `initialize` 一個 app 只能呼叫一次，但登入可以按很多次。
+  static bool _initialized = false;
+
+  Future<void> _ensureInitialized() async {
+    if (_initialized) return;
+    await GoogleSignIn.instance.initialize(serverClientId: _serverClientId);
+    _initialized = true;
+  }
 
   User? get currentUser => _auth.currentUser;
 
@@ -35,6 +58,7 @@ class AuthRepository {
   /// `auth/` 前綴與不帶前綴的寫法，所以兩個版本共用同一份訊息。
   Future<User> signInWithGoogle() async {
     try {
+      await _ensureInitialized();
       final account = await GoogleSignIn.instance.authenticate();
 
       final credential = GoogleAuthProvider.credential(
