@@ -9,6 +9,7 @@ import '../domain/settlement_text.dart';
 import '../domain/task_status.dart';
 import '../state/providers.dart';
 import 'expense_day_group.dart';
+import 'expense_form_page.dart';
 import 'expense_row.dart';
 import 'theme.dart';
 
@@ -146,6 +147,7 @@ class _Loaded extends ConsumerWidget {
                 children: [
                   _ExpensesTab(
                     task: task,
+                    archived: archived,
                     collapsed: collapsed,
                     onToggleDay: onToggleDay,
                   ),
@@ -165,52 +167,88 @@ class _Loaded extends ConsumerWidget {
 
 class _ExpensesTab extends ConsumerWidget {
   final Task task;
+  final bool archived;
   final Set<String> collapsed;
   final void Function(String date) onToggleDay;
 
   const _ExpensesTab({
     required this.task,
+    required this.archived,
     required this.collapsed,
     required this.onToggleDay,
   });
+
+  /// 開新增或編輯表單。存完之後把這個任務相關的東西全部作廢重讀 ——
+  /// 支出列表、結算、任務本身的 expenseCount 都變了。
+  Future<void> _openForm(
+    BuildContext context,
+    WidgetRef ref, {
+    Expense? existing,
+  }) async {
+    final saved = await Navigator.of(context).push<Object?>(
+      MaterialPageRoute(
+        builder: (_) => ExpenseFormPage(taskId: task.id, existing: existing),
+      ),
+    );
+    if (saved == null) return;
+    ref.invalidate(expensesProvider(task.id));
+    ref.invalidate(taskProvider(task.id));
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final expenses = ref.watch(expensesProvider(task.id));
     final members = ref.watch(membersProvider(task.id));
 
-    return expenses.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => _Centered('讀取支出失敗：$err'),
-      data: (list) {
-        if (list.isEmpty) return const _Centered('這個任務還沒有支出。');
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      // 封存的任務唯讀，收起新增入口 —— rules 也擋著，這裡只是不要讓人
+      // 按了才失敗。
+      floatingActionButton: archived
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _openForm(context, ref),
+              icon: const Icon(Icons.add),
+              label: const Text('新增支出'),
+            ),
+      body: expenses.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => _Centered('讀取支出失敗：$err'),
+        data: (list) {
+          if (list.isEmpty) return const _Centered('這個任務還沒有支出。');
 
-        final names = {
-          for (final m in members.value ?? const <TaskMember>[])
-            m.uid: m.nickname,
-        };
-        final groups = groupExpensesByDate(list, task.defaultCurrency);
+          final names = {
+            for (final m in members.value ?? const <TaskMember>[])
+              m.uid: m.nickname,
+          };
+          final groups = groupExpensesByDate(list, task.defaultCurrency);
 
-        return ListView(
-          children: [
-            for (final group in groups)
-              ExpenseDayGroup(
-                group: group,
-                currency: task.defaultCurrency,
-                open: !collapsed.contains(group.date),
-                onToggle: () => onToggleDay(group.date),
-                children: [
-                  for (final expense in group.expenses)
-                    ExpenseRow(
-                      expense: expense,
-                      memberNames: names,
-                      baseCurrency: task.defaultCurrency,
-                    ),
-                ],
-              ),
-          ],
-        );
-      },
+          return ListView(
+            // 底部留白給浮動按鈕，不然最後一筆會被蓋住。
+            padding: const EdgeInsets.only(bottom: 88),
+            children: [
+              for (final group in groups)
+                ExpenseDayGroup(
+                  group: group,
+                  currency: task.defaultCurrency,
+                  open: !collapsed.contains(group.date),
+                  onToggle: () => onToggleDay(group.date),
+                  children: [
+                    for (final expense in group.expenses)
+                      ExpenseRow(
+                        expense: expense,
+                        memberNames: names,
+                        baseCurrency: task.defaultCurrency,
+                        onTap: archived
+                            ? null
+                            : () => _openForm(context, ref, existing: expense),
+                      ),
+                  ],
+                ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

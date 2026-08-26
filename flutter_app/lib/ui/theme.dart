@@ -25,13 +25,28 @@ abstract final class AppColors {
 }
 
 ThemeData buildAppTheme() {
+  /*
+    secondary 這一組一定要自己給。
+
+    Material 3 的 ChoiceChip、SegmentedButton 選中狀態用的是
+    `secondaryContainer`，而不是 `primary`。只設 primary 的話它們會退回
+    Material 預設的青綠色 —— 在一個橘色的 app 裡憑空冒出綠色的選中狀態，
+    而且完全沒有任何警告。
+
+    這裡把 secondary 指成同一組橘色，讓「選中」在整個 app 裡是同一個顏色。
+  */
   const scheme = ColorScheme.light(
     primary: AppColors.primary,
     onPrimary: Colors.white,
     primaryContainer: AppColors.primarySoft,
     onPrimaryContainer: AppColors.primary,
+    secondary: AppColors.primary,
+    onSecondary: Colors.white,
+    secondaryContainer: AppColors.primarySoft,
+    onSecondaryContainer: AppColors.primary,
     surface: AppColors.card,
     onSurface: AppColors.ink,
+    surfaceContainerHighest: AppColors.surface,
     error: AppColors.danger,
     onError: Colors.white,
     outline: AppColors.lineStrong,
