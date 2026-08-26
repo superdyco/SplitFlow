@@ -7,6 +7,7 @@ import '../domain/my_cost.dart';
 import '../domain/task_status.dart';
 import '../state/providers.dart';
 import 'task_card.dart';
+import 'task_page.dart';
 import 'theme.dart';
 
 /// 我的分帳。`src/pages/TaskListPage.vue` 的 Flutter 版。
@@ -26,6 +27,21 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
   Map<String, int>? _costs;
   bool _costsBusy = false;
   String? _costsError;
+
+  /// 點卡片進任務頁。
+  ///
+  /// 回來之後把這個任務的資料作廢重讀 —— 在裡面新增或刪了支出的話，
+  /// 列表上的筆數與「我的花費」都過期了。不重讀的話使用者會看到舊數字，
+  /// 而且不知道為什麼。
+  Future<void> _openTask(Task task) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => TaskPage(taskId: task.id)),
+    );
+    if (!mounted) return;
+    ref.invalidate(tasksProvider);
+    // 花費是手動算的，回來之後那份快照可能也過期了，收起來重算比顯示錯的好。
+    setState(() => _costs = null);
+  }
 
   Future<void> _loadCosts(List<Task> tasks) async {
     final uid = ref.read(authStateProvider).value?.uid;
@@ -117,6 +133,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
                       uid: uid,
                     ),
                     myCost: _costs?[task.id],
+                    onTap: () => _openTask(task),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -133,6 +150,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
                         uid: uid,
                       ),
                       myCost: _costs?[task.id],
+                      onTap: () => _openTask(task),
                     ),
                     const SizedBox(height: 12),
                   ],
