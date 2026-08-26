@@ -8,7 +8,9 @@ import '../domain/models.dart';
 import '../domain/offline_write.dart';
 // 'required' 這個名字跟 Flutter 的 @required 標註撞名，加前綴分開。
 import '../domain/validation.dart' as validate;
+import '../data/place_service.dart';
 import '../state/providers.dart';
+import 'place_field.dart';
 import 'theme.dart';
 
 /// 新增／編輯支出。`src/pages/ExpenseFormPage.vue` 的 Flutter 版。
@@ -22,9 +24,8 @@ import 'theme.dart';
 ///
 /// 這三支都是網頁版驗證過、而且有測試釘住的同一份邏輯。
 ///
-/// **暫時沒搬的**：收據拍照（要相機與影像壓縮套件）、地點搜尋建議
-/// （要 Places API）。地點目前是純文字輸入 —— 網頁版沒設定金鑰時也是這樣退化的，
-/// 所以資料形狀相容。
+/// **暫時沒搬的**：收據拍照（要相機與影像壓縮套件）。地點搜尋已經接上了，
+/// 沒設定金鑰時退回純文字輸入 —— 跟網頁版一樣。
 class ExpenseFormPage extends ConsumerStatefulWidget {
   final String taskId;
 
@@ -42,7 +43,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   final _amount = TextEditingController();
   final _rate = TextEditingController(text: '1');
   final _note = TextEditingController();
-  final _place = TextEditingController();
+
+  /// 地點欄位現在自己管字串，這裡只留它算出來的結果。
+  ExpensePlace? _place;
 
   ExpenseCategory _category = defaultCategory;
   String _currency = 'TWD';
@@ -82,7 +85,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       _splitWith.addAll(existing.splits.keys);
       _date = existing.date ?? expenseDate(existing);
       _time = existing.time ?? '';
-      _place.text = existing.place?.name ?? '';
+      _place = existing.place;
       for (final entry in existing.splits.entries) {
         _custom[entry.key] = TextEditingController(
           text: amountToInput(entry.value, existing.currency),
@@ -97,7 +100,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     _amount.dispose();
     _rate.dispose();
     _note.dispose();
-    _place.dispose();
     for (final c in _custom.values) {
       c.dispose();
     }
@@ -216,7 +218,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         throw const FormatException('自訂分攤的合計必須等於支出金額');
       }
 
-      final placeName = _place.text.trim();
+      final place = _place;
       final input = <String, dynamic>{
         'title': validate.required(_title.text, '支出名稱'),
         'category': _category.name,
@@ -227,15 +229,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         'paidBy': _paidBy,
         'splitMode': _splitMode.name,
         'splits': splits,
-        // 只打名字沒有座標，跟網頁版沒設定金鑰時的退化行為一致。
-        'place': placeName.isEmpty
+        // 從建議選出來的帶著座標，只打名字的就只有名字 —— 後者跟網頁版
+        // 沒設定金鑰時的退化行為一致。
+        'place': place == null
             ? null
             : {
-                'name': placeName,
-                'address': null,
-                'lat': null,
-                'lng': null,
-                'placeId': null,
+                'name': place.name,
+                'address': place.address,
+                'lat': place.lat,
+                'lng': place.lng,
+                'placeId': place.placeId,
               },
         'note': _note.text.trim(),
         'date': _date.isEmpty ? todayInput() : _date,
@@ -602,8 +605,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 ),
                 _Field(
                   label: '地點（選填）',
-                  hint: '目前只能打名字，地點搜尋還沒搬過來',
-                  child: TextField(controller: _place),
+                  hint: PlaceService.placesEnabled
+                      ? '選建議的地點會一起記下座標，報告的地圖才標得出來'
+                      : '沒有設定地點金鑰，目前只能打名字',
+                  child: PlaceField(
+                    taskId: widget.taskId,
+                    initial: widget.existing?.place,
+                    // 這一格自己管輸入，父層只要知道最後算出來是什麼。
+                    onChanged: (value) => _place = value,
+                  ),
                 ),
                 _Field(
                   label: '備註（選填）',

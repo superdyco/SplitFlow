@@ -7,7 +7,7 @@
 `dart test` 166 項全過、`dart analyze` 乾淨，debug APK 裝在模擬器上驗過。
 
 跑得起來的：登入、任務列表、建立任務、支出列表與新增／編輯支出、
-成員管理（升降權限、移除）、結算與付款記錄／確認、個人設定。
+成員管理（升降權限、移除）、結算與付款記錄／確認、地點搜尋、個人設定。
 
 驗證方式是拿正式資料庫裡的越南任務（15 人、100 筆支出、含既有付款）
 在模擬器上實際操作 —— 不是只看畫面長出來，而是每個寫入都做完一次來回：
@@ -187,11 +187,34 @@ FlutterFire 給 `popup-closed-by-user`。`normalizeAuthCode` 統一剝掉前綴�
 | | 網頁版位置 | 為什麼還沒動 |
 | --- | --- | --- |
 | 收據拍照 | `src/components/expense/ReceiptField.vue` | 不是移植是重寫：相機、壓縮、Storage 上傳，原生的做法跟網頁完全不同。`receipt_policy.dart` 已經先搬好了 |
-| 地點搜尋 | `src/services/placeService.ts` | Places API 的 REST 呼叫，`place_bias.dart` 已經先搬好了 |
 | 加入邀請 | `src/pages/JoinPage.vue` | 建議留在網頁版：邀請連結的價值在於「點了就進得去」，跟公開報告是同一個道理。`joinTask` 在 repository 裡寫好了，哪天要接不用重寫 |
 
 編輯支出時**不會動到收據**：更新只送有列出來的欄位，Firestore 保留其餘的，
 所以網頁版傳上去的收據不會被原生版洗掉。這是刻意的，不是還沒做。
+
+## 地點搜尋要另外一把金鑰
+
+程式碼寫好了，但**網頁版那把 Places 金鑰在 Android 上會被擋掉**。
+在模擬器上實測，Google 回的是：
+
+```
+Requests from referer <empty> are blocked.
+```
+
+原因是那把金鑰設的是 HTTP referrer 限制，而 Android 的請求沒有 referrer。
+這不是程式的問題，是金鑰的限制對不上。
+
+要用的話得去 Cloud Console 開一把新的，限制選「Android 應用程式」，
+填套件名 `com.dyco.splitflow` 與 debug keystore 的 SHA-1（跟登入註冊的是同一個），
+然後：
+
+```bash
+flutter build apk --debug --dart-define=PLACES_API_KEY=<新的金鑰>
+```
+
+沒傳 `--dart-define` 的話功能自動停用，地點欄位退回純文字輸入 ——
+跟網頁版沒設定金鑰時一樣，不會壞掉。金鑰被擋時也不會擋住記帳：
+錯誤訊息第一句就是「直接打地點名字一樣存得起來」。
 
 ## 移植時特別小心的三個地方
 

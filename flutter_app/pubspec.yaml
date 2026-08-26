@@ -28,6 +28,10 @@ dependencies:
 
   http: ^1.2.0
 
+  # 只拿來記「每個任務最後用過的座標」，當作下次地點搜尋的位置偏好。
+  # 網頁版那邊是 localStorage，同樣是可有可無的資料 —— 讀不到就沒有偏好。
+  shared_preferences: ^2.3.0
+
   intl: ^0.19.0
 
 dev_dependencies:

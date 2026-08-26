@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/auth_repository.dart';
+import '../data/bias_store.dart';
 import '../data/expense_repository.dart';
+import '../data/place_service.dart';
 import '../data/task_repository.dart';
 import '../domain/models.dart';
 import '../domain/settlement.dart';
@@ -21,6 +23,11 @@ final userRepositoryProvider = Provider((ref) => UserRepository());
 final taskRepositoryProvider = Provider((ref) => TaskRepository());
 final expenseRepositoryProvider = Provider((ref) => ExpenseRepository());
 final paymentRepositoryProvider = Provider((ref) => PaymentRepository());
+
+/// 地點搜尋。沒設 `--dart-define=PLACES_API_KEY` 的話它會回報自己不可用，
+/// 地點欄位就退回純文字輸入。
+final placeServiceProvider = Provider((ref) => PlaceService());
+final biasStoreProvider = Provider((ref) => BiasStore());
 
 // ---------------------------------------------------------------- 登入
 
