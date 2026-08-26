@@ -129,6 +129,11 @@ class Expense {
 /// 回國之後的還款。只有 confirmed 的才算數 —— 收款人沒點頭之前，
 /// 那筆錢在帳上不存在。
 class Payment {
+  /// Firestore 文件 id。確認與刪除都要靠它。
+  ///
+  /// 有預設值是因為結算只看金額與狀態 —— 算餘額的測試不需要編出 id 來。
+  final String id;
+
   final String from;
   final String to;
   final int amount;
@@ -137,6 +142,7 @@ class Payment {
   final String status;
 
   const Payment({
+    this.id = '',
     required this.from,
     required this.to,
     required this.amount,

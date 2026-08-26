@@ -199,7 +199,7 @@ void main() {
 
   group('paymentFromMap', () {
     test('confirmed 照實轉', () {
-      final payment = paymentFromMap({
+      final payment = paymentFromMap('p1', {
         'from': 'a',
         'to': 'b',
         'amount': 30000,
@@ -211,7 +211,7 @@ void main() {
 
     test('認不得的狀態當成 pending —— 猜錯的方向要是「少扣」而不是「多扣」', () {
       for (final status in ['pending', '沒看過的狀態', null]) {
-        final payment = paymentFromMap({
+        final payment = paymentFromMap('p1', {
           'from': 'a',
           'to': 'b',
           'amount': 30000,

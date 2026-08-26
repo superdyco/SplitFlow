@@ -102,7 +102,7 @@ class PaymentRepository {
   Future<List<Payment>> listPayments(String taskId) async {
     final snap =
         await paymentsRef(taskId).orderBy('createdAt', descending: true).get();
-    return snap.docs.map((doc) => paymentFromMap(doc.data())).toList();
+    return snap.docs.map((doc) => paymentFromMap(doc.id, doc.data())).toList();
   }
 
   /// 收款人自己記的話當下就算確認 —— 本來就只有他能證明錢收到了。

@@ -59,8 +59,9 @@ Expense expenseFromMap(
   );
 }
 
-Payment paymentFromMap(Map<String, dynamic> data) {
+Payment paymentFromMap(String id, Map<String, dynamic> data) {
   return Payment(
+    id: id,
     from: (data['from'] as String?) ?? '',
     to: (data['to'] as String?) ?? '',
     amount: (data['amount'] as num?)?.toInt() ?? 0,

@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../domain/currency.dart';
 import '../domain/expense_groups.dart';
 import '../domain/models.dart';
 
-import '../domain/settlement_text.dart';
 import '../domain/task_status.dart';
 import '../state/providers.dart';
 import 'expense_day_group.dart';
 import 'expense_form_page.dart';
 import 'expense_row.dart';
+import 'members_tab.dart';
+import 'settlement_tab.dart';
 import 'theme.dart';
 
 /// 任務詳情。`src/pages/TaskPage.vue` 的 Flutter 版。
@@ -151,8 +151,8 @@ class _Loaded extends ConsumerWidget {
                     collapsed: collapsed,
                     onToggleDay: onToggleDay,
                   ),
-                  _MembersTab(taskId: task.id),
-                  _SettlementTab(task: task),
+                  MembersTab(task: task, archived: archived),
+                  SettlementTab(task: task, archived: archived),
                 ],
               ),
             ),
@@ -253,248 +253,7 @@ class _ExpensesTab extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------- 成員
-
-class _MembersTab extends ConsumerWidget {
-  final String taskId;
-
-  const _MembersTab({required this.taskId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final members = ref.watch(membersProvider(taskId));
-    final text = Theme.of(context).textTheme;
-
-    return members.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => _Centered('讀取成員失敗：$err'),
-      data: (list) => ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        children: [
-          for (final member in list)
-            ListTile(
-              // 被移除的人仍然列出來 —— 既有支出還掛著他的名字，
-              // 從清單裡消失只會讓人以為那些帳算錯了。
-              leading: CircleAvatar(
-                backgroundColor:
-                    member.active ? AppColors.primarySoft : AppColors.line,
-                child: Text(
-                  member.nickname.isEmpty
-                      ? '?'
-                      : member.nickname.characters.first,
-                  style: TextStyle(
-                    color: member.active ? AppColors.primary : AppColors.muted,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              title: Text(
-                member.nickname.isEmpty ? '（沒有暱稱）' : member.nickname,
-                style: text.bodyMedium?.copyWith(
-                  color: member.active ? AppColors.ink : AppColors.muted,
-                ),
-              ),
-              subtitle: Text(
-                member.active ? _roleLabel(member.role) : '已移除',
-                style: text.bodySmall,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  String _roleLabel(String role) => switch (role) {
-        'owner' => '擁有者',
-        'admin' => '管理員',
-        _ => '成員',
-      };
-}
-
-// ---------------------------------------------------------------- 結算
-
-class _SettlementTab extends ConsumerWidget {
-  final Task task;
-
-  const _SettlementTab({required this.task});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final settlement = ref.watch(settlementProvider(task.id));
-    final members = ref.watch(membersProvider(task.id));
-    final payments = ref.watch(paymentsProvider(task.id));
-    final text = Theme.of(context).textTheme;
-
-    return settlement.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => _Centered('算不出結算：$err'),
-      data: (result) {
-        final names = {
-          for (final m in members.value ?? const <TaskMember>[])
-            m.uid: m.nickname,
-        };
-        final pending = (payments.value ?? const <Payment>[])
-            .where((p) => p.status != 'confirmed')
-            .length;
-
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('總花費', style: text.bodySmall),
-                    Text(
-                      '${result.currency} '
-                      '${formatAmount(result.total, result.currency)}',
-                      style: figureStyle,
-                    ),
-                    const SizedBox(height: 4),
-                    Text('列入 ${result.expenseCount} 筆支出',
-                        style: text.bodySmall),
-                  ],
-                ),
-              ),
-            ),
-
-            // 這兩個警告是正確性需求，不是貼心提醒：未換算的支出根本沒進
-            // 結算，總額偏低；待確認的付款還沒從轉帳金額扣掉。
-            if (result.unconverted.isNotEmpty)
-              _Warning('有 ${result.unconverted.length} 筆支出還沒有匯率，未算入上面的金額'),
-            if (pending > 0) _Warning('有 $pending 筆付款等待確認，還沒從下面的金額扣除'),
-
-            const SizedBox(height: 20),
-            Text('誰欠誰', style: text.titleMedium),
-            const SizedBox(height: 8),
-            if (result.transfers.isEmpty)
-              Text('大家都已結清，不需要轉帳。', style: text.bodyMedium)
-            else
-              for (final transfer in result.transfers)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${names[transfer.from] ?? '已離開的成員'} → '
-                          '${names[transfer.to] ?? '已離開的成員'}',
-                          style: text.bodyMedium,
-                        ),
-                      ),
-                      Text(
-                        '${result.currency} '
-                        '${formatAmount(transfer.amount, result.currency)}',
-                        style: text.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-            const SizedBox(height: 24),
-            Text('每個人的收支', style: text.titleMedium),
-            const SizedBox(height: 8),
-            for (final balance in result.balances)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(names[balance.uid] ?? '已離開的成員',
-                          style: text.bodyMedium),
-                    ),
-                    Text(
-                      '${balance.balance >= 0 ? '應收 ' : '應付 '}'
-                      '${formatAmount(balance.balance.abs(), result.currency)}',
-                      style: text.bodyMedium?.copyWith(
-                        color: balance.balance >= 0
-                            ? AppColors.success
-                            : AppColors.danger,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.copy, size: 18),
-              label: const Text('複製結算文字'),
-              onPressed: () => _copy(context, result, names, pending),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _copy(
-    BuildContext context,
-    Settlement result,
-    Map<String, String> names,
-    int pending,
-  ) {
-    final text = buildSettlementText(SettlementTextInput(
-      taskName: task.name,
-      currency: result.currency,
-      transfers: result.transfers,
-      memberNames: names,
-      expenseCount: result.expenseCount,
-      total: result.total,
-      unconvertedCount: result.unconverted.length,
-      pendingCount: pending,
-    ));
-
-    // 剪貼簿之後接，先讓內容看得到 —— 這一段的重點是文字組得對不對。
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        content: SingleChildScrollView(child: SelectableText(text)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('關閉'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ---------------------------------------------------------------- 小元件
-
-class _Warning extends StatelessWidget {
-  final String message;
-  const _Warning(this.message);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('⚠ '),
-          Expanded(
-            child: Text(
-              message,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppColors.danger),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _Centered extends StatelessWidget {
   final String text;
