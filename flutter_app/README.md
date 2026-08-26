@@ -1,23 +1,22 @@
 # SplitFlow · Flutter 版（進行中）
 
-網頁版的移植。**目前只有領域邏輯這一層，而且還沒有編譯過。**
+網頁版的移植。**記帳這條主線已經可以用了**，在模擬器上跑過真實資料。
 
 ## 現在的狀態
 
-**純邏輯層 + 資料存取層已寫完：`dart test` 151 項全過、`dart analyze` 乾淨。**
+`dart test` 166 項全過、`dart analyze` 乾淨，debug APK 裝在模擬器上驗過。
 
-⚠️ 但要講清楚**測試涵蓋到哪裡**：151 項全部是純函式與文件轉換。
-repository 那一層（真的打 Firestore 的部分）**一行都還沒被執行過** ——
-這台機器上沒有模擬器也沒有實機，`flutter run` 跑不起來。
+跑得起來的：登入、任務列表、建立任務、支出列表與新增／編輯支出、
+成員管理（升降權限、移除）、結算與付款記錄／確認、個人設定。
 
-平台資料夾、Firebase 註冊、`firebase_options.dart` 都齊了，缺的只是一個
-跑得起來的裝置。
+驗證方式是拿正式資料庫裡的越南任務（15 人、100 筆支出、含既有付款）
+在模擬器上實際操作 —— 不是只看畫面長出來，而是每個寫入都做完一次來回：
+升權限再降回去、記一筆付款再確認再刪掉，看結算金額有沒有跟著動、
+動完之後資料有沒有回到原狀。
 
-還沒有的東西：
-
-- 平台資料夾（`android/`、`ios/`…）—— 需要時跑 `flutter create .` 補上，
-  不會蓋掉 `lib/` 與 `test/`
-- 資料存取層（Firestore）、狀態管理、任何畫面
+⚠️ 測試涵蓋率要講清楚：166 項**全部是純函式與文件轉換**。
+repository 那一層（真的打 Firestore 的）沒有自動化測試，靠的是上面那種
+手動來回。
 
 ## 開發環境
 
@@ -183,13 +182,16 @@ FlutterFire 給 `popup-closed-by-user`。`normalizeAuthCode` 統一剝掉前綴�
 **5. `enabledProviders` 在原生版可能要改。** 目前跟網頁版一樣只開 Google，
 但 iOS 上架時 Apple 會要求提供 Apple 登入。真的要送 App Store 時記得回來看。
 
-## 還沒開始的
+## 還沒搬的
 
-| | 網頁版位置 | 備註 |
+| | 網頁版位置 | 為什麼還沒動 |
 | --- | --- | --- |
-| 資料存取 | `src/services/` | FlutterFire 的 API 幾乎 1:1 |
-| 狀態管理 | `src/composables/`、`src/stores/` | 改成 Riverpod |
-| 畫面 | `src/pages/`、`src/components/` | 整個重寫，量最大的一塊 |
+| 收據拍照 | `src/components/expense/ReceiptField.vue` | 不是移植是重寫：相機、壓縮、Storage 上傳，原生的做法跟網頁完全不同。`receipt_policy.dart` 已經先搬好了 |
+| 地點搜尋 | `src/services/placeService.ts` | Places API 的 REST 呼叫，`place_bias.dart` 已經先搬好了 |
+| 加入邀請 | `src/pages/JoinPage.vue` | 建議留在網頁版：邀請連結的價值在於「點了就進得去」，跟公開報告是同一個道理。`joinTask` 在 repository 裡寫好了，哪天要接不用重寫 |
+
+編輯支出時**不會動到收據**：更新只送有列出來的欄位，Firestore 保留其餘的，
+所以網頁版傳上去的收據不會被原生版洗掉。這是刻意的，不是還沒做。
 
 ## 移植時特別小心的三個地方
 
