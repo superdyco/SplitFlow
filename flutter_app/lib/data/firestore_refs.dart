@@ -11,11 +11,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 FirebaseFirestore get db => FirebaseFirestore.instance;
 
-CollectionReference<Map<String, dynamic>> get usersRef => db.collection('users');
+CollectionReference<Map<String, dynamic>> get usersRef =>
+    db.collection('users');
 
-CollectionReference<Map<String, dynamic>> get tasksRef => db.collection('tasks');
+CollectionReference<Map<String, dynamic>> get tasksRef =>
+    db.collection('tasks');
 
-CollectionReference<Map<String, dynamic>> get invitesRef => db.collection('invites');
+CollectionReference<Map<String, dynamic>> get invitesRef =>
+    db.collection('invites');
 
 DocumentReference<Map<String, dynamic>> taskRef(String taskId) =>
     tasksRef.doc(taskId);

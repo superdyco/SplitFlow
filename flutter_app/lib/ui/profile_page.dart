@@ -1,0 +1,212 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../domain/auth_error.dart' as auth;
+import '../domain/models.dart';
+import '../domain/validation.dart' as validate;
+import '../state/providers.dart';
+import 'theme.dart';
+
+/// 個人設定。`src/pages/ProfilePage.vue` 的 Flutter 版。
+///
+/// 網頁版這一頁還有診斷資訊（版本、待上傳收據、錯誤清單）與「我的收藏／探索」
+/// 的入口。收藏與探索留在網頁版；診斷資訊等有東西可以診斷再說 ——
+/// 目前原生版還沒有離線佇列，抄過來的會是一份空表。
+///
+/// 拆成外層等資料、內層畫表單兩個 widget，是因為表單的
+/// `TextEditingController` 要用暱稱當初始值。如果在 `initState` 裡讀
+/// `FutureProvider.value`，那時候它還在載入中、必然是 null，欄位會是空的 ——
+/// 使用者看到空白暱稱，一存就把原本的名字清掉了。
+class ProfilePage extends ConsumerWidget {
+  const ProfilePage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(userProfileProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('個人設定')),
+      body: profile.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Text('讀取個人資料失敗：$err', textAlign: TextAlign.center),
+          ),
+        ),
+        data: (value) => value == null
+            ? const Center(child: Text('找不到個人資料。'))
+            : _Form(profile: value),
+      ),
+    );
+  }
+}
+
+class _Form extends ConsumerStatefulWidget {
+  final UserProfile profile;
+
+  const _Form({required this.profile});
+
+  @override
+  ConsumerState<_Form> createState() => _FormState();
+}
+
+class _FormState extends ConsumerState<_Form> {
+  late final TextEditingController _nickname;
+  late String _initial;
+
+  bool _touched = false;
+  bool _saving = false;
+  bool _saved = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // 這裡拿得到真的暱稱 —— 資料已經由外層等好了。
+    _initial = widget.profile.nickname;
+    _nickname = TextEditingController(text: _initial);
+  }
+
+  @override
+  void dispose() {
+    _nickname.dispose();
+    super.dispose();
+  }
+
+  String? get _nicknameError =>
+      validate.textFieldError(_nickname.text, '暱稱', max: 20, touched: _touched);
+
+  bool get _dirty => _nickname.text.trim() != _initial.trim();
+  bool get _canSubmit =>
+      _nickname.text.trim().isNotEmpty && _nicknameError == null && _dirty;
+
+  Future<void> _save() async {
+    setState(() => _touched = true);
+    if (!_canSubmit) return;
+
+    setState(() {
+      _saving = true;
+      _error = null;
+      _saved = false;
+    });
+
+    try {
+      await ref
+          .read(userRepositoryProvider)
+          .updateNickname(widget.profile.uid, validate.required(_nickname.text, '暱稱'));
+      if (!mounted) return;
+      setState(() {
+        _initial = _nickname.text;
+        _saved = true;
+        _saving = false;
+      });
+      ref.invalidate(userProfileProvider);
+    } catch (err) {
+      if (mounted) {
+        setState(() {
+          _error = err.toString();
+          _saving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final user = ref.watch(authStateProvider).value;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('暱稱', style: text.bodySmall),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _nickname,
+                  maxLength: 20,
+                  onChanged: (_) => setState(() => _saved = false),
+                  onTapOutside: (_) => setState(() => _touched = true),
+                ),
+                if (_nicknameError != null)
+                  Text(_nicknameError!,
+                      style: text.bodySmall?.copyWith(color: AppColors.danger)),
+                const SizedBox(height: 8),
+                Text('同行的人在支出與結算上看到的就是這個名字。',
+                    style: text.bodySmall),
+                const Divider(height: 28),
+                _Row(label: '電子郵件', value: user?.email ?? '未提供'),
+                _Row(
+                  label: '登入方式',
+                  value: auth.providerLabel(widget.profile.provider),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '下次請用同一種方式登入。換一個供應商會被視為另一個帳號，看不到現在的任務。',
+          style: text.bodySmall,
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 16),
+          Text(_error!,
+              style: text.bodyMedium?.copyWith(color: AppColors.danger)),
+        ],
+        const SizedBox(height: 24),
+        FilledButton(
+          onPressed: (_saving || !_canSubmit) ? null : _save,
+          child: Text(_saving
+              ? '儲存中...'
+              : _saved
+                  ? '已儲存'
+                  : '儲存變更'),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
+          onPressed: () async {
+            await ref.read(authRepositoryProvider).signOut();
+            if (context.mounted) Navigator.of(context).pop();
+          },
+          child: const Text('登出'),
+        ),
+      ],
+    );
+  }
+}
+
+class _Row extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _Row({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: text.bodySmall),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

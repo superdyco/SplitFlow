@@ -34,7 +34,8 @@ class ExpenseRow extends StatelessWidget {
   /// 有記時間就接在後面（`03/05 19:30`），沒記就只有日期。
   String get _shown {
     final date = expenseDate(expense);
-    final short = date.length >= 10 ? date.substring(5).replaceAll('-', '/') : date;
+    final short =
+        date.length >= 10 ? date.substring(5).replaceAll('-', '/') : date;
     final time = expenseTime(expense);
     return time.isEmpty ? short : '$short $time';
   }
@@ -71,7 +72,8 @@ class ExpenseRow extends StatelessWidget {
                 children: [
                   Text(
                     expense.title,
-                    style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                    style:
+                        text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),

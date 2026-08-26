@@ -6,6 +6,8 @@ import '../domain/models.dart';
 import '../domain/my_cost.dart';
 import '../domain/task_status.dart';
 import '../state/providers.dart';
+import 'create_task_page.dart';
+import 'profile_page.dart';
 import 'task_card.dart';
 import 'task_page.dart';
 import 'theme.dart';
@@ -61,8 +63,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
         // 成員也要載：餘數分給誰取決於加入順序，少了它數字會跟結算頁差幾分錢。
         final list = await expenses.listExpenses(task.id);
         final order = await repo.memberOrder(task.id);
-        result[task.id] =
-            myTripCost(list, order, uid, task.defaultCurrency);
+        result[task.id] = myTripCost(list, order, uid, task.defaultCurrency);
       }
 
       if (mounted) setState(() => _costs = result);
@@ -83,11 +84,27 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
         title: const Text('我的分帳'),
         actions: [
           IconButton(
-            tooltip: '登出',
-            icon: const Icon(Icons.logout),
-            onPressed: () => ref.read(authRepositoryProvider).signOut(),
+            tooltip: '個人設定',
+            icon: const Icon(Icons.person_outline),
+            onPressed: () async {
+              await Navigator.of(context).push<void>(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
+              );
+              // 改了暱稱之後，成員清單與結算上顯示的名字都要跟著更新。
+              if (mounted) ref.invalidate(userProfileProvider);
+            },
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final created = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(builder: (_) => const CreateTaskPage()),
+          );
+          if (created == true && mounted) ref.invalidate(tasksProvider);
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('建立'),
       ),
       body: tasks.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -114,7 +131,8 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
               await ref.read(tasksProvider.future);
             },
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              // 底部留白給浮動按鈕，不然最後一張卡會被蓋住。
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
               children: [
                 _CostSection(
                   tasks: costable,
@@ -194,7 +212,8 @@ class _CostSection extends StatelessWidget {
           ),
           if (error != null) ...[
             const SizedBox(height: 8),
-            Text(error!, style: text.bodySmall?.copyWith(color: AppColors.danger)),
+            Text(error!,
+                style: text.bodySmall?.copyWith(color: AppColors.danger)),
           ],
         ],
       );
@@ -215,8 +234,7 @@ class _CostSection extends StatelessWidget {
             spacing: 24,
             runSpacing: 10,
             children: [
-              if (totals.isEmpty)
-                Text('目前還沒有算得出金額的支出。', style: text.bodySmall),
+              if (totals.isEmpty) Text('目前還沒有算得出金額的支出。', style: text.bodySmall),
               for (final item in totals)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -115,9 +115,8 @@ class PaymentRepository {
     await paymentDoc.set({
       ...input,
       'createdBy': createdBy,
-      'confirmedAt': input['status'] == 'confirmed'
-          ? FieldValue.serverTimestamp()
-          : null,
+      'confirmedAt':
+          input['status'] == 'confirmed' ? FieldValue.serverTimestamp() : null,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });

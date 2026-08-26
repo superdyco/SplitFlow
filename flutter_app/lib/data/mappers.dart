@@ -33,7 +33,8 @@ Expense expenseFromMap(
   if (splits == null) {
     // 自訂分攤之前的舊支出只存了參與者名單，金額要當場均分推回來。
     // 用同一支 allocate，餘數的分法才會跟結算頁一致。
-    final legacyIds = (data['splitMemberIds'] as List?)?.cast<String>() ?? const [];
+    final legacyIds =
+        (data['splitMemberIds'] as List?)?.cast<String>() ?? const [];
     final shares = allocate(amount, List<int>.filled(legacyIds.length, 1));
     splits = {
       for (var i = 0; i < legacyIds.length; i += 1) legacyIds[i]: shares[i],
@@ -49,7 +50,8 @@ Expense expenseFromMap(
     paidBy: (data['paidBy'] as String?) ?? '',
     splits: splits,
     category: categoryFrom(data['category'] as String?),
-    splitMode: data['splitMode'] == 'custom' ? SplitMode.custom : SplitMode.even,
+    splitMode:
+        data['splitMode'] == 'custom' ? SplitMode.custom : SplitMode.even,
     date: _nonEmpty(data['date']),
     time: _nonEmpty(data['time']),
     createdAt: createdAt,

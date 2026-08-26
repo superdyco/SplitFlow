@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../domain/models.dart';
@@ -35,7 +37,93 @@ TaskMember _memberFrom(Map<String, dynamic> data) {
   );
 }
 
+/// 邀請碼。16 bytes 的隨機十六進位字串，跟網頁版同一個格式。
+///
+/// 用 `Random.secure()` 而不是預設的 `Random()` —— 這串字是任務的唯一
+/// 門禁，猜得到就進得來。預設的 Random 是可預測的偽隨機。
+String createInviteCode() {
+  final random = Random.secure();
+  return List<int>.generate(16, (_) => random.nextInt(256))
+      .map((b) => b.toRadixString(16).padLeft(2, '0'))
+      .join();
+}
+
 class TaskRepository {
+  /// 建立任務。
+  ///
+  /// 任務文件、owner 的成員文件、邀請文件**必須在同一個 batch 裡** ——
+  /// 少了任何一個，使用者會拿到一個進不去或邀不了人的任務，而且沒有任何
+  /// 錯誤訊息可以解釋。
+  ///
+  /// 回傳新任務的 id 與邀請碼。兩者都是 client 端產生的，所以離線也拿得到 ——
+  /// 不用寫完再查一次，而查回來的那一步正是會出錯的地方（同名任務撈錯）。
+  Future<({String taskId, String inviteCode})> createTask({
+    required String name,
+    required String defaultCurrency,
+    required String? startDate,
+    required String? endDate,
+    required UserProfile owner,
+  }) async {
+    final taskDoc = tasksRef.doc();
+    final inviteCode = createInviteCode();
+    final now = FieldValue.serverTimestamp();
+
+    final batch = db.batch();
+
+    batch.set(taskDoc, {
+      'name': name,
+      'ownerId': owner.uid,
+      'adminIds': [owner.uid],
+      'memberIds': [owner.uid],
+      'defaultCurrency': defaultCurrency,
+      'startDate': startDate,
+      'endDate': endDate,
+      'status': 'active',
+      'inviteCode': inviteCode,
+      'memberCount': 1,
+      'expenseCount': 0,
+      'createdAt': now,
+      'updatedAt': now,
+    });
+
+    batch.set(membersRef(taskDoc.id).doc(owner.uid), {
+      'uid': owner.uid,
+      'nickname': owner.nickname,
+      'role': 'owner',
+      'joinedAt': now,
+      'active': true,
+    });
+
+    batch.set(invitesRef.doc(inviteCode), {
+      'taskId': taskDoc.id,
+      'taskName': name,
+      'defaultCurrency': defaultCurrency,
+      'startDate': startDate,
+      'endDate': endDate,
+      'createdBy': owner.uid,
+      'active': true,
+      'createdAt': now,
+    });
+
+    await batch.commit();
+    return (taskId: taskDoc.id, inviteCode: inviteCode);
+  }
+
+  /// 用邀請碼查任務。
+  ///
+  /// 停用的邀請讀取會被 Security Rules 擋下來，對使用者來說跟「連結不存在」
+  /// 是同一件事 —— 所以 permission-denied 也回 null，讓畫面說「連結無效」
+  /// 而不是丟一個 Firebase 錯誤碼給他看。
+  Future<Map<String, dynamic>?> getInvite(String inviteCode) async {
+    try {
+      final snap = await invitesRef.doc(inviteCode).get();
+      return snap.data();
+    } on FirebaseException catch (err) {
+      if (err.code == 'permission-denied') return null;
+      rethrow;
+    }
+  }
+
   /// 我參與的所有任務。
   ///
   /// 只查一次，角色從 task 文件的 ownerId / adminIds 推導，不逐一讀
@@ -45,8 +133,7 @@ class TaskRepository {
   /// 也刻意不在查詢裡過濾 status：多一個條件就要建複合索引，而 `!=` 還會帶來
   /// 排序限制。一個使用者的任務是幾十個等級，載回來在前端分堆比較划算。
   Future<List<Task>> listUserTasks(String uid) async {
-    final snap =
-        await tasksRef.where('memberIds', arrayContains: uid).get();
+    final snap = await tasksRef.where('memberIds', arrayContains: uid).get();
     return snap.docs.map((doc) => _taskFrom(doc.id, doc.data())).toList();
   }
 

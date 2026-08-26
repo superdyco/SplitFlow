@@ -60,7 +60,8 @@ class ExpenseDayGroup extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(_label,
-                    style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    style:
+                        text.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
                 const Spacer(),
                 Text(
                   '${group.count} 筆 · ${formatAmount(group.total, currency)}',
