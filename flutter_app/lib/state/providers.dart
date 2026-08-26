@@ -1,0 +1,96 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../data/auth_repository.dart';
+import '../data/expense_repository.dart';
+import '../data/task_repository.dart';
+import '../domain/models.dart';
+import '../domain/settlement.dart';
+
+/// 狀態層。`src/composables/` 與 `src/stores/` 的 Riverpod 版。
+///
+/// 選 Riverpod 而不是 Provider 的理由跟網頁版選 composable 一樣：
+/// **取用不綁 widget tree**。領域層完全不知道 Flutter 存在，狀態層也就不該
+/// 逼它知道 —— 測試裡可以直接把 repository 換掉，不用先蓋一棵 widget 樹。
+
+// ---------------------------------------------------------------- repository
+
+/// repository 用 provider 包起來而不是直接 new，這樣測試可以 override。
+final authRepositoryProvider = Provider((ref) => AuthRepository());
+final userRepositoryProvider = Provider((ref) => UserRepository());
+final taskRepositoryProvider = Provider((ref) => TaskRepository());
+final expenseRepositoryProvider = Provider((ref) => ExpenseRepository());
+final paymentRepositoryProvider = Provider((ref) => PaymentRepository());
+
+// ---------------------------------------------------------------- 登入
+
+/// 目前的登入狀態。
+///
+/// 用 stream 而不是一次性讀取：Firebase 還原登入狀態是非同步的，開 App 當下
+/// `currentUser` 可能還是 null，等一下才變成使用者。畫面要跟著變，不能只看
+/// 第一眼。
+final authStateProvider = StreamProvider<User?>((ref) {
+  return ref.watch(authRepositoryProvider).authStateChanges();
+});
+
+/// 我的暱稱等資料。沒登入時是 null。
+final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return null;
+  return ref.watch(userRepositoryProvider).getProfile(user.uid);
+});
+
+// ---------------------------------------------------------------- 任務
+
+/// 我參與的所有任務。
+///
+/// 不在這裡過濾狀態 —— 分堆是 `partitionTasks` 的事，而那支有測試釘住
+/// 「已刪除的絕對不能出現」。放在這裡過濾的話那條規則就散掉了。
+final tasksProvider = FutureProvider<List<Task>>((ref) async {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const [];
+  return ref.watch(taskRepositoryProvider).listUserTasks(user.uid);
+});
+
+final taskProvider = FutureProvider.family<Task?, String>((ref, taskId) {
+  return ref.watch(taskRepositoryProvider).getTask(taskId);
+});
+
+final membersProvider =
+    FutureProvider.family<List<TaskMember>, String>((ref, taskId) {
+  return ref.watch(taskRepositoryProvider).listTaskMembers(taskId);
+});
+
+final expensesProvider =
+    FutureProvider.family<List<Expense>, String>((ref, taskId) {
+  return ref.watch(expenseRepositoryProvider).listExpenses(taskId);
+});
+
+final paymentsProvider =
+    FutureProvider.family<List<Payment>, String>((ref, taskId) {
+  return ref.watch(paymentRepositoryProvider).listPayments(taskId);
+});
+
+// ---------------------------------------------------------------- 結算
+
+/// 一個任務的結算結果。
+///
+/// 三筆資料都到齊才算得出來，所以這裡把它們合起來等。
+///
+/// **成員順序不是裝飾**：`allocate` 的餘數是照加入順序分的，順序錯了那一塊錢
+/// 就落在別人身上，跟網頁版的數字會對不起來。所以一定要用
+/// `listTaskMembers` 的順序（依 joinedAt），不能用 `task.memberIds`。
+final settlementProvider =
+    FutureProvider.family<Settlement, String>((ref, taskId) async {
+  final task = await ref.watch(taskProvider(taskId).future);
+  final expenses = await ref.watch(expensesProvider(taskId).future);
+  final payments = await ref.watch(paymentsProvider(taskId).future);
+  final members = await ref.watch(membersProvider(taskId).future);
+
+  return settleExpenses(
+    expenses,
+    payments,
+    members.map((member) => member.uid).toList(),
+    task?.defaultCurrency ?? 'TWD',
+  );
+});
