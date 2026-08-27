@@ -92,7 +92,7 @@ void main() {
     });
 
     test('管理員也不行 —— 刪掉整趟旅程不是代記帳的權限', () {
-      final t = Task(
+      const t = Task(
         id: 't1',
         name: 'x',
         defaultCurrency: 'TWD',
