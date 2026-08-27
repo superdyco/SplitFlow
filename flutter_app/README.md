@@ -268,59 +268,72 @@ FlutterFire 給 `popup-closed-by-user`。`normalizeAuthCode` 統一剝掉前綴�
 加一個旋轉旗標，自己畫的話收據會躺著存進去）。參數跟網頁版對齊：長邊
 1600px、quality 80。
 
-## 地點與地圖要另外一把金鑰（**目前還沒有，所以兩個都是空的**）
+## 地點與地圖的金鑰
 
-程式碼都寫好了，但**網頁版那把金鑰在 Android 上會被擋掉**。在模擬器上實測，
-兩個功能各自回：
-
-| 功能 | Google 回的 |
-| --- | --- |
-| 地點搜尋 | `Requests from referer <empty> are blocked.` |
-| 地圖 | `Authorization failure` / `Error requesting API token. StatusCode=INVALID_ARGUMENT` |
-
-原因是同一件事：那把金鑰設的是 **HTTP referrer 限制**，而 Android 的請求
-沒有 referrer。這不是程式的問題。
-
-### 要做的事
-
-在 Cloud Console 開一把新金鑰，限制選「**Android 應用程式**」，
-填套件名與 SHA-1（值見下面「簽章的 SHA-1」那一節，跟 Google 登入
-註冊的是同一個），然後**啟用這兩個 API**：
+需要一把**限制成「Android 應用程式」**的金鑰（套件名 + 簽章 SHA-1，見下面
+那一節），而且要啟用**兩個** API：
 
 - **Places API (New)** —— 地點搜尋
 - **Maps SDK for Android** —— 地圖
 
-⚠️ 這兩個在 Cloud Console 是**分開的 API**，只開一個的話另一個照樣 403。
-網頁版的地圖用的又是第三個（Maps JavaScript API），別搞混。
+這兩個在 Cloud Console 是分開的，只開一個另一個照樣 403。網頁版的地圖用的
+又是第三個（Maps JavaScript API），別搞混。
+
+網頁版那把金鑰**不能用**：它設的是 HTTP referrer 限制，而 Android 的請求
+沒有 referrer。
 
 ### 金鑰要設在兩個地方
 
 ```bash
 # 1. 原生的 Maps SDK 是從 AndroidManifest 讀的，不吃 --dart-define。
 #    寫進 android/local.properties（已經在 .gitignore 裡）：
-MAPS_API_KEY=<新的金鑰>
+MAPS_API_KEY=<金鑰>
 
 # 2. Dart 這邊：
-flutter build apk --debug   --dart-define=PLACES_API_KEY=<新的金鑰>   --dart-define=MAPS_API_KEY=<新的金鑰>
+flutter build apk --debug   --dart-define=PLACES_API_KEY=<金鑰>   --dart-define=MAPS_API_KEY=<金鑰>
 ```
 
-同一把金鑰寫兩次看起來很蠢，但各有真正的用途：manifest 那份是原生 SDK 要讀的，
+同一把金鑰寫兩次看起來很蠢，但各有用途：manifest 那份是原生 SDK 要讀的，
 dart-define 那份是**用來判斷「要不要畫地圖」**。沒有它的話，金鑰沒設時
 `GoogleMap` 會畫出一塊灰色 —— 沒有錯誤、沒有訊息，使用者只會覺得壞了。
-所以 Dart 這邊自己判斷，沒設就改顯示一句說得出下一步的話。
 
-### 兩種失敗長得不一樣
+### REST 請求要自己附上身分
 
-- **完全沒設金鑰** → 地點欄位退回純文字輸入、地圖換成一段說明。都不會壞。
-- **設了但沒授權**（現在就是這樣）→ 地點搜尋顯示 Google 的原話並告訴你
-  「直接打地點名字一樣存得起來」；**地圖則是一塊空白，畫面上看不出原因**。
-  這一種只能從 logcat 認：
+**這是最容易漏的一步。** Android 限制的金鑰是靠套件名 + 簽章認人的，
+原生 SDK（地圖）會自動附上，但走 `http` 套件的 REST 請求**不會** ——
+Google 那邊看到的是 `<empty>`：
 
-  ```bash
-  adb logcat -d | grep "Google Maps Android API"
-  ```
+```
+Requests from this Android client application <empty> are blocked.
+```
 
-  `google_maps_flutter` 沒有提供授權失敗的 callback，所以 Dart 這邊偵測不到。
+所以每個 Places 請求都要帶：
+
+| header | 值 |
+| --- | --- |
+| `X-Android-Package` | `com.dyco.splitflow` |
+| `X-Android-Cert` | 簽章 SHA-1，**大寫、不含冒號** |
+
+兩個值都是**執行期**從原生那邊問的（`MainActivity.kt` 開了一個
+MethodChannel，`lib/data/app_identity.dart` 去問）。刻意不寫死常數：
+debug 與 release 是不同簽章，上架 Play 又會被重簽，寫死的話換一種建置就壞，
+而且壞的形式是「地點搜尋沒反應」，看不出跟簽章有關。
+
+### 錯誤訊息對照
+
+| 看到什麼 | 意思 |
+| --- | --- |
+| `Requests from referer <empty> are blocked` | 用到網頁版那把 referrer 限制的金鑰 |
+| `Requests from this Android client application <empty> are blocked` | 金鑰對了，但 REST 請求沒附上身分 header |
+| 地圖是一塊空白，logcat 有 `Authorization failure` | 金鑰沒開 Maps SDK for Android，或 SHA-1 不符 |
+| 地點欄位變成純文字輸入 | 完全沒傳 `--dart-define=PLACES_API_KEY` |
+
+`google_maps_flutter` 沒有提供授權失敗的 callback，所以地圖那一種
+Dart 偵測不到，只能從 logcat 認：
+
+```bash
+adb logcat -d | grep "Google Maps Android API"
+```
 
 ## 模擬器沒有 GPS
 

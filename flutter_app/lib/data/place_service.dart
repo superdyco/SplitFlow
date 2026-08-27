@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../domain/models.dart';
 import '../domain/place_bias.dart';
 import '../domain/place_search.dart';
+import 'app_identity.dart';
 
 /// Places API (New) 的 REST 端點。`src/services/placeService.ts` 的 Dart 版。
 ///
@@ -14,10 +15,16 @@ import '../domain/place_search.dart';
 /// 沒設就整個功能停用、地點欄位退回純文字輸入（`placesEnabled` 為 false）。
 /// 網頁版沒設定金鑰時也是這樣退化的。
 ///
-/// ⚠️ **網頁版那把金鑰多半不能直接拿來用。** 它設的是 HTTP referrer 限制，
-/// 而 Android 的請求沒有 referrer，會被擋下來（回 403，訊息會照實顯示出來）。
-/// 原生版需要一把限制成「Android 應用程式」的金鑰（套件名 + SHA-1），
-/// 或者一把不限制的 —— 不限制的別放進版本庫。
+/// ⚠️ **網頁版那把金鑰不能直接拿來用。** 它設的是 HTTP referrer 限制，
+/// 而 Android 的請求沒有 referrer。原生版要一把限制成「Android 應用程式」
+/// 的金鑰（套件名 + 簽章 SHA-1）。
+///
+/// 而且光有那把金鑰還不夠：**REST 請求要自己把身分附上去**。
+/// 原生 SDK（例如地圖）會自動送套件名與簽章，走 http 套件的請求不會 ——
+/// Google 那邊看到的是 `<empty>`，回的是
+/// `Requests from this Android client application <empty> are blocked`。
+/// 所以每個請求都要帶 `X-Android-Package` 與 `X-Android-Cert`
+/// （見 `app_identity.dart`）。
 class PlaceService {
   static const _autocompleteUrl =
       'https://places.googleapis.com/v1/places:autocomplete';
@@ -48,6 +55,7 @@ class PlaceService {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': _apiKey,
+        ...?await AppIdentity.headers(),
       },
       body: jsonEncode(autocompleteBody(
         input: trimmed,
@@ -78,6 +86,7 @@ class PlaceService {
 
     final response = await _client.get(uri, headers: {
       'X-Goog-Api-Key': _apiKey,
+      ...?await AppIdentity.headers(),
       // 只要這幾個欄位。FieldMask 直接決定計費等級，多要幾個欄位就跳到
       // 更貴的那一階，而地圖與報告需要的就只有座標跟地址。
       'X-Goog-FieldMask': 'id,displayName,formattedAddress,location',
