@@ -5,10 +5,23 @@
          沒有相機的裝置照樣裝得起來，只是拍照那個選項按了沒反應。 -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- 「定位」鍵：抓現在的座標當作地點搜尋的位置偏好。
+         只要粗略位置就夠了（偏好半徑是 30km），但 Places 的
+         geolocator 在 Android 上兩個都會問，所以兩個都宣告。
+         這是**選填功能**，使用者拒絕權限只是少了那顆鍵的效果。 -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <application
         android:label="splitflow"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- 值來自 android/local.properties 的 MAPS_API_KEY（不進版控）。
+             沒設的話是空字串，地圖會是灰的 —— 所以 Dart 那邊也拿得到同一個
+             資訊，沒設就不畫地圖、改顯示說明。 -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${mapsApiKey}" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

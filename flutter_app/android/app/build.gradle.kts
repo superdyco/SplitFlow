@@ -1,3 +1,17 @@
+import java.util.Properties
+
+// 地圖金鑰。原生的 Maps SDK 是從 AndroidManifest 讀的，不像 Places 那樣
+// 可以走 --dart-define，所以這裡從 local.properties（不進版控）撈出來
+// 填進 manifest placeholder。
+//
+// 沒設就是空字串：App 照樣編得起來、裝得起來，地圖那一塊會顯示成一段說明
+// 而不是一塊灰的（見 lib/ui/place_map.dart）。
+val mapsApiKey: String = Properties().run {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+    getProperty("MAPS_API_KEY", "")
+}
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -30,6 +44,11 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        manifestPlaceholders["mapsApiKey"] = mapsApiKey
+        // Dart 那邊要知道「到底有沒有設金鑰」才決定畫不畫地圖。
+        // manifest 讀不回來，所以同一個值也用 BuildConfig 之外的方式傳：
+        // 見 lib/ui/place_map.dart 的 MAPS_API_KEY dart-define。
     }
 
     buildTypes {

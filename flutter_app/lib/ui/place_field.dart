@@ -8,6 +8,7 @@ import '../domain/models.dart';
 import '../domain/place_bias.dart';
 import '../domain/place_search.dart';
 import '../state/providers.dart';
+import 'place_map.dart';
 import 'theme.dart';
 
 /// 地點欄位。`ExpenseFormPage.vue` 裡地點那一段的 Flutter 版。
@@ -45,6 +46,12 @@ class _PlaceFieldState extends ConsumerState<PlaceField> {
 
   List<PlaceSuggestion> _suggestions = const [];
   LatLng? _bias;
+
+  /// 按「定位」抓到的座標。**不會存進支出** —— 這顆鍵只回答「我在哪」，
+  /// 不去猜你人在哪家店。它做兩件事：把搜尋的位置偏好換成這裡，
+  /// 以及在還沒選地點時讓地圖有東西可以顯示。
+  LatLng? _here;
+  bool _locating = false;
   Timer? _debounce;
   String _session = newSessionToken();
 
@@ -157,6 +164,30 @@ class _PlaceFieldState extends ConsumerState<PlaceField> {
     }
   }
 
+  /// 定位鍵。
+  ///
+  /// 刻意**不去查附近有什麼店、也不動地點欄位** —— 這顆鍵只回答「我在哪」。
+  /// 順帶把搜尋的位置偏好換成這裡：人就在這，比上一筆支出的座標更準，
+  /// 而且 locationBias 是 autocomplete 請求上的一個欄位，不會多花錢。
+  Future<void> _locate() async {
+    setState(() {
+      _locating = true;
+      _error = null;
+    });
+    try {
+      final here = await ref.read(geolocationProvider).current();
+      if (!mounted) return;
+      setState(() {
+        _here = here;
+        _bias = here;
+      });
+    } catch (err) {
+      if (mounted) setState(() => _error = err.toString());
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
   void _clear() {
     _debounce?.cancel();
     setState(() {
@@ -164,6 +195,7 @@ class _PlaceFieldState extends ConsumerState<PlaceField> {
       _selected = null;
       _suggestions = const [];
       _error = null;
+      // 目前位置不清掉：那是「我在哪」，跟這一格填了什麼地點無關。
     });
     _emit();
   }
@@ -172,6 +204,18 @@ class _PlaceFieldState extends ConsumerState<PlaceField> {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final selected = _selected;
+    // 選過的地點才算數 —— 選完又改字的話，那個座標已經不是這一格說的地方了。
+    final showsSelected = selected != null &&
+        selected.name == _query.text.trim() &&
+        selected.lat != null &&
+        selected.lng != null;
+
+    // 有選地點就標地點，沒有就標「我在哪」（如果按過定位）。
+    // 兩個都沒有就不畫地圖 —— 一張沒有東西可標的地圖只是佔位子。
+    final marker = showsSelected
+        ? LatLng(selected.lat!, selected.lng!)
+        : _here;
+    final markerTitle = showsSelected ? selected.name : '你目前的位置';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,12 +272,35 @@ class _PlaceFieldState extends ConsumerState<PlaceField> {
             ),
           ),
         // 有地址就顯示出來，這是「選到的是不是我想的那一家」唯一看得出來的地方。
-        if (selected != null &&
-            selected.name == _query.text.trim() &&
-            selected.address != null)
+        if (showsSelected && selected.address != null)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(selected.address!, style: text.bodySmall),
+          ),
+
+        // 定位鍵。放在地圖上面而不是輸入框裡，因為它跟「打字搜尋」是兩件事：
+        // 一個是找地點，一個是回答「我在哪」。
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            icon: _locating
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.my_location, size: 16),
+            label: Text(_locating ? '定位中...' : '用我現在的位置'),
+            onPressed: _locating ? null : _locate,
+          ),
+        ),
+
+        if (marker != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: PlaceMap.enabled
+                ? PlaceMap(center: marker, title: markerTitle)
+                : const PlaceMapUnavailable(),
           ),
       ],
     );

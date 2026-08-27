@@ -7,7 +7,8 @@
 `dart test` 166 項全過、`dart analyze` 乾淨，debug APK 裝在模擬器上驗過。
 
 跑得起來的：登入、任務列表、建立任務、支出列表與新增／編輯支出、
-成員管理（升降權限、移除）、結算與付款記錄／確認、地點搜尋、收據拍照、個人設定。
+成員管理（升降權限、移除）、結算與付款記錄／確認、地點搜尋與地圖、收據拍照、
+邀請連結、個人設定。
 
 驗證方式是拿正式資料庫裡的越南任務（15 人、100 筆支出、含既有付款）
 在模擬器上實際操作 —— 不是只看畫面長出來，而是每個寫入都做完一次來回：
@@ -228,31 +229,74 @@ FlutterFire 給 `popup-closed-by-user`。`normalizeAuthCode` 統一剝掉前綴�
 加一個旋轉旗標，自己畫的話收據會躺著存進去）。參數跟網頁版對齊：長邊
 1600px、quality 80。
 
-## 地點搜尋要另外一把金鑰
+## 地點與地圖要另外一把金鑰（**目前還沒有，所以兩個都是空的**）
 
-程式碼寫好了，但**網頁版那把 Places 金鑰在 Android 上會被擋掉**。
-在模擬器上實測，Google 回的是：
+程式碼都寫好了，但**網頁版那把金鑰在 Android 上會被擋掉**。在模擬器上實測，
+兩個功能各自回：
 
-```
-Requests from referer <empty> are blocked.
-```
+| 功能 | Google 回的 |
+| --- | --- |
+| 地點搜尋 | `Requests from referer <empty> are blocked.` |
+| 地圖 | `Authorization failure` / `Error requesting API token. StatusCode=INVALID_ARGUMENT` |
 
-原因是那把金鑰設的是 HTTP referrer 限制，而 Android 的請求沒有 referrer。
-這不是程式的問題，是金鑰的限制對不上。
+原因是同一件事：那把金鑰設的是 **HTTP referrer 限制**，而 Android 的請求
+沒有 referrer。這不是程式的問題。
 
-要用的話得去 Cloud Console 開一把新的，限制選「Android 應用程式」，
-填套件名 `com.dyco.splitflow` 與 debug keystore 的 SHA-1（跟登入註冊的是同一個），
-然後：
+### 要做的事
+
+在 Cloud Console 開一把新金鑰，限制選「**Android 應用程式**」，
+填套件名 `com.dyco.splitflow` 與 debug keystore 的 SHA-1（跟 Google 登入
+註冊的是同一個），然後**啟用這兩個 API**：
+
+- **Places API (New)** —— 地點搜尋
+- **Maps SDK for Android** —— 地圖
+
+⚠️ 這兩個在 Cloud Console 是**分開的 API**，只開一個的話另一個照樣 403。
+網頁版的地圖用的又是第三個（Maps JavaScript API），別搞混。
+
+### 金鑰要設在兩個地方
 
 ```bash
-flutter build apk --debug --dart-define=PLACES_API_KEY=<新的金鑰>
+# 1. 原生的 Maps SDK 是從 AndroidManifest 讀的，不吃 --dart-define。
+#    寫進 android/local.properties（已經在 .gitignore 裡）：
+MAPS_API_KEY=<新的金鑰>
+
+# 2. Dart 這邊：
+flutter build apk --debug   --dart-define=PLACES_API_KEY=<新的金鑰>   --dart-define=MAPS_API_KEY=<新的金鑰>
 ```
 
-沒傳 `--dart-define` 的話功能自動停用，地點欄位退回純文字輸入 ——
-跟網頁版沒設定金鑰時一樣，不會壞掉。金鑰被擋時也不會擋住記帳：
-錯誤訊息第一句就是「直接打地點名字一樣存得起來」。
+同一把金鑰寫兩次看起來很蠢，但各有真正的用途：manifest 那份是原生 SDK 要讀的，
+dart-define 那份是**用來判斷「要不要畫地圖」**。沒有它的話，金鑰沒設時
+`GoogleMap` 會畫出一塊灰色 —— 沒有錯誤、沒有訊息，使用者只會覺得壞了。
+所以 Dart 這邊自己判斷，沒設就改顯示一句說得出下一步的話。
 
-## 移植時特別小心的三個地方
+### 兩種失敗長得不一樣
+
+- **完全沒設金鑰** → 地點欄位退回純文字輸入、地圖換成一段說明。都不會壞。
+- **設了但沒授權**（現在就是這樣）→ 地點搜尋顯示 Google 的原話並告訴你
+  「直接打地點名字一樣存得起來」；**地圖則是一塊空白，畫面上看不出原因**。
+  這一種只能從 logcat 認：
+
+  ```bash
+  adb logcat -d | grep "Google Maps Android API"
+  ```
+
+  `google_maps_flutter` 沒有提供授權失敗的 callback，所以 Dart 這邊偵測不到。
+
+## 模擬器沒有 GPS
+
+按「用我現在的位置」在模擬器上預設會等到逾時 —— 那台機器根本沒有定位。
+要測的話先灌一個座標進去：
+
+```bash
+adb emu geo fix 121.5645 25.0339   # 經度在前，緯度在後
+```
+
+逾時之後會退回 `getLastKnownPosition()`（網頁版是靠 `maximumAge: 60000`
+拿到同一個效果）。座標舊一點沒關係：它只拿來當搜尋的位置偏好，而偏好半徑
+是 30km。
+
+## 移植時特別小心的三個地方## 移植時特別小心的三個地方
 
 **1. `List.sort` 在 Dart 不保證穩定，JS 的 `Array.sort` 保證。**
 `allocate` 與 `_buildTransfers` 的比較子都補了「平手時比索引／比 uid」。

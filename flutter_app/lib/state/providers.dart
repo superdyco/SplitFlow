@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/auth_repository.dart';
 import '../data/bias_store.dart';
 import '../data/expense_repository.dart';
+import '../data/geolocation.dart';
 import '../data/place_service.dart';
 import '../data/receipt_picker.dart';
 import '../data/receipt_repository.dart';
@@ -30,6 +31,10 @@ final paymentRepositoryProvider = Provider((ref) => PaymentRepository());
 /// 地點欄位就退回純文字輸入。
 final placeServiceProvider = Provider((ref) => PlaceService());
 final biasStoreProvider = Provider((ref) => BiasStore());
+
+/// 「我現在在哪」。只用來當地點搜尋的位置偏好與地圖的中心點，
+/// 不會存進任何一筆支出。
+final geolocationProvider = Provider((ref) => Geolocation());
 
 /// 收據。picker 是拍照／選圖，repository 是 Storage。
 final receiptPickerProvider = Provider((ref) => ReceiptPicker());

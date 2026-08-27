@@ -28,6 +28,14 @@ dependencies:
 
   http: ^1.2.0
 
+  # 地點下面那張地圖，以及「我現在在哪」。
+  #
+  # 地圖用原生的 Google Maps view（跟網頁版的 Maps JavaScript API 對應），
+  # 金鑰**不是**走 --dart-define：原生 SDK 是從 AndroidManifest 讀的，
+  # 所以那把金鑰由 android/local.properties 經 gradle 填進 manifest。
+  google_maps_flutter: ^2.9.0
+  geolocator: ^13.0.0
+
   # 拍照與從相簿選。內建 maxWidth/maxHeight/imageQuality，縮放跟轉 JPEG
   # 都是原生做的 —— 網頁版那邊要自己開 canvas 畫一次才做得到同樣的事。
   image_picker: ^1.1.0
