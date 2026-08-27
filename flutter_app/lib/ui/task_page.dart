@@ -9,6 +9,7 @@ import '../state/providers.dart';
 import 'expense_day_group.dart';
 import 'expense_form_page.dart';
 import 'expense_row.dart';
+import 'invite_sheet.dart';
 import 'members_tab.dart';
 import 'settlement_tab.dart';
 import 'theme.dart';
@@ -97,6 +98,10 @@ class _Loaded extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final text = Theme.of(context).textTheme;
+    final uid = ref.watch(authStateProvider).value?.uid ?? '';
+    // 跟網頁版同一個條件：管理員，而且沒封存。
+    final canInvite =
+        (task.ownerId == uid || task.adminIds.contains(uid)) && !archived;
 
     return DefaultTabController(
       length: 3,
@@ -119,6 +124,19 @@ class _Loaded extends ConsumerWidget {
               ],
             ),
           ),
+          actions: [
+            // 邀請連結原本只有「剛建立任務」那一頁看得到，離開之後手機上
+            // 就再也拿不到 —— 旅途中臨時多一個人要加入，只能去開瀏覽器。
+            if (canInvite)
+              TextButton(
+                onPressed: () => showInviteSheet(
+                  context,
+                  taskName: task.name,
+                  inviteCode: task.inviteCode,
+                ),
+                child: const Text('邀請'),
+              ),
+          ],
           bottom: const TabBar(
             labelColor: AppColors.primary,
             unselectedLabelColor: AppColors.muted,

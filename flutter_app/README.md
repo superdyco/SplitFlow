@@ -186,7 +186,7 @@ FlutterFire 給 `popup-closed-by-user`。`normalizeAuthCode` 統一剝掉前綴�
 
 | | 網頁版位置 | 為什麼還沒動 |
 | --- | --- | --- |
-| 加入邀請 | `src/pages/JoinPage.vue` | 建議留在網頁版：邀請連結的價值在於「點了就進得去」，跟公開報告是同一個道理。`joinTask` 在 repository 裡寫好了，哪天要接不用重寫 |
+| 加入邀請 | `src/pages/JoinTaskPage.vue` | 建議留在網頁版：邀請連結的價值在於「點了就進得去」，跟公開報告是同一個道理。**產生連結那一半原生版有**（任務頁右上角「邀請」），只有「打開連結加入」留在網頁。`joinTask` 在 repository 裡寫好了，哪天要接不用重寫 |
 
 編輯支出時**不會動到收據**：更新只送有列出來的欄位，Firestore 保留其餘的，
 所以網頁版傳上去的收據不會被原生版洗掉。這是刻意的，不是還沒做。

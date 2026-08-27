@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../domain/currency.dart';
 import '../domain/expense_date.dart';
+import '../domain/invite.dart';
 import '../domain/validation.dart' as validate;
 import '../state/providers.dart';
 import 'theme.dart';
@@ -211,9 +212,7 @@ class _Created extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    // 邀請連結指向網頁版 —— 收到的人多半還沒裝 App，而網頁版的加入頁
-    // 不需要先安裝任何東西。這也是為什麼公開報告留在網頁版。
-    final url = 'https://splitflow-e39c0.web.app/join/$inviteCode';
+    final url = inviteUrl(inviteCode);
 
     return Scaffold(
       appBar: AppBar(title: const Text('建立完成')),
