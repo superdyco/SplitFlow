@@ -81,8 +81,40 @@ emulator.exe -avd splitflow -no-snapshot-load -gpu swiftshader_indirect &
 flutter run
 ```
 
-Google 登入需要 debug 憑證的 SHA-1 註冊在 Firebase，**已經設好了**
-（`76:EE:77:...`）。換一台機器開發的話要重做一次：
+## 簽章的 SHA-1
+
+Google 把「這個請求真的來自你的 App 嗎」拆成兩個條件：**套件名**加上
+**簽章憑證的 SHA-1**。套件名是公開的，任何人都能做一個同名的 App，
+所以只有配上簽章指紋才擋得住盜用。這是 Android 版的 referrer 限制。
+
+這台機器目前的值：
+
+```
+套件名稱：com.dyco.splitflow
+SHA-1：   76:EE:77:E4:9E:A2:7E:23:74:AE:B1:57:AF:1E:52:57:30:35:FB:F6
+```
+
+**不是機密。** 它來自 `~/.android/debug.keystore`，那是 Android SDK 自動產生的
+開發用簽章，密碼是寫死的 `android`，本來就是拿來貼進各種 Console 的。
+
+同一個值有**兩個地方**要用：
+
+| 用途 | 設在哪 | 狀態 |
+| --- | --- | --- |
+| Google 登入 | Firebase 專案設定 | 已設好 |
+| 地點搜尋、地圖 | Cloud Console 的 API 金鑰限制 | **還沒**（見上一節）|
+
+### 三個之後會咬人的地方
+
+1. **release build 是另一把簽章。** 目前 `build.gradle.kts` 裡的 release
+   還是用 debug 憑證簽（那裡有 TODO），所以暫時同一個 SHA-1。真的做正式簽章
+   之後要把新的也加進去，否則**正式版地圖空白、debug 版一切正常**。
+2. **上架 Play 又是另一個。** Play App Signing 會用它自己的憑證重簽，
+   還要再加 Play Console 給的那一個。本機好好的、商店載下來的壞掉，就是這個。
+3. **換電腦或重灌，`debug.keystore` 會重新產生**，指紋就變了。
+   那時候 Google 登入跟地圖會同時失效，症狀看起來毫不相干，其實同一個原因。
+
+換一台機器開發的話，登入這邊要重做一次：
 
 ```bash
 keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android
@@ -92,7 +124,14 @@ npx firebase apps:sdkconfig ANDROID <androidAppId> --out android/app/google-serv
 ```
 
 沒做的話登入會失敗成 `ApiException: 10`（DEVELOPER_ERROR），
-訊息完全看不出跟憑證有關。
+訊息完全看不出跟憑證有關。地圖那邊則要回 Cloud Console 把新的 SHA-1
+加到金鑰限制裡。
+
+新機器的指紋這樣查：
+
+```bash
+keytool -list -v -keystore ~/.android/debug.keystore   -alias androiddebugkey -storepass android | grep SHA1
+```
 
 領域層的測試用純 Dart 的 `package:test`，不需要 widget 環境。這讓
 「`lib/domain/` 不准 import Flutter」變成編譯器會抓的事，而不是靠自律。
@@ -245,7 +284,7 @@ FlutterFire 給 `popup-closed-by-user`。`normalizeAuthCode` 統一剝掉前綴�
 ### 要做的事
 
 在 Cloud Console 開一把新金鑰，限制選「**Android 應用程式**」，
-填套件名 `com.dyco.splitflow` 與 debug keystore 的 SHA-1（跟 Google 登入
+填套件名與 SHA-1（值見下面「簽章的 SHA-1」那一節，跟 Google 登入
 註冊的是同一個），然後**啟用這兩個 API**：
 
 - **Places API (New)** —— 地點搜尋
