@@ -54,6 +54,19 @@ export PATH="/c/dev/flutter/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emula
 sdkmanager.bat --sdk_root=C:/dev/android-sdk "ndk/28.2.13676358"
 ```
 
+**AVD 預設不接電腦的鍵盤。** `avdmanager` 建出來的 config.ini 是
+`hw.keyboard=no`，所以在模擬器的輸入框裡打字完全沒反應，只有點螢幕上那個
+虛擬鍵盤才進得去 —— 而且沒有任何錯誤訊息，看起來就只是壞掉。
+已經改成 `yes`（在 `~/.android/avd/splitflow.avd/config.ini`），
+這個設定**只有冷開機才吃得到**：
+
+```bash
+adb emu kill
+emulator.exe -avd splitflow -no-snapshot-load &
+```
+
+重建 AVD 的話記得再改一次。
+
 ## 跑測試
 
 ```bash
