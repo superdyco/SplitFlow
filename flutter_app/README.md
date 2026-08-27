@@ -104,15 +104,31 @@ SHA-1：   76:EE:77:E4:9E:A2:7E:23:74:AE:B1:57:AF:1E:52:57:30:35:FB:F6
 | Google 登入 | Firebase 專案設定 | 已設好 |
 | 地點搜尋、地圖 | Cloud Console 的 API 金鑰限制 | **還沒**（見上一節）|
 
-### 三個之後會咬人的地方
+### 金鑰不用換，是清單要加
 
-1. **release build 是另一把簽章。** 目前 `build.gradle.kts` 裡的 release
-   還是用 debug 憑證簽（那裡有 TODO），所以暫時同一個 SHA-1。真的做正式簽章
-   之後要把新的也加進去，否則**正式版地圖空白、debug 版一切正常**。
-2. **上架 Play 又是另一個。** Play App Signing 會用它自己的憑證重簽，
+金鑰沒有「測試版／正式版」之分。Cloud Console 上那把金鑰帶的是一份
+**（套件名 + SHA-1）的清單**，現在只有一組。之後是在**同一把金鑰**上
+按 ADD 再加一組，不是開新的。
+
+現在 release 還是用 debug 憑證簽的（`build.gradle.kts` 裡的 TODO 還在），
+所以 `flutter build apk --release` 出來的 APK 指紋跟 debug 一樣，
+現在這把金鑰直接就能用在正式版上。
+
+要加第二組、第三組的時機：
+
+1. **建立正式 keystore 之後** —— 那時 release 的指紋才會跟 debug 不同。
+   忘了加的話是**正式版地圖空白、debug 版一切正常**。
+2. **上架 Play** —— Play App Signing 會用它自己的憑證重簽，
    還要再加 Play Console 給的那一個。本機好好的、商店載下來的壞掉，就是這個。
-3. **換電腦或重灌，`debug.keystore` 會重新產生**，指紋就變了。
+3. **換電腦或重灌**，`debug.keystore` 會重新產生，指紋就變了。
    那時候 Google 登入跟地圖會同時失效，症狀看起來毫不相干，其實同一個原因。
+
+### 比拆金鑰更該做的兩件事
+
+- **API 限制**：把這把金鑰限定成只能呼叫 Places API (New) 與
+  Maps SDK for Android。金鑰被撈走時，別人也不能拿去開別的服務算你的帳。
+- **配額上限**：在 Quotas 給每日請求數設天花板。這是唯一擋得住帳單失控的
+  東西 —— 限制只擋得住盜用，擋不住自己寫出來的無窮迴圈。
 
 換一台機器開發的話，登入這邊要重做一次：
 
