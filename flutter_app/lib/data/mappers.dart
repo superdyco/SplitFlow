@@ -73,6 +73,92 @@ ExpenseReceipt? _receiptFrom(dynamic value) {
   return receipt.isEmpty ? null : receipt;
 }
 
+/// 結算快照。
+///
+/// 每個欄位都補得住預設值：快照是歷史紀錄，讀不出來的那一份不該讓整頁掛掉，
+/// 顯示成一份空的結算至少還看得到日期與備註。
+SettlementSnapshot settlementFromMap(
+  String id,
+  Map<String, dynamic> data,
+  DateTime? createdAt,
+) {
+  return SettlementSnapshot(
+    id: id,
+    createdBy: (data['createdBy'] as String?) ?? '',
+    createdAt: createdAt,
+    data: SettlementSnapshotInput(
+      currency: (data['currency'] as String?) ?? '',
+      total: (data['total'] as num?)?.toInt() ?? 0,
+      paidTotal: (data['paidTotal'] as num?)?.toInt() ?? 0,
+      expenseCount: (data['expenseCount'] as num?)?.toInt() ?? 0,
+      balances: _balances(data['balances']),
+      transfers: _transfers(data['transfers']),
+      memberNames: _names(data['memberNames']),
+      note: (data['note'] as String?) ?? '',
+    ),
+  );
+}
+
+Map<String, String> _names(dynamic value) {
+  if (value is! Map) return const {};
+  return {
+    for (final entry in value.entries) '${entry.key}': '${entry.value}',
+  };
+}
+
+List<MemberBalance> _balances(dynamic value) {
+  if (value is! List) return const [];
+  return [
+    for (final item in value)
+      if (item is Map)
+        MemberBalance(
+          uid: (item['uid'] as String?) ?? '',
+          paid: (item['paid'] as num?)?.toInt() ?? 0,
+          owed: (item['owed'] as num?)?.toInt() ?? 0,
+          balance: (item['balance'] as num?)?.toInt() ?? 0,
+        ),
+  ];
+}
+
+List<Transfer> _transfers(dynamic value) {
+  if (value is! List) return const [];
+  return [
+    for (final item in value)
+      if (item is Map)
+        Transfer(
+          from: (item['from'] as String?) ?? '',
+          to: (item['to'] as String?) ?? '',
+          amount: (item['amount'] as num?)?.toInt() ?? 0,
+        ),
+  ];
+}
+
+/// 快照寫進 Firestore 的形狀。**要跟網頁版寫出來的一模一樣** ——
+/// 同一個任務的紀錄兩邊都讀得到。
+Map<String, dynamic> settlementToMap(SettlementSnapshotInput input) {
+  return {
+    'currency': input.currency,
+    'total': input.total,
+    'paidTotal': input.paidTotal,
+    'expenseCount': input.expenseCount,
+    'balances': [
+      for (final item in input.balances)
+        {
+          'uid': item.uid,
+          'paid': item.paid,
+          'owed': item.owed,
+          'balance': item.balance,
+        },
+    ],
+    'transfers': [
+      for (final item in input.transfers)
+        {'from': item.from, 'to': item.to, 'amount': item.amount},
+    ],
+    'memberNames': input.memberNames,
+    'note': input.note,
+  };
+}
+
 Payment paymentFromMap(String id, Map<String, dynamic> data) {
   return Payment(
     id: id,

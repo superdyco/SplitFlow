@@ -26,6 +26,8 @@ final userRepositoryProvider = Provider((ref) => UserRepository());
 final taskRepositoryProvider = Provider((ref) => TaskRepository());
 final expenseRepositoryProvider = Provider((ref) => ExpenseRepository());
 final paymentRepositoryProvider = Provider((ref) => PaymentRepository());
+final settlementRepositoryProvider =
+    Provider((ref) => SettlementRepository());
 
 /// 地點搜尋。沒設 `--dart-define=PLACES_API_KEY` 的話它會回報自己不可用，
 /// 地點欄位就退回純文字輸入。
@@ -64,6 +66,12 @@ final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
   final user = ref.watch(authStateProvider).value;
   if (user == null) return null;
   return ref.watch(userRepositoryProvider).getProfile(user.uid);
+});
+
+/// 這個任務存過的結算紀錄。
+final snapshotsProvider =
+    FutureProvider.family<List<SettlementSnapshot>, String>((ref, taskId) {
+  return ref.watch(settlementRepositoryProvider).list(taskId);
 });
 
 // ---------------------------------------------------------------- 任務

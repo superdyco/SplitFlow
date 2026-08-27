@@ -5,9 +5,12 @@ import '../domain/currency.dart';
 import '../domain/models.dart';
 import '../domain/offline_write.dart';
 import '../domain/payment_actions.dart';
+import '../domain/settlement.dart';
 import '../domain/settlement_text.dart';
 import '../state/providers.dart';
+import 'category_chart.dart';
 import 'payment_sheet.dart';
+import 'settlement_history.dart';
 import 'theme.dart';
 
 /// 結算分頁。`src/components/settlement/SettlementPanel.vue` 的 Flutter 版。
@@ -114,6 +117,49 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
 
     await _run(() =>
         ref.read(paymentRepositoryProvider).deletePayment(task.id, payment.id));
+  }
+
+  Future<void> _saveSnapshot(
+    Settlement result,
+    Map<String, String> names,
+    String note,
+  ) async {
+    final uid = _uid;
+    await _run(() => ref.read(settlementRepositoryProvider).create(
+          task.id,
+          toSnapshotInput(result, names, note),
+          uid,
+        ));
+    ref.invalidate(snapshotsProvider(task.id));
+  }
+
+  Future<void> _removeSnapshot(SettlementSnapshot snapshot) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('刪除這筆結算紀錄？'),
+        content: const Text('紀錄刪掉就沒了，但目前的帳目不受影響 —— 結算隨時可以重算。'),
+        actions: [
+          // 取消刻意用灰的：兩顆都是主色的話，紅的那顆就不顯眼了。
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.muted),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('刪除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    await _run(() => ref
+        .read(settlementRepositoryProvider)
+        .delete(task.id, snapshot.id));
+    ref.invalidate(snapshotsProvider(task.id));
   }
 
   @override
@@ -237,6 +283,15 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
                 ),
             ],
 
+            const SizedBox(height: 28),
+            CategoryChart(
+              // 用支出列表算，跟結算是同一份資料 —— 缺匯率的兩邊都排除，
+              // 所以圖表的總和跟上面那個總花費對得起來。
+              expenses: ref.watch(expensesProvider(task.id)).value ??
+                  const <Expense>[],
+              currency: result.currency,
+            ),
+
             const SizedBox(height: 24),
             Text('每個人的收支', style: text.titleMedium),
             const SizedBox(height: 8),
@@ -268,6 +323,19 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
               icon: const Icon(Icons.copy, size: 18),
               label: const Text('複製結算文字'),
               onPressed: () => _copy(context, result, names, pending.length),
+            ),
+
+            const SizedBox(height: 32),
+            SettlementHistory(
+              settlement: result,
+              snapshots:
+                  ref.watch(snapshotsProvider(task.id)).value ??
+                      const <SettlementSnapshot>[],
+              taskName: task.name,
+              canManage: _canWrite,
+              busy: _busy,
+              onSave: (note) => _saveSnapshot(result, names, note),
+              onRemove: _removeSnapshot,
             ),
           ],
         );

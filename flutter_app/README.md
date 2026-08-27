@@ -8,7 +8,7 @@
 
 跑得起來的：登入與第一次取暱稱、任務列表（含封存／解除／刪除）、建立任務、
 支出列表與新增／編輯支出、成員管理（升降權限、移除）、結算與付款記錄／確認、
-地點搜尋與地圖、收據拍照、邀請連結、個人設定。
+地點搜尋與地圖、收據拍照、結算紀錄與分類圖表、邀請連結、個人設定。
 
 驗證方式是拿正式資料庫裡的越南任務（15 人、100 筆支出、含既有付款）
 在模擬器上實際操作 —— 不是只看畫面長出來，而是每個寫入都做完一次來回：
@@ -255,8 +255,6 @@ FlutterFire 給 `popup-closed-by-user`。`normalizeAuthCode` 統一剝掉前綴�
 
 | | 網頁版位置 | 為什麼還沒動 |
 | --- | --- | --- |
-| 結算紀錄 | `src/components/settlement/SettlementHistory.vue` | 把某次結算存成一筆帶備註的快照、之後回頭查。`toSnapshotInput` / `matchesSnapshot` 搬好了，還沒接畫面 |
-| 分類圖表 | `src/components/settlement/CategoryChart.vue` | 各分類佔比。`category_totals.dart` 搬好了，**目前沒有任何畫面 import 它** |
 | 加入邀請 | `src/pages/JoinTaskPage.vue` | 建議留在網頁版：邀請連結的價值在於「點了就進得去」，跟公開報告是同一個道理。**產生連結那一半原生版有**（任務頁右上角「邀請」），只有「打開連結加入」留在網頁。`joinTask` 在 repository 裡寫好了，哪天要接不用重寫 |
 
 編輯支出時**不會動到收據**：更新只送有列出來的欄位，Firestore 保留其餘的，

@@ -253,6 +253,26 @@ class SettlementSnapshotInput {
   });
 }
 
+/// 已經存進 Firestore 的結算快照。
+///
+/// 快照存下來就**不能改**，只能整份刪掉重存。這是刻意的：它的價值在於
+/// 「當時算出來就是這樣」，可以事後編輯的話那份保證就沒了。
+class SettlementSnapshot {
+  final String id;
+  final SettlementSnapshotInput data;
+  final String createdBy;
+
+  /// 離線寫入時伺服器時間還沒回來，這裡會是 null。
+  final DateTime? createdAt;
+
+  const SettlementSnapshot({
+    required this.id,
+    required this.data,
+    required this.createdBy,
+    required this.createdAt,
+  });
+}
+
 /// 一個分帳任務。
 class Task {
   final String id;

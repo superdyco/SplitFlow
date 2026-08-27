@@ -98,6 +98,42 @@ class ExpenseRepository {
   }
 }
 
+/// 結算快照。`src/services/settlementService.ts` 的 Dart 版。
+class SettlementRepository {
+  /// 新的排前面。
+  Future<List<SettlementSnapshot>> list(String taskId) async {
+    final snap = await settlementsRef(taskId)
+        .orderBy('createdAt', descending: true)
+        .get();
+    return snap.docs
+        .map((doc) => settlementFromMap(
+              doc.id,
+              doc.data(),
+              toDateTime(doc.data()['createdAt']),
+            ))
+        .toList();
+  }
+
+  Future<String> create(
+    String taskId,
+    SettlementSnapshotInput input,
+    String createdBy,
+  ) async {
+    final ref = settlementsRef(taskId).doc();
+    await ref.set({
+      ...settlementToMap(input),
+      'createdBy': createdBy,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return ref.id;
+  }
+
+  /// 快照存下來就不能改，只能整份刪掉重存。
+  Future<void> delete(String taskId, String settlementId) {
+    return settlementsRef(taskId).doc(settlementId).delete();
+  }
+}
+
 class PaymentRepository {
   Future<List<Payment>> listPayments(String taskId) async {
     final snap =
