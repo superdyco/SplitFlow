@@ -5,6 +5,8 @@ import '../data/auth_repository.dart';
 import '../data/bias_store.dart';
 import '../data/expense_repository.dart';
 import '../data/place_service.dart';
+import '../data/receipt_picker.dart';
+import '../data/receipt_repository.dart';
 import '../data/task_repository.dart';
 import '../domain/models.dart';
 import '../domain/settlement.dart';
@@ -28,6 +30,18 @@ final paymentRepositoryProvider = Provider((ref) => PaymentRepository());
 /// 地點欄位就退回純文字輸入。
 final placeServiceProvider = Provider((ref) => PlaceService());
 final biasStoreProvider = Provider((ref) => BiasStore());
+
+/// 收據。picker 是拍照／選圖，repository 是 Storage。
+final receiptPickerProvider = Provider((ref) => ReceiptPicker());
+final receiptRepositoryProvider = Provider((ref) => ReceiptRepository());
+
+/// 一張收據的下載網址。
+///
+/// 用 provider 而不是在 widget 裡 `FutureBuilder`，是為了讓同一個路徑在
+/// 縮圖與放大檢視之間共用同一次查詢 —— 點開來看不該再問一次網址。
+final receiptUrlProvider = FutureProvider.family<String, String>((ref, path) {
+  return ref.watch(receiptRepositoryProvider).downloadUrl(path);
+});
 
 // ---------------------------------------------------------------- 登入
 

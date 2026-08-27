@@ -56,7 +56,21 @@ Expense expenseFromMap(
     time: _nonEmpty(data['time']),
     createdAt: createdAt,
     place: _placeFrom(data['place']),
+    receipt: _receiptFrom(data['receipt']),
   );
+}
+
+/// 收據欄位。收據功能之前的支出沒有這個欄位，是 null。
+///
+/// 兩個欄位都空的話回 null 而不是一個空殼 —— 「有一個什麼都沒有的收據」
+/// 跟「沒有收據」對畫面是同一件事，讓呼叫端只要判斷一次。
+ExpenseReceipt? _receiptFrom(dynamic value) {
+  if (value is! Map) return null;
+  final receipt = ExpenseReceipt(
+    path: _nonEmpty(value['path']),
+    localId: _nonEmpty(value['localId']),
+  );
+  return receipt.isEmpty ? null : receipt;
 }
 
 Payment paymentFromMap(String id, Map<String, dynamic> data) {

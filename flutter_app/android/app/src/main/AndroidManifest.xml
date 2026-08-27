@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 收據拍照。image_picker 走的是系統相機 App，所以不需要 CAMERA 權限
+         （那是自己開相機預覽才要的）；相簿選圖走的是系統選擇器，同樣不需要
+         READ_MEDIA_IMAGES。宣告 android.hardware.camera 但 required=false，
+         沒有相機的裝置照樣裝得起來，只是拍照那個選項按了沒反應。 -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <application
         android:label="splitflow"
         android:name="${applicationName}"

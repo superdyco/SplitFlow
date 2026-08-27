@@ -109,6 +109,8 @@ class Expense {
 
   final ExpensePlace? place;
 
+  final ExpenseReceipt? receipt;
+
   const Expense({
     required this.id,
     required this.title,
@@ -123,7 +125,33 @@ class Expense {
     this.time,
     this.createdAt,
     this.place,
+    this.receipt,
   });
+}
+
+/// 一筆支出的收據照片。
+///
+/// 兩個欄位不會同時有值：
+///
+///   - `path` 有值 = 照片已經在 Storage 上
+///   - `localId` 有值 = 還在等網路，圖存在裝置上（**網頁版才有的狀態**，
+///     原生版目前是傳成功才寫這個欄位，所以只會讀到、不會產生）
+///
+/// 原生版讀得懂 `localId` 是因為同一筆支出可能是在網頁版拍的照。那時候
+/// 照片還沒上去，這裡什麼也做不了 —— 但至少要顯示成「待上傳」而不是「沒有收據」。
+class ExpenseReceipt {
+  final String? path;
+  final String? localId;
+
+  const ExpenseReceipt({this.path, this.localId});
+
+  bool get uploaded => path != null && path!.isNotEmpty;
+
+  /// 網頁版排了隊還沒傳上去。
+  bool get pending => !uploaded && localId != null && localId!.isNotEmpty;
+
+  /// 兩個欄位都空的收據等於沒有收據。
+  bool get isEmpty => !uploaded && !pending;
 }
 
 /// 回國之後的還款。只有 confirmed 的才算數 —— 收款人沒點頭之前，

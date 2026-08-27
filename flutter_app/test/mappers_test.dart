@@ -197,6 +197,46 @@ void main() {
     });
   });
 
+  group('收據欄位', () {
+    ExpenseReceipt? receiptOf(dynamic value) =>
+        expenseFromMap('e1', {'receipt': value}, null).receipt;
+
+    test('已經傳上去的', () {
+      final receipt = receiptOf({'path': 'tasks/t1/expenses/e1/receipt.jpg'});
+      expect(receipt?.uploaded, isTrue);
+      expect(receipt?.pending, isFalse);
+      expect(receipt?.path, 'tasks/t1/expenses/e1/receipt.jpg');
+    });
+
+    test('網頁版排隊中的 —— 原生版讀得懂，但那張圖在另一台裝置上', () {
+      final receipt = receiptOf({'path': null, 'localId': 'abc'});
+      expect(receipt?.pending, isTrue);
+      expect(receipt?.uploaded, isFalse);
+    });
+
+    test('傳完之後 localId 會被清成 null，那時算已上傳', () {
+      final receipt =
+          receiptOf({'path': 'tasks/t1/expenses/e1/receipt.jpg', 'localId': null});
+      expect(receipt?.uploaded, isTrue);
+      expect(receipt?.pending, isFalse);
+    });
+
+    test('收據功能之前的支出沒有這個欄位', () {
+      expect(expenseFromMap('e1', {}, null).receipt, isNull);
+    });
+
+    test('兩個欄位都空的等於沒有收據 —— 不要讓呼叫端判斷兩次', () {
+      expect(receiptOf({}), isNull);
+      expect(receiptOf({'path': '', 'localId': ''}), isNull);
+      expect(receiptOf({'path': null, 'localId': null}), isNull);
+    });
+
+    test('形狀不對的當作沒有，不要丟例外', () {
+      expect(receiptOf('receipt.jpg'), isNull);
+      expect(receiptOf(42), isNull);
+    });
+  });
+
   group('paymentFromMap', () {
     test('confirmed 照實轉', () {
       final payment = paymentFromMap('p1', {

@@ -78,7 +78,10 @@ class ExpenseRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  Text('$_shown · $paidBy 付 · $splitLabel',
+                  Text(
+                      // 有收據要看得出來，不然只能一筆一筆點進去找。
+                      '$_shown · $paidBy 付 · $splitLabel'
+                      '${expense.receipt == null ? '' : ' · 📎'}',
                       style: text.bodySmall),
                 ],
               ),
