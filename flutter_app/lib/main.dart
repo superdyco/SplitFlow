@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'firebase_options.dart';
 import 'state/providers.dart';
+import 'ui/onboarding_page.dart';
 import 'ui/sign_in_page.dart';
 import 'ui/task_list_page.dart';
 import 'ui/theme.dart';
@@ -43,7 +44,17 @@ class SplitFlowApp extends StatelessWidget {
   }
 }
 
-/// 登入狀態決定看到哪一頁。
+/// 該看哪一頁。**判斷只放在這裡一個地方。**
+///
+/// 三種狀態，順序有意義：
+///
+///   1. 沒登入 → 登入頁
+///   2. 登入了但還沒有暱稱 → 取暱稱（`users/{uid}` 是那一頁寫進去的）
+///   3. 都有了 → 任務列表
+///
+/// 第 2 種不能跳過。登入只建立 Firebase 帳號，沒有那份使用者文件的話，
+/// 建立任務會失敗、加入任務也沒有名字可顯示 —— 而唯一能設暱稱的個人設定頁
+/// 又要求先有那份文件，是個死結。
 ///
 /// 用 stream 而不是一次性讀取：Firebase 還原登入狀態是非同步的，開 App 當下
 /// `currentUser` 可能還是 null，等一下才變成使用者。只看第一眼的話，
@@ -56,11 +67,34 @@ class _Root extends ConsumerWidget {
     final auth = ref.watch(authStateProvider);
 
     return auth.when(
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => const _Waiting(),
       error: (err, _) => _FatalPage(message: '登入狀態讀取失敗：$err'),
-      data: (user) => user == null ? const SignInPage() : const TaskListPage(),
+      data: (user) {
+        if (user == null) return const SignInPage();
+
+        final profile = ref.watch(userProfileProvider);
+        return profile.when(
+          // 讀資料的空檔不要先閃一下取暱稱頁 —— 那會讓每次開 App 都像
+          // 第一次使用。
+          loading: () => const _Waiting(),
+          // 讀不到就當作還沒設定：真的沒有的話這一頁正好；只是網路不好的話，
+          // 存的時候用的是 merge，不會洗掉既有資料。
+          error: (err, _) => OnboardingPage(user: user),
+          data: (value) => (value == null || value.nickname.trim().isEmpty)
+              ? OnboardingPage(user: user)
+              : const TaskListPage(),
+        );
+      },
     );
+  }
+}
+
+class _Waiting extends StatelessWidget {
+  const _Waiting();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }
 

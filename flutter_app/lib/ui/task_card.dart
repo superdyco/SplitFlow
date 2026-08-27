@@ -23,12 +23,21 @@ class TaskCard extends StatelessWidget {
 
   final VoidCallback? onTap;
 
+  /// 封存／解除封存／刪除。null 代表這個人不能做（只有 owner 能），
+  /// 那時整排按鈕都不出現。
+  final VoidCallback? onArchive;
+  final VoidCallback? onUnarchive;
+  final VoidCallback? onDelete;
+
   const TaskCard({
     super.key,
     required this.task,
     required this.role,
     required this.myCost,
     this.onTap,
+    this.onArchive,
+    this.onUnarchive,
+    this.onDelete,
   });
 
   @override
@@ -101,6 +110,36 @@ class TaskCard extends StatelessWidget {
                         '${formatAmount(myCost!, task.defaultCurrency)}',
                         style: figureStyle.copyWith(fontSize: 16),
                       ),
+                    ],
+                  ),
+                ],
+                // 只有 owner 拿得到這幾顆。放在卡片底部而不是右上角的
+                // 選單裡，是因為手機上那種三點選單很難按中，而這些操作
+                // 一輩子也按不到幾次 —— 不值得為了省一點空間讓它變難按。
+                if (onArchive != null || onUnarchive != null ||
+                    onDelete != null) ...[
+                  const Divider(height: 24),
+                  Row(
+                    children: [
+                      if (archived && onUnarchive != null)
+                        TextButton(
+                          onPressed: onUnarchive,
+                          child: const Text('解除封存'),
+                        )
+                      else if (!archived && onArchive != null)
+                        TextButton(
+                          onPressed: onArchive,
+                          child: const Text('封存'),
+                        ),
+                      const Spacer(),
+                      if (onDelete != null)
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.danger,
+                          ),
+                          onPressed: onDelete,
+                          child: const Text('刪除'),
+                        ),
                     ],
                   ),
                 ],

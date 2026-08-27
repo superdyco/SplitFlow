@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/currency.dart';
 import '../domain/models.dart';
 import '../domain/my_cost.dart';
+import '../domain/offline_write.dart';
+import '../domain/task_actions.dart';
 import '../domain/task_status.dart';
 import '../state/providers.dart';
 import 'create_task_page.dart';
 import 'profile_page.dart';
+import 'confirm_dialog.dart';
 import 'task_card.dart';
 import 'task_page.dart';
 import 'theme.dart';
@@ -72,6 +75,53 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     } finally {
       if (mounted) setState(() => _costsBusy = false);
     }
+  }
+
+  /// 封存／解除封存／刪除。
+  ///
+  /// 不做樂觀更新：失敗時要把卡片放回原狀，多一組狀態換一點點速度，
+  /// 而這個操作一輩子按不到幾次。網頁版的取捨一樣。
+  Future<void> _changeStatus(Task task, TaskStatus next) async {
+    final ok = await showConfirmDialog(context, taskActionPrompt(task, next));
+    if (!ok || !mounted) return;
+
+    try {
+      await settleWrite(
+        ref.read(taskRepositoryProvider).setTaskStatus(task.id, next.name),
+      );
+      if (!mounted) return;
+      ref.invalidate(tasksProvider);
+    } catch (err) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('沒有成功：$err')),
+      );
+    }
+  }
+
+  /// 這張卡要不要給那幾顆按鈕。
+  ///
+  /// 只有 owner 能封存與刪除 —— firestore.rules 也擋著，這裡收起來只是
+  /// 不要讓人按了才失敗。
+  TaskCard _card(Task task, String uid) {
+    final manageable = canChangeTaskStatus(task, uid);
+    return TaskCard(
+      task: task,
+      role: taskRole(
+        ownerId: task.ownerId,
+        adminIds: task.adminIds,
+        uid: uid,
+      ),
+      myCost: _costs?[task.id],
+      onTap: () => _openTask(task),
+      onArchive: manageable
+          ? () => _changeStatus(task, TaskStatus.archived)
+          : null,
+      onUnarchive:
+          manageable ? () => _changeStatus(task, TaskStatus.active) : null,
+      onDelete:
+          manageable ? () => _changeStatus(task, TaskStatus.deleted) : null,
+    );
   }
 
   @override
@@ -143,16 +193,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
                 ),
                 const SizedBox(height: 16),
                 for (final task in parts.active) ...[
-                  TaskCard(
-                    task: task,
-                    role: taskRole(
-                      ownerId: task.ownerId,
-                      adminIds: task.adminIds,
-                      uid: uid,
-                    ),
-                    myCost: _costs?[task.id],
-                    onTap: () => _openTask(task),
-                  ),
+                  _card(task, uid),
                   const SizedBox(height: 12),
                 ],
                 if (parts.archived.isNotEmpty) ...[
@@ -160,16 +201,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
                   Text('已封存', style: text.titleMedium),
                   const SizedBox(height: 12),
                   for (final task in parts.archived) ...[
-                    TaskCard(
-                      task: task,
-                      role: taskRole(
-                        ownerId: task.ownerId,
-                        adminIds: task.adminIds,
-                        uid: uid,
-                      ),
-                      myCost: _costs?[task.id],
-                      onTap: () => _openTask(task),
-                    ),
+                    _card(task, uid),
                     const SizedBox(height: 12),
                   ],
                 ],
