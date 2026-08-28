@@ -378,13 +378,15 @@ owner 的成員文件在同一個 batch，`get()` 那當下讀不到任務，會
 （`authError.ts` 對登入錯誤有完整中文對應，Firestore 這條沒有）。該修，但修好之後
 畫面上就看不到 code 了 —— 所以錯誤清單要先有，順序是對的。
 
-## 待辦：用 GitHub Actions 跑規則測試
+## 已完成：用 GitHub Actions 跑規則測試
 
 本機裝不了 JDK 21（公司擋 Microsoft Store，winget 取不到來源），但 GitHub 的 runner
 內建 Java。加一個 workflow 在每次 push 跑 `npm run test:rules`，就能繞過本機限制。
 
 這比裝 JDK 更值得做：規則會一直改，而規則出錯的代價是資料外洩或功能整個壞掉 ——
 那正是最該有自動化把關的地方，不該依賴某一台機器的環境。
+
+`.github/workflows/rules.yml`：每次 push 與 PR 跑 `npm test` 與 `npm run test:rules`。
 
 ## 待辦：確認框統一
 
