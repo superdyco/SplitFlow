@@ -10,11 +10,13 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  updateDoc,
   writeBatch
 } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import type { AssignableRole, TaskMember } from "@/types/member";
 import type { UserProfile } from "@/types/user";
+import { generateVirtualMemberId } from "@/utils/virtualMember";
 
 export async function getTaskMember(taskId: string, uid: string): Promise<TaskMember | null> {
   const snap = await getDoc(doc(db, "tasks", taskId, "members", uid));
@@ -55,6 +57,46 @@ export async function joinTask(taskId: string, profile: UserProfile): Promise<vo
       updatedAt: serverTimestamp()
     });
   });
+}
+
+/**
+ * 建立一個沒有帳號的成員。給長輩這種連 Gmail 都沒有、但確實有參與分帳的人。
+ *
+ * 用 writeBatch 而不是 joinTask 那種 transaction：id 是現場產生的，不可能
+ * 已經存在，所以沒有「先讀再決定」的需要。
+ *
+ * 回傳合成 id，呼叫端可以拿去預先選成付款人。
+ */
+export async function createVirtualMember(taskId: string, nickname: string): Promise<string> {
+  const uid = generateVirtualMemberId();
+  const batch = writeBatch(db);
+
+  batch.set(doc(db, "tasks", taskId, "members", uid), {
+    uid,
+    nickname,
+    role: "member",
+    joinedAt: serverTimestamp(),
+    active: true,
+    virtual: true
+  });
+  batch.update(doc(db, "tasks", taskId), {
+    memberIds: arrayUnion(uid),
+    memberCount: increment(1),
+    updatedAt: serverTimestamp()
+  });
+
+  await batch.commit();
+  return uid;
+}
+
+/**
+ * 改成員的暱稱。實務上只有虛擬成員會用到 —— 真實成員的暱稱來自個人資料，
+ * 他自己改；虛擬成員沒有個人資料，名字是別人替他打的，所以打錯要有得改。
+ *
+ * 只動 member 文件，不碰 task。規則那邊走 managesMemberAsAdmin()。
+ */
+export async function renameMember(taskId: string, uid: string, nickname: string): Promise<void> {
+  await updateDoc(doc(db, "tasks", taskId, "members", uid), { nickname });
 }
 
 /** 升級為 admin 或降級為 member，member 文件與 task.adminIds 一起改。 */

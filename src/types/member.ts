@@ -17,4 +17,10 @@ export interface TaskMember {
   role: TaskRole;
   joinedAt: Timestamp;
   active: boolean;
+
+  /**
+   * 這個成員沒有帳號，由 owner/admin 代為建立，只存在於帳目上。
+   * 舊文件沒有這個欄位，一律當成 false。
+   */
+  virtual?: boolean;
 }
