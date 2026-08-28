@@ -33,6 +33,7 @@ const OTHER = "uid_other";
 const OUTSIDER = "uid_outsider";
 const TASK = "task1";
 const CODE = "invitecode1";
+const VIRTUAL = "v_k3n8x2p9qz1m4w7t6r0a";
 
 let testEnv;
 let passed = 0;
@@ -565,6 +566,146 @@ async function main() {
   await test("admin 不能改 member 文件的 uid", async () => {
     await seed();
     await assertFails(updateDoc(doc(as(OWNER), "tasks", TASK, "members", OTHER), { uid: "換一個" }));
+  });
+
+  // --- 虛擬成員 ---
+  // 沒有帳號的人（長輩）由 admin 代為建立。合成 id 進得了 memberIds，
+  // 但它永遠不等於任何 request.auth.uid，所以拿不到任何權限。
+  async function createVirtual(db, id = VIRTUAL, overrides = {}) {
+    const batch = writeBatch(db);
+    batch.set(doc(db, "tasks", TASK, "members", id), {
+      uid: id,
+      nickname: "阿嬤",
+      role: "member",
+      joinedAt: new Date(),
+      active: true,
+      virtual: true,
+      ...overrides
+    });
+    batch.update(doc(db, "tasks", TASK), {
+      memberIds: arrayUnion(id),
+      memberCount: increment(1),
+      updatedAt: serverTimestamp()
+    });
+    return batch.commit();
+  }
+
+  await test("admin 可以建立虛擬成員", async () => {
+    await seed();
+    await assertSucceeds(createVirtual(as(ADMIN)));
+  });
+
+  await test("owner 可以建立虛擬成員", async () => {
+    await seed();
+    await assertSucceeds(createVirtual(as(OWNER)));
+  });
+
+  await test("一般成員不能建立虛擬成員", async () => {
+    await seed();
+    await assertFails(createVirtual(as(MEMBER)));
+  });
+
+  await test("外人不能建立虛擬成員", async () => {
+    await seed();
+    await assertFails(createVirtual(as(OUTSIDER)));
+  });
+
+  // 這條是安全核心：admin 本來就能往 memberIds 塞任意字串，
+  // 建立路徑若不驗格式，就等於 admin 可以偽造任何真人的 member 文件。
+  await test("id 沒有 v_ 前綴會被擋", async () => {
+    await seed();
+    await assertFails(createVirtual(as(ADMIN), "k3n8x2p9qz1m4w7t6r0ab"));
+  });
+
+  await test("id 長度不對會被擋", async () => {
+    await seed();
+    await assertFails(createVirtual(as(ADMIN), "v_k3n8x2p9"));
+  });
+
+  await test("id 含大寫會被擋", async () => {
+    await seed();
+    await assertFails(createVirtual(as(ADMIN), "v_K3n8x2p9qz1m4w7t6r0a"));
+  });
+
+  await test("admin 不能藉這條路建立真人的 member 文件", async () => {
+    await seed();
+    await assertFails(createVirtual(as(ADMIN), OUTSIDER));
+  });
+
+  await test("缺 virtual: true 走不了這條路", async () => {
+    await seed();
+    await assertFails(createVirtual(as(ADMIN), VIRTUAL, { virtual: false }));
+  });
+
+  await test("虛擬成員不能一開始就是 admin", async () => {
+    await seed();
+    await assertFails(createVirtual(as(ADMIN), VIRTUAL, { role: "admin" }));
+  });
+
+  await test("虛擬成員不能被升成 admin", async () => {
+    await seed();
+    await createVirtual(as(ADMIN));
+    const db = as(ADMIN);
+    const batch = writeBatch(db);
+    batch.update(doc(db, "tasks", TASK, "members", VIRTUAL), { role: "admin" });
+    batch.update(doc(db, "tasks", TASK), { adminIds: arrayUnion(VIRTUAL), updatedAt: serverTimestamp() });
+    await assertFails(batch.commit());
+  });
+
+  await test("不能把真實成員翻成虛擬", async () => {
+    await seed();
+    await assertFails(updateDoc(doc(as(ADMIN), "tasks", TASK, "members", OTHER), { virtual: true }));
+  });
+
+  await test("不能把虛擬成員翻回真實", async () => {
+    await seed();
+    await createVirtual(as(ADMIN));
+    await assertFails(updateDoc(doc(as(ADMIN), "tasks", TASK, "members", VIRTUAL), { virtual: false }));
+  });
+
+  await test("虛擬成員可以改名", async () => {
+    await seed();
+    await createVirtual(as(ADMIN));
+    await assertSucceeds(updateDoc(doc(as(ADMIN), "tasks", TASK, "members", VIRTUAL), { nickname: "外婆" }));
+  });
+
+  await test("虛擬成員可以被移除", async () => {
+    await seed();
+    await createVirtual(as(ADMIN));
+    const db = as(ADMIN);
+    const batch = writeBatch(db);
+    batch.update(doc(db, "tasks", TASK, "members", VIRTUAL), { active: false, role: "member" });
+    batch.update(doc(db, "tasks", TASK), {
+      memberIds: arrayRemove(VIRTUAL),
+      adminIds: arrayRemove(VIRTUAL),
+      memberCount: increment(-1),
+      updatedAt: serverTimestamp()
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  // 欄位比照 seed() 裡的 e1 —— validExpenseShape() 沒有要求 date，
+  // 多寫反而會跟既有測試資料的形狀不一致。
+  await test("虛擬成員可以當支出的付款人與分攤對象", async () => {
+    await seed();
+    await createVirtual(as(ADMIN));
+    const db = as(MEMBER);
+    await assertSucceeds(
+      setDoc(doc(db, "tasks", TASK, "expenses", "e_virtual"), {
+        title: "阿嬤請客",
+        category: "food",
+        amount: 6000,
+        currency: "TWD",
+        rate: 1,
+        baseAmount: 6000,
+        paidBy: VIRTUAL,
+        splitMode: "even",
+        splits: { [VIRTUAL]: 3000, [MEMBER]: 3000 },
+        createdBy: MEMBER,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+    );
   });
 
   // --- 被移除之後 ---
