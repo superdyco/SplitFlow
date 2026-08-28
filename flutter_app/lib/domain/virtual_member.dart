@@ -1,5 +1,3 @@
-import 'dart:math';
-
 /// 虛擬成員的 member 文件 ID。`src/utils/virtualMember.ts` 的 Dart 版。
 ///
 /// 格式是 `v_` + 20 個小寫英數，固定 22 字元。這個 id 會被寫進
@@ -9,6 +7,8 @@ import 'dart:math';
 /// 這條格式在四個地方各出現一次：這裡、網頁版的 `src/utils/virtualMember.ts`、
 /// `firestore.rules`、規則測試。改一處就要改四處。
 library;
+
+import 'dart:math';
 
 const String _alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const int _bodyLength = 20;

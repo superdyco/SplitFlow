@@ -92,9 +92,9 @@ RemoveMemberPrompt removeMemberPrompt({
 
   return RemoveMemberPrompt(
     title: title,
-    message: '${who} 出現在 ${counts}裡。\n\n'
+    message: '$who 出現在 $counts裡。\n\n'
         '・保留結算資料：$keep\n\n'
-        '・真實移除：連同那 ${counts}一起刪除，無法復原。'
+        '・真實移除：連同那 $counts一起刪除，無法復原。'
         '其中有些支出是別人付的，刪掉之後那些人的帳也會跟著不見。'
         '結算紀錄裡仍然看得到他的名字。',
     hasRecords: true,
