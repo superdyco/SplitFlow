@@ -25,10 +25,18 @@ import { usePayments } from "@/composables/usePayments";
 import { useTask } from "@/composables/useTask";
 import { useTaskMembers } from "@/composables/useTaskMembers";
 import { useTripReport } from "@/composables/useTripReport";
-import { createVirtualMember, removeMember, renameMember, setMemberRole } from "@/services/memberService";
+import {
+  createVirtualMember,
+  hardDeleteMember,
+  removeMember,
+  renameMember,
+  setMemberRole
+} from "@/services/memberService";
 import { confirmPayment, createPayment, deletePayment } from "@/services/paymentService";
 import { buildInviteUrl, firebaseErrorMessage } from "@/utils/firestore";
-import { removeMemberMessage } from "@/utils/memberRemoval";
+import { removeMemberPrompt, type RemoveMemberPrompt } from "@/utils/memberRemoval";
+import { memberFootprint, type MemberFootprint } from "@/utils/memberFootprint";
+import RemoveMemberDialog from "@/components/member/RemoveMemberDialog.vue";
 import { isInstalledApp } from "@/utils/platform";
 
 type Tab = "expenses" | "members" | "settlement";
@@ -290,17 +298,50 @@ function changeRole(targetUid: string, role: AssignableRole) {
   return runMemberAction(targetUid, () => setMemberRole(taskId.value, targetUid, role));
 }
 
+const removing = ref<{ uid: string; prompt: RemoveMemberPrompt; footprint: MemberFootprint } | null>(null);
+
+/**
+ * 按下「移除」只負責算出後果並開對話框，真正動手的是下面兩支。
+ *
+ * 沒有帳的人也走同一個對話框 —— 只是它不給選擇、也不要求打字。
+ */
 function removeTaskMember(targetUid: string) {
   const target = memberState.members.value.find(member => member.uid === targetUid);
+  const footprint = memberFootprint(targetUid, expenseState.expenses.value, paymentState.payments.value);
   // 沒出現在 balances 代表他還沒參與任何一筆支出，當作已結清。
   const balance = settlement.value.balances.find(item => item.uid === targetUid)?.balance ?? 0;
-  const message = removeMemberMessage({
-    name: target?.nickname || "",
-    balance,
-    currency: settlement.value.currency
-  });
-  if (!window.confirm(message)) return;
-  return runMemberAction(targetUid, () => removeMember(taskId.value, targetUid));
+
+  removing.value = {
+    uid: targetUid,
+    footprint,
+    prompt: removeMemberPrompt({
+      name: target?.nickname || "",
+      expenseCount: footprint.expenseIds.length,
+      paymentCount: footprint.paymentIds.length,
+      balance,
+      currency: settlement.value.currency
+    })
+  };
+}
+
+/** 保留結算資料 —— 舊的軟刪，行為完全不變。 */
+async function confirmSoftRemove() {
+  const target = removing.value;
+  if (!target) return;
+  removing.value = null;
+  await runMemberAction(target.uid, () => removeMember(taskId.value, target.uid));
+}
+
+/** 真實移除 —— 連他的支出與付款一起刪。 */
+async function confirmHardRemove() {
+  const target = removing.value;
+  if (!target) return;
+  await runMemberAction(target.uid, () =>
+    hardDeleteMember(taskId.value, target.uid, target.footprint)
+  );
+  removing.value = null;
+  // 支出與付款也被刪了，兩份列表都要重讀 —— runMemberAction 只重載任務與成員。
+  await Promise.all([expenseState.load(), paymentState.load()]);
 }
 
 /**
@@ -578,6 +619,16 @@ onMounted(load);
               </button>
             </div>
           </template>
+
+          <RemoveMemberDialog
+            v-if="removing"
+            :open="true"
+            :prompt="removing.prompt"
+            :busy="busyUid === removing.uid"
+            @soft="confirmSoftRemove"
+            @hard="confirmHardRemove"
+            @cancel="removing = null"
+          />
         </section>
 
         <section v-if="activeTab === 'settlement'" class="stack">
