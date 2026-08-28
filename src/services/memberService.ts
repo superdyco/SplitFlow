@@ -17,6 +17,8 @@ import { db } from "@/firebase/config";
 import type { AssignableRole, TaskMember } from "@/types/member";
 import type { UserProfile } from "@/types/user";
 import { generateVirtualMemberId } from "@/utils/virtualMember";
+import type { MemberFootprint } from "@/utils/memberFootprint";
+import { deleteReceipt } from "@/services/receiptService";
 
 export async function getTaskMember(taskId: string, uid: string): Promise<TaskMember | null> {
   const snap = await getDoc(doc(db, "tasks", taskId, "members", uid));
@@ -129,4 +131,67 @@ export async function removeMember(taskId: string, uid: string): Promise<void> {
   });
 
   await batch.commit();
+}
+
+/** 一個 writeBatch 上限 500 筆寫入，留 50 筆餘裕給同批的計數器更新。 */
+const BATCH_LIMIT = 450;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
+ * 真的把一個人從任務裡刪掉 —— 連同他的支出與付款。
+ *
+ * 給「這個人根本不該在這裡」用的：加錯人、測試資料。想保留帳目的話走
+ * `removeMember()` 的軟刪。
+ *
+ * **順序是這支函式的核心。** 分批寫入不是原子的，所以 member 文件放到最後
+ * 才刪：中途失敗時那個人還在成員列表上，使用者重按一次就從頭再跑，已刪的
+ * 支出查不到、不會重複刪，剩下的繼續刪。反過來先刪 member 文件的話，失敗
+ * 會留下「成員不見了但支出還在」，而且再也沒有介面可以重試。
+ *
+ * 收據是 best-effort —— `deleteReceipt()` 本來就吞掉所有錯誤，孤兒檔案是
+ * 既有的設計取捨。
+ */
+export async function hardDeleteMember(
+  taskId: string,
+  uid: string,
+  footprint: MemberFootprint
+): Promise<void> {
+  for (const ids of chunk(footprint.expenseIds, BATCH_LIMIT)) {
+    const batch = writeBatch(db);
+    for (const expenseId of ids) {
+      batch.delete(doc(db, "tasks", taskId, "expenses", expenseId));
+    }
+    batch.update(doc(db, "tasks", taskId), {
+      expenseCount: increment(-ids.length),
+      updatedAt: serverTimestamp()
+    });
+    await batch.commit();
+  }
+
+  for (const ids of chunk(footprint.paymentIds, BATCH_LIMIT)) {
+    const batch = writeBatch(db);
+    for (const paymentId of ids) {
+      batch.delete(doc(db, "tasks", taskId, "payments", paymentId));
+    }
+    await batch.commit();
+  }
+
+  // 最後才動成員本身。
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "tasks", taskId, "members", uid));
+  batch.update(doc(db, "tasks", taskId), {
+    memberIds: arrayRemove(uid),
+    adminIds: arrayRemove(uid),
+    memberCount: increment(-1),
+    updatedAt: serverTimestamp()
+  });
+  await batch.commit();
+
+  // 帳都刪乾淨了才清照片。失敗不影響結果，孤兒檔案是既有取捨。
+  await Promise.all(footprint.expenseIds.map(id => deleteReceipt(taskId, id)));
 }
