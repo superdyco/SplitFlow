@@ -121,11 +121,21 @@ service cloud.firestore {
 
       match /members/{uid} {
         // owner 不能被降級也不能被移除，admin 只能動 admin/member 兩種角色。
+        //
+        // 虛擬成員只能停在 member —— 升成 admin 沒有意義（他沒有帳號，adminIds 裡
+        // 多一個合成 id 不會讓任何人拿到權限），但會讓成員列顯示一個永遠不會生效的
+        // 「管理員」。virtual 本身也不准翻轉，否則真人與虛擬的界線就沒了。
+        // 用 .get("virtual", false) 是因為既有成員文件沒有這個欄位。
         function managesMemberAsAdmin() {
           return isTaskAdmin(taskId)
             && resource.data.role != "owner"
             && request.resource.data.uid == resource.data.uid
-            && request.resource.data.role in ["admin", "member"];
+            && request.resource.data.role in ["admin", "member"]
+            && request.resource.data.get("virtual", false) == resource.data.get("virtual", false)
+            && (
+              resource.data.get("virtual", false) == false
+              || request.resource.data.role == "member"
+            );
         }
 
         // 被移除過的人重新用邀請連結加入時，自己把 active 改回 true，角色不能自己升。
@@ -139,21 +149,45 @@ service cloud.firestore {
             && uid in taskAfterData(taskId).memberIds;
         }
 
+        /*
+          虛擬成員：沒有帳號的人（長輩），由 owner/admin 代為建立。
+
+          `uid.matches` 那條是安全核心而不是格式潔癖。admin 本來就能往
+          task.memberIds 塞任意字串（updatesTaskAsAdmin 沒有 hasOnly），少了它，
+          這條路就是「admin 可以替任何真人偽造 member 文件」的後門。
+          合成 id 固定 22 字元，Firebase uid 是 28 字元，長度就對不上。
+
+          用 taskAfterData 而不是 taskData，理由跟下面的 create 一樣：
+          member 文件與 task.memberIds 在同一個 batch 裡寫。
+        */
+        function createsVirtualMember() {
+          return isTaskAdmin(taskId)
+            && uid.matches("^v_[a-z0-9]{20}$")
+            && taskAfterData(taskId).status == "active"
+            && uid in taskAfterData(taskId).memberIds
+            && request.resource.data.uid == uid
+            && request.resource.data.virtual == true
+            && request.resource.data.active == true
+            && request.resource.data.role == "member";
+        }
+
         allow get: if isSelf(uid) || isTaskMember(taskId);
         allow list: if isTaskMember(taskId);
         // 用 after 狀態而不是 taskIsActive：建立任務時，任務文件與 owner 的成員
         // 文件在同一個 batch 裡，那當下 get() 讀不到任務，會把建立任務整個擋掉。
         // 封存的任務其 after 狀態仍是 archived，所以照樣擋得住新成員加入。
-        allow create: if isSelf(uid)
-          && taskAfterData(taskId).status == "active"
-          && uid in taskAfterData(taskId).memberIds
-          && request.resource.data.uid == request.auth.uid
-          && request.resource.data.active == true
-          && request.resource.data.role in ["owner", "member"]
-          && (
-            request.resource.data.role == "member"
-            || taskAfterData(taskId).ownerId == request.auth.uid
-          );
+        allow create: if (
+            isSelf(uid)
+            && taskAfterData(taskId).status == "active"
+            && uid in taskAfterData(taskId).memberIds
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.active == true
+            && request.resource.data.role in ["owner", "member"]
+            && (
+              request.resource.data.role == "member"
+              || taskAfterData(taskId).ownerId == request.auth.uid
+            )
+          ) || createsVirtualMember();
         allow update: if managesMemberAsAdmin() || rejoinsSelf();
         allow delete: if false;
       }
