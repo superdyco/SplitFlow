@@ -43,17 +43,15 @@ describe("removeMemberMessage", () => {
 describe("removeMemberPrompt", () => {
   const base = { name: "阿嬤", balance: 0, currency: "TWD" };
 
-  it("沒有帳時不給選擇，也不要求打字", () => {
+  it("沒有帳時不給選擇", () => {
     const prompt = removeMemberPrompt({ ...base, expenseCount: 0, paymentCount: 0 });
     expect(prompt.hasRecords).toBe(false);
-    expect(prompt.requireText).toBeNull();
     expect(prompt.message).toContain("還沒有任何支出與付款記錄");
   });
 
-  it("有帳時要求打出名字才能真刪", () => {
+  it("有帳時要給兩個選擇", () => {
     const prompt = removeMemberPrompt({ ...base, expenseCount: 12, paymentCount: 2 });
     expect(prompt.hasRecords).toBe(true);
-    expect(prompt.requireText).toBe("阿嬤");
   });
 
   it("把筆數數給使用者看", () => {

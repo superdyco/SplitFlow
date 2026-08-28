@@ -3,15 +3,14 @@
  * 移除成員的對話框。
  *
  * 跟 ConfirmDialog 分開的理由是它給不了三個出口 —— 這裡要「取消 / 保留結算
- * 資料 / 真實移除」。摩擦機制（照著打名字才按得下去）比照 ConfirmDialog 的
- * requireText，理由一樣：後果越嚴重、需要越刻意的動作。
+ * 資料 / 真實移除」。
  *
- * 沒有帳的人不給選擇也不要求打字 —— 沒東西可失去，逼他打字只是懲罰。
+ * 刻意不要求打出名字：那層摩擦留給刪整個任務。這裡已經是兩段式的選擇，
+ * 而且訊息把後果都講明了。
  */
-import { computed, ref, watch } from "vue";
 import type { RemoveMemberPrompt } from "@/utils/memberRemoval";
 
-const props = defineProps<{
+defineProps<{
   open: boolean;
   prompt: RemoveMemberPrompt;
   busy: boolean;
@@ -22,20 +21,6 @@ const emit = defineEmits<{
   (e: "hard"): void;
   (e: "cancel"): void;
 }>();
-
-const typed = ref("");
-
-// 每次重新開啟都要清空，不然上一次打的字會讓按鈕一開始就是啟用的。
-watch(
-  () => props.open,
-  isOpen => {
-    if (isOpen) typed.value = "";
-  }
-);
-
-const canHardDelete = computed(
-  () => !props.prompt.requireText || typed.value.trim() === props.prompt.requireText
-);
 </script>
 
 <template>
@@ -43,11 +28,6 @@ const canHardDelete = computed(
     <div class="card dialog stack">
       <strong class="section-title">{{ prompt.title }}</strong>
       <p class="tiny message">{{ prompt.message }}</p>
-
-      <label v-if="prompt.requireText" class="field">
-        <span class="label">請輸入「{{ prompt.requireText }}」以確認真實移除</span>
-        <input v-model="typed" class="input" autocomplete="off" :disabled="busy" />
-      </label>
 
       <button
         v-if="prompt.hasRecords"
@@ -59,7 +39,7 @@ const canHardDelete = computed(
       </button>
       <button
         class="btn btn-block btn-danger"
-        :disabled="busy || !canHardDelete"
+        :disabled="busy"
         @click="emit('hard')"
       >
         {{ busy ? "刪除中…" : prompt.hasRecords ? "真實移除" : "刪除" }}

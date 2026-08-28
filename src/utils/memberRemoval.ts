@@ -51,15 +51,15 @@ export interface RemoveMemberPrompt {
   message: string;
   /** true 代表要給「保留 / 真實移除」兩個選擇；false 代表直接刪。 */
   hasRecords: boolean;
-  /** 真實移除要照著打的字。沒有帳時是 null —— 沒東西可失去就不該有摩擦。 */
-  requireText: string | null;
 }
 
 /**
  * 移除成員的對話框內容。
  *
- * 分級摩擦跟 `ConfirmDialog` 的 `requireText` 是同一個道理：沒有帳的人刪掉
- * 風險是零，逼他打字只是懲罰；有 12 筆支出要一起消失就不一樣了。
+ * 沒有帳的人不給選擇 —— 沒東西可失去，多問一次只是擋路。
+ *
+ * 刻意**不要求打出名字**：那層摩擦留給刪整個任務（`taskActionPrompt`），
+ * 成員移除已經有兩段式的選擇，而且訊息裡把後果都講明了。
  */
 export function removeMemberPrompt({
   name,
@@ -75,8 +75,7 @@ export function removeMemberPrompt({
     return {
       title,
       message: `${who} 還沒有任何支出與付款記錄，會直接從這個任務移除。`,
-      hasRecords: false,
-      requireText: null
+      hasRecords: false
     };
   }
 
@@ -99,7 +98,6 @@ export function removeMemberPrompt({
   return {
     title,
     message: lines.join("\n"),
-    hasRecords: true,
-    requireText: who
+    hasRecords: true
   };
 }

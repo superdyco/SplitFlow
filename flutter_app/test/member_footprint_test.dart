@@ -70,7 +70,7 @@ void main() {
   });
 
   group('removeMemberPrompt', () {
-    test('沒有帳時不給選擇，也不要求打字', () {
+    test('沒有帳時不給選擇', () {
       final prompt = removeMemberPrompt(
           name: '阿嬤',
           expenseCount: 0,
@@ -78,11 +78,10 @@ void main() {
           balance: 0,
           currency: 'TWD');
       expect(prompt.hasRecords, isFalse);
-      expect(prompt.requireText, isNull);
       expect(prompt.message, contains('還沒有任何支出與付款記錄'));
     });
 
-    test('有帳時要求打出名字才能真刪', () {
+    test('有帳時要給兩個選擇，並把筆數數出來', () {
       final prompt = removeMemberPrompt(
           name: '阿嬤',
           expenseCount: 12,
@@ -90,7 +89,6 @@ void main() {
           balance: 0,
           currency: 'TWD');
       expect(prompt.hasRecords, isTrue);
-      expect(prompt.requireText, '阿嬤');
       expect(prompt.message, contains('12 筆支出'));
       expect(prompt.message, contains('2 筆付款記錄'));
     });
