@@ -90,32 +90,10 @@ class _MembersTabState extends ConsumerState<MembersTab> {
 
   /// 改名只對虛擬成員開放 —— 真實成員的暱稱來自個人資料，他自己改。
   Future<void> _rename(TaskMember member) async {
-    final controller = TextEditingController(text: member.nickname);
     final next = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('改名'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 20,
-          decoration: const InputDecoration(counterText: ''),
-          onSubmitted: (value) => Navigator.of(context).pop(value.trim()),
-        ),
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.muted),
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('儲存'),
-          ),
-        ],
-      ),
+      builder: (context) => _RenameDialog(initial: member.nickname),
     );
-    controller.dispose();
 
     if (next == null || next.isEmpty || next == member.nickname) return;
 
@@ -277,6 +255,65 @@ class _MembersTabState extends ConsumerState<MembersTab> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 改名對話框。
+///
+/// 做成 StatefulWidget 只為了一件事：**controller 要由對話框自己持有**。
+///
+/// 原本是在 `showDialog` 的 Future 回來之後就 `controller.dispose()`，
+/// 那會 crash（`_dependents.isEmpty` assertion）。Future 在路由 pop 的當下
+/// 就完成了，但關閉動畫還在跑、TextField 還掛在樹上，這時候把它的 controller
+/// 拆掉就踩到 element 拆解的檢查。
+///
+/// State 的 `dispose()` 是在路由真的離開之後才呼叫的，時機才對。
+class _RenameDialog extends StatefulWidget {
+  final String initial;
+
+  const _RenameDialog({required this.initial});
+
+  @override
+  State<_RenameDialog> createState() => _RenameDialogState();
+}
+
+class _RenameDialogState extends State<_RenameDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initial);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.of(context).pop(_controller.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('改名'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLength: 20,
+        decoration: const InputDecoration(counterText: ''),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          style: TextButton.styleFrom(foregroundColor: AppColors.muted),
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        TextButton(onPressed: _submit, child: const Text('儲存')),
+      ],
     );
   }
 }
