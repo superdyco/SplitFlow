@@ -25,7 +25,7 @@ import { usePayments } from "@/composables/usePayments";
 import { useTask } from "@/composables/useTask";
 import { useTaskMembers } from "@/composables/useTaskMembers";
 import { useTripReport } from "@/composables/useTripReport";
-import { removeMember, setMemberRole } from "@/services/memberService";
+import { createVirtualMember, removeMember, renameMember, setMemberRole } from "@/services/memberService";
 import { confirmPayment, createPayment, deletePayment } from "@/services/paymentService";
 import { buildInviteUrl, firebaseErrorMessage } from "@/utils/firestore";
 import { removeMemberMessage } from "@/utils/memberRemoval";
@@ -244,6 +244,46 @@ async function runMemberAction(targetUid: string, action: () => Promise<void>) {
   } finally {
     busyUid.value = null;
   }
+}
+
+const virtualNickname = ref("");
+const addingVirtual = ref(false);
+
+/**
+ * 長輩這類沒有 Google 帳號的人，由管理者代為建立。
+ *
+ * 沒有走 runMemberAction 是因為那支函式要一個 targetUid 來標示哪一列在忙，
+ * 而這裡還沒有人可以標 —— id 要等寫入成功才存在。刷新與錯誤處理照抄它。
+ */
+async function addVirtualMember() {
+  const nickname = virtualNickname.value.trim();
+  if (!nickname || addingVirtual.value) return;
+
+  addingVirtual.value = true;
+  actionError.value = null;
+  try {
+    await createVirtualMember(taskId.value, nickname);
+    virtualNickname.value = "";
+    await Promise.all([taskState.load(), memberState.load()]);
+  } catch (err) {
+    actionError.value = firebaseErrorMessage(err);
+  } finally {
+    addingVirtual.value = false;
+  }
+}
+
+/**
+ * 改名只對虛擬成員開放 —— 真實成員的暱稱來自個人資料，他自己改。
+ *
+ * 用 window.prompt 是因為 ConfirmDialog 是確認框、不收文字輸入，目前沒有
+ * 現成的輸入對話框元件。todo.md 的「確認框統一」那條要一起換掉。
+ */
+function renameTaskMember(targetUid: string) {
+  const target = memberState.members.value.find(member => member.uid === targetUid);
+  const next = window.prompt("改成什麼名字？", target?.nickname ?? "")?.trim();
+  if (!next || next === target?.nickname) return;
+
+  return runMemberAction(targetUid, () => renameMember(taskId.value, targetUid, next.slice(0, 20)));
 }
 
 function changeRole(targetUid: string, role: AssignableRole) {
@@ -513,7 +553,30 @@ onMounted(load);
               @promote="changeRole($event, 'admin')"
               @demote="changeRole($event, 'member')"
               @remove="removeTaskMember"
+              @rename="renameTaskMember"
             />
+
+            <div v-if="taskState.isAdmin.value" class="card stack">
+              <strong>新增沒有帳號的成員</strong>
+              <p class="tiny">
+                長輩這類沒有 Google 帳號的人，可以先用名字記進帳裡 ——
+                他會照常被分攤、出現在結算，只是不能自己打開這個網站。
+              </p>
+              <input
+                v-model="virtualNickname"
+                class="input"
+                maxlength="20"
+                placeholder="例如：阿嬤"
+                @keyup.enter="addVirtualMember"
+              />
+              <button
+                class="btn"
+                :disabled="addingVirtual || !virtualNickname.trim()"
+                @click="addVirtualMember"
+              >
+                {{ addingVirtual ? "新增中…" : "新增" }}
+              </button>
+            </div>
           </template>
         </section>
 
