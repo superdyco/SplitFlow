@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../domain/member_footprint.dart';
 import '../domain/models.dart';
 import '../domain/virtual_member.dart';
 import 'firestore_refs.dart';
@@ -238,6 +239,62 @@ class TaskRepository {
   /// 只動 member 文件，不碰 task。規則那邊走 managesMemberAsAdmin()。
   Future<void> renameMember(String taskId, String uid, String nickname) {
     return membersRef(taskId).doc(uid).update({'nickname': nickname});
+  }
+
+  /// 一個 batch 上限 500 筆寫入，留 50 筆餘裕給同批的計數器更新。
+  static const int _batchLimit = 450;
+
+  /// 真的把一個人從任務裡刪掉 —— 連同他的支出與付款。
+  /// `src/services/memberService.ts` 的 `hardDeleteMember` 的 Dart 版。
+  ///
+  /// 給「這個人根本不該在這裡」用的：加錯人、測試資料。想保留帳目的話走
+  /// `removeMember()` 的軟刪。
+  ///
+  /// **順序是這支函式的核心。** 分批寫入不是原子的，所以 member 文件放到
+  /// 最後才刪：中途失敗時那個人還在成員列表上，使用者重按一次就從頭再跑。
+  /// 反過來先刪 member 文件的話，失敗會留下「成員不見了但支出還在」，
+  /// 而且再也沒有介面可以重試。
+  ///
+  /// 收據**不在這裡**清。刪 Storage 要 ReceiptRepository，而 repository
+  /// 之間不互相 import —— 那件事交給呼叫端做，跟網頁版把 deleteReceipt
+  /// 放在 service 層是同一個分層考量。
+  Future<void> hardDeleteMember(
+    String taskId,
+    String uid,
+    MemberFootprint footprint,
+  ) async {
+    for (var i = 0; i < footprint.expenseIds.length; i += _batchLimit) {
+      final ids = footprint.expenseIds.skip(i).take(_batchLimit).toList();
+      final batch = db.batch();
+      for (final expenseId in ids) {
+        batch.delete(expensesRef(taskId).doc(expenseId));
+      }
+      batch.update(taskRef(taskId), {
+        'expenseCount': FieldValue.increment(-ids.length),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      await batch.commit();
+    }
+
+    for (var i = 0; i < footprint.paymentIds.length; i += _batchLimit) {
+      final ids = footprint.paymentIds.skip(i).take(_batchLimit).toList();
+      final batch = db.batch();
+      for (final paymentId in ids) {
+        batch.delete(paymentsRef(taskId).doc(paymentId));
+      }
+      await batch.commit();
+    }
+
+    // 最後才動成員本身。
+    final batch = db.batch();
+    batch.delete(membersRef(taskId).doc(uid));
+    batch.update(taskRef(taskId), {
+      'memberIds': FieldValue.arrayRemove([uid]),
+      'adminIds': FieldValue.arrayRemove([uid]),
+      'memberCount': FieldValue.increment(-1),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
   }
 
   /// 用邀請連結加入。
