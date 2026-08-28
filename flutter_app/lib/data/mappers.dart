@@ -203,3 +203,16 @@ Map<String, int>? _intMap(dynamic value) {
   });
   return result;
 }
+
+/// member 文件。`active` 與 `virtual` 都是後來才加的欄位，舊文件沒有 ——
+/// 兩個都往「保守」的方向猜：還在、不是虛擬的。反過來猜的話，
+/// 所有舊成員會一次消失或一次全變成虛擬。
+TaskMember memberFromMap(Map<String, dynamic> data) {
+  return TaskMember(
+    uid: (data['uid'] as String?) ?? '',
+    nickname: (data['nickname'] as String?) ?? '',
+    role: (data['role'] as String?) ?? 'member',
+    active: data['active'] != false,
+    virtual: data['virtual'] == true,
+  );
+}

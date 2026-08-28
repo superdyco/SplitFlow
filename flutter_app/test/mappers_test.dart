@@ -261,4 +261,36 @@ void main() {
       }
     });
   });
+  group('memberFromMap', () {
+    test('讀得到虛擬成員', () {
+      final member = memberFromMap({
+        'uid': 'v_k3n8x2p9qz1m4w7t6r0a',
+        'nickname': '阿嬤',
+        'role': 'member',
+        'active': true,
+        'virtual': true,
+      });
+      expect(member.uid, 'v_k3n8x2p9qz1m4w7t6r0a');
+      expect(member.nickname, '阿嬤');
+      expect(member.virtual, isTrue);
+    });
+
+    // 這個欄位是虛擬成員功能之後才加的。舊文件沒有它 —— 猜成 true
+    // 的話所有既有成員會一次全變成虛擬的。
+    test('舊文件沒有 virtual 就當成真實成員', () {
+      final member = memberFromMap({
+        'uid': 'uid_member',
+        'nickname': '小明',
+        'role': 'member',
+        'active': true,
+      });
+      expect(member.virtual, isFalse);
+    });
+
+    test('舊文件沒有 active 仍當成還在', () {
+      final member = memberFromMap({'uid': 'u', 'nickname': 'n', 'role': 'member'});
+      expect(member.active, isTrue);
+      expect(member.virtual, isFalse);
+    });
+  });
 }

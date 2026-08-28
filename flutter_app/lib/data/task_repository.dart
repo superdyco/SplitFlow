@@ -3,7 +3,9 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../domain/models.dart';
+import '../domain/virtual_member.dart';
 import 'firestore_refs.dart';
+import 'mappers.dart';
 
 /// 任務與成員的讀寫。`src/services/taskService.ts` 與 `memberService.ts` 的
 /// Dart 版。
@@ -23,17 +25,6 @@ Task _taskFrom(String id, Map<String, dynamic> data) {
     inviteCode: (data['inviteCode'] as String?) ?? '',
     memberCount: (data['memberCount'] as num?)?.toInt() ?? 0,
     expenseCount: (data['expenseCount'] as num?)?.toInt() ?? 0,
-  );
-}
-
-TaskMember _memberFrom(Map<String, dynamic> data) {
-  return TaskMember(
-    uid: (data['uid'] as String?) ?? '',
-    nickname: (data['nickname'] as String?) ?? '',
-    role: (data['role'] as String?) ?? 'member',
-    // 這個欄位是移除成員功能之後才加的，舊文件沒有 —— 當成還在，
-    // 反過來猜的話所有舊成員會一次消失。
-    active: data['active'] != false,
   );
 }
 
@@ -156,14 +147,14 @@ class TaskRepository {
   Future<TaskMember?> getTaskMember(String taskId, String uid) async {
     final snap = await membersRef(taskId).doc(uid).get();
     final data = snap.data();
-    return data == null ? null : _memberFrom(data);
+    return data == null ? null : memberFromMap(data);
   }
 
   /// 回傳所有成員文件，**包含已被移除的**（active: false）——
   /// 舊支出還查得到暱稱，而且結算的餘數分配依賴這個順序。
   Future<List<TaskMember>> listTaskMembers(String taskId) async {
     final snap = await membersRef(taskId).orderBy('joinedAt').get();
-    return snap.docs.map((doc) => _memberFrom(doc.data())).toList();
+    return snap.docs.map((doc) => memberFromMap(doc.data())).toList();
   }
 
   /// 加入順序，給結算用。
@@ -211,6 +202,42 @@ class TaskRepository {
       'updatedAt': FieldValue.serverTimestamp(),
     });
     return batch.commit();
+  }
+
+  /// 建立一個沒有帳號的成員。給長輩這種連 Gmail 都沒有、但確實有參與分帳的人。
+  ///
+  /// 用 batch 而不是 joinTask 那種 transaction：id 是現場產生的，不可能
+  /// 已經存在，所以沒有「先讀再決定」的需要。
+  ///
+  /// 回傳合成 id，呼叫端可以拿去預先選成付款人。
+  Future<String> createVirtualMember(String taskId, String nickname) async {
+    final uid = generateVirtualMemberId();
+    final batch = db.batch();
+
+    batch.set(membersRef(taskId).doc(uid), {
+      'uid': uid,
+      'nickname': nickname,
+      'role': 'member',
+      'joinedAt': FieldValue.serverTimestamp(),
+      'active': true,
+      'virtual': true,
+    });
+    batch.update(taskRef(taskId), {
+      'memberIds': FieldValue.arrayUnion([uid]),
+      'memberCount': FieldValue.increment(1),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+    return uid;
+  }
+
+  /// 改成員的暱稱。實務上只有虛擬成員會用到 —— 真實成員的暱稱來自個人資料，
+  /// 他自己改；虛擬成員沒有個人資料，名字是別人替他打的，所以打錯要有得改。
+  ///
+  /// 只動 member 文件，不碰 task。規則那邊走 managesMemberAsAdmin()。
+  Future<void> renameMember(String taskId, String uid, String nickname) {
+    return membersRef(taskId).doc(uid).update({'nickname': nickname});
   }
 
   /// 用邀請連結加入。

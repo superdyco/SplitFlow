@@ -318,11 +318,16 @@ class TaskMember {
   final String role;
   final bool active;
 
+  /// 這個成員沒有帳號，由 owner/admin 代為建立，只存在於帳目上。
+  /// 他不會登入，所以任何「他自己來操作」的介面都不該對他出現。
+  final bool virtual;
+
   const TaskMember({
     required this.uid,
     required this.nickname,
     required this.role,
     required this.active,
+    this.virtual = false,
   });
 }
 
