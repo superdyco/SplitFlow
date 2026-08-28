@@ -37,3 +37,69 @@ export function removeMemberMessage({ name, balance, currency }: RemoveMemberMes
 
   return `${situation}\n\n${consequence}既有支出與結算金額都會保留。\n\n確定要移除嗎？`;
 }
+
+export interface RemoveMemberPromptInput {
+  name: string;
+  expenseCount: number;
+  paymentCount: number;
+  balance: number;
+  currency: string;
+}
+
+export interface RemoveMemberPrompt {
+  title: string;
+  message: string;
+  /** true 代表要給「保留 / 真實移除」兩個選擇；false 代表直接刪。 */
+  hasRecords: boolean;
+  /** 真實移除要照著打的字。沒有帳時是 null —— 沒東西可失去就不該有摩擦。 */
+  requireText: string | null;
+}
+
+/**
+ * 移除成員的對話框內容。
+ *
+ * 分級摩擦跟 `ConfirmDialog` 的 `requireText` 是同一個道理：沒有帳的人刪掉
+ * 風險是零，逼他打字只是懲罰；有 12 筆支出要一起消失就不一樣了。
+ */
+export function removeMemberPrompt({
+  name,
+  expenseCount,
+  paymentCount,
+  balance,
+  currency
+}: RemoveMemberPromptInput): RemoveMemberPrompt {
+  const who = name || "這位成員";
+  const title = `移除「${who}」`;
+
+  if (expenseCount === 0 && paymentCount === 0) {
+    return {
+      title,
+      message: `${who} 還沒有任何支出與付款記錄，會直接從這個任務移除。`,
+      hasRecords: false,
+      requireText: null
+    };
+  }
+
+  // 只列真的有的那幾項，不然會出現「0 筆支出」這種讀起來很怪的句子。
+  const counts = [
+    expenseCount > 0 ? `${expenseCount} 筆支出` : null,
+    paymentCount > 0 ? `${paymentCount} 筆付款記錄` : null
+  ]
+    .filter(Boolean)
+    .join("、");
+
+  const lines = [
+    `${who} 出現在 ${counts}裡。`,
+    "",
+    `・保留結算資料：${removeMemberMessage({ name: who, balance, currency })}`,
+    "",
+    `・真實移除：連同那 ${counts}一起刪除，無法復原。其中有些支出是別人付的，刪掉之後那些人的帳也會跟著不見。結算紀錄裡仍然看得到他的名字。`
+  ];
+
+  return {
+    title,
+    message: lines.join("\n"),
+    hasRecords: true,
+    requireText: who
+  };
+}

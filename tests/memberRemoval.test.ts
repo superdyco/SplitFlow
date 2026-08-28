@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { removeMemberMessage } from "@/utils/memberRemoval";
+import { removeMemberMessage, removeMemberPrompt } from "@/utils/memberRemoval";
 
 describe("removeMemberMessage", () => {
   it("已結清時只講權限，不提金額", () => {
@@ -37,5 +37,50 @@ describe("removeMemberMessage", () => {
     expect(removeMemberMessage({ name: "小明", balance: 80000, currency: "TWD" })).toContain(
       "確定要移除嗎？"
     );
+  });
+});
+
+describe("removeMemberPrompt", () => {
+  const base = { name: "阿嬤", balance: 0, currency: "TWD" };
+
+  it("沒有帳時不給選擇，也不要求打字", () => {
+    const prompt = removeMemberPrompt({ ...base, expenseCount: 0, paymentCount: 0 });
+    expect(prompt.hasRecords).toBe(false);
+    expect(prompt.requireText).toBeNull();
+    expect(prompt.message).toContain("還沒有任何支出與付款記錄");
+  });
+
+  it("有帳時要求打出名字才能真刪", () => {
+    const prompt = removeMemberPrompt({ ...base, expenseCount: 12, paymentCount: 2 });
+    expect(prompt.hasRecords).toBe(true);
+    expect(prompt.requireText).toBe("阿嬤");
+  });
+
+  it("把筆數數給使用者看", () => {
+    const prompt = removeMemberPrompt({ ...base, expenseCount: 12, paymentCount: 2 });
+    expect(prompt.message).toContain("12 筆支出");
+    expect(prompt.message).toContain("2 筆付款記錄");
+  });
+
+  // 這兩句是整個功能的風險揭露，少一句都不行。
+  it("講明會誤傷別人的帳", () => {
+    const prompt = removeMemberPrompt({ ...base, expenseCount: 12, paymentCount: 0 });
+    expect(prompt.message).toContain("別人付的");
+  });
+
+  it("講明結算紀錄裡他還在", () => {
+    const prompt = removeMemberPrompt({ ...base, expenseCount: 12, paymentCount: 0 });
+    expect(prompt.message).toContain("結算紀錄");
+  });
+
+  it("只有付款沒有支出時不會冒出「0 筆支出」", () => {
+    const prompt = removeMemberPrompt({ ...base, expenseCount: 0, paymentCount: 3 });
+    expect(prompt.message).toContain("3 筆付款記錄");
+    expect(prompt.message).not.toContain("0 筆支出");
+  });
+
+  it("沒有名字時用代稱", () => {
+    const prompt = removeMemberPrompt({ ...base, name: "", expenseCount: 0, paymentCount: 0 });
+    expect(prompt.title).toContain("這位成員");
   });
 });
