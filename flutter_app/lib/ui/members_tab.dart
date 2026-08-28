@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../domain/expense_actions.dart';
+import '../domain/member_footprint.dart';
 import '../domain/models.dart';
 import '../domain/offline_write.dart';
 import '../state/providers.dart';
+import 'remove_member_dialog.dart';
 import 'theme.dart';
 
 /// 任務的成員分頁。`src/components/member/MemberRow.vue` 與 TaskPage 的
@@ -126,48 +127,65 @@ class _MembersTabState extends ConsumerState<MembersTab> {
     );
   }
 
+  /// 移除成員。先算出他留下了哪些帳，再讓使用者決定要不要一起刪。
+  ///
+  /// 沒有帳的人不跳選擇，直接刪 —— 軟刪存在的唯一理由是「讓舊支出查得到
+  /// 暱稱」，沒有舊支出就沒有這個需求。
   Future<void> _remove(TaskMember member) async {
-    // 未結清時的後果要講清楚 —— 移除只拿掉權限，帳目原封不動，
-    // 但他從此看不到這個任務，也沒辦法自己記錄付款。
-    final settlement = ref.read(settlementProvider(widget.task.id)).value;
-    final balance = settlement?.balances
+    final expenses =
+        ref.read(expensesProvider(widget.task.id)).value ?? const <Expense>[];
+    final payments =
+        ref.read(paymentsProvider(widget.task.id)).value ?? const <Payment>[];
+    final footprint = memberFootprint(member.uid, expenses, payments);
+
+    // 沒出現在 balances 代表他還沒參與任何一筆支出，當作已結清。
+    final balance = ref
+            .read(settlementProvider(widget.task.id))
+            .value
+            ?.balances
             .where((b) => b.uid == member.uid)
             .map((b) => b.balance)
             .firstOrNull ??
         0;
 
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('移除成員'),
-        content: Text(removeMemberMessage(
-          name: member.nickname,
-          balance: balance,
-          currency: widget.task.defaultCurrency,
-        )),
-        actions: [
-          // 取消刻意用灰的：兩顆都是主色的話，紅的那顆就不顯眼了。
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.muted),
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('移除'),
-          ),
-        ],
+    final choice = await showRemoveMemberDialog(
+      context,
+      removeMemberPrompt(
+        name: member.nickname,
+        expenseCount: footprint.expenseIds.length,
+        paymentCount: footprint.paymentIds.length,
+        balance: balance,
+        currency: widget.task.defaultCurrency,
       ),
     );
-    if (ok != true) return;
 
+    if (!mounted || choice == RemoveMemberChoice.cancel) return;
+
+    final repository = ref.read(taskRepositoryProvider);
     await _run(
       member.uid,
-      () => ref
-          .read(taskRepositoryProvider)
-          .removeMember(widget.task.id, member.uid),
+      () => choice == RemoveMemberChoice.soft
+          ? repository.removeMember(widget.task.id, member.uid)
+          : repository.hardDeleteMember(widget.task.id, member.uid, footprint),
     );
+
+    if (choice != RemoveMemberChoice.hard) return;
+
+    // 真實移除連支出也刪了，那兩份快取要跟著失效。
+    ref.invalidate(expensesProvider(widget.task.id));
+    ref.invalidate(paymentsProvider(widget.task.id));
+
+    // 帳都刪乾淨了才清照片，best-effort —— 孤兒檔案是既有的設計取捨
+    // （見網頁版 receiptService 的 deleteReceipt 註解）。失敗不該讓已經
+    // 成功的刪除看起來像失敗了。
+    final receipts = ref.read(receiptRepositoryProvider);
+    for (final expenseId in footprint.expenseIds) {
+      try {
+        await receipts.delete(widget.task.id, expenseId);
+      } catch (_) {
+        // 檔案本來就不存在、或現在離線 —— 都不影響結果。
+      }
+    }
   }
 
   @override
