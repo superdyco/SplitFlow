@@ -708,6 +708,43 @@ async function main() {
     );
   });
 
+  // --- 真實刪除成員 ---
+  // 軟刪（active: false）留給「他確實參與過，但不該再看到這個任務」；
+  // 這條路是給「這個人根本不該在這裡」——加錯人、測試資料。
+  await test("admin 可以真的刪掉 member 文件", async () => {
+    await seed();
+    await assertSucceeds(deleteDoc(doc(as(ADMIN), "tasks", TASK, "members", OTHER)));
+  });
+
+  await test("admin 可以真的刪掉虛擬成員", async () => {
+    await seed();
+    await createVirtual(as(ADMIN));
+    await assertSucceeds(deleteDoc(doc(as(ADMIN), "tasks", TASK, "members", VIRTUAL)));
+  });
+
+  // 既有的軟刪走 managesMemberAsAdmin()，那裡面擋著 owner。新開的刪除路徑
+  // 如果不擋，admin 就能把 owner 從任務裡刪掉 —— 比軟刪能做的事還多。
+  await test("admin 不能刪掉 owner", async () => {
+    await seed();
+    await assertFails(deleteDoc(doc(as(ADMIN), "tasks", TASK, "members", OWNER)));
+  });
+
+  await test("一般成員不能刪 member 文件", async () => {
+    await seed();
+    await assertFails(deleteDoc(doc(as(MEMBER), "tasks", TASK, "members", OTHER)));
+  });
+
+  await test("外人不能刪 member 文件", async () => {
+    await seed();
+    await assertFails(deleteDoc(doc(as(OUTSIDER), "tasks", TASK, "members", OTHER)));
+  });
+
+  await test("封存的任務不能刪 member 文件", async () => {
+    await seed();
+    await updateDoc(doc(as(OWNER), "tasks", TASK), { status: "archived", updatedAt: serverTimestamp() });
+    await assertFails(deleteDoc(doc(as(ADMIN), "tasks", TASK, "members", OTHER)));
+  });
+
   // --- 被移除之後 ---
   await test("被移除的人不能再讀任務", async () => {
     await seed();

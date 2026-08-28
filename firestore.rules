@@ -189,7 +189,20 @@ service cloud.firestore {
             )
           ) || createsVirtualMember();
         allow update: if managesMemberAsAdmin() || rejoinsSelf();
-        allow delete: if false;
+
+        /*
+          真實刪除。軟刪（active: false）留給「他確實參與過，但不該再看到
+          這個任務」；這條是給「這個人根本不該在這裡」——加錯人、測試資料。
+
+          role != "owner" 不能少：軟刪走 managesMemberAsAdmin()，那裡面擋著
+          owner。這條不擋的話，admin 就能把 owner 從他自己的任務裡刪掉，
+          變成新路徑能做的事比舊路徑還多。
+
+          taskIsActive 是因為封存的任務唯讀 —— 封存之後不該還能改帳。
+        */
+        allow delete: if isTaskAdmin(taskId)
+          && taskIsActive(taskId)
+          && resource.data.role != "owner";
       }
 
       match /expenses/{expenseId} {
