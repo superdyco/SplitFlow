@@ -193,6 +193,8 @@ lib/domain/
   place_bias.dart       ← src/utils/placeBias.ts
   validation.dart       ← src/utils/firestore.ts 的驗證函式
   offline_write.dart    ← src/utils/offlineWrite.ts
+  virtual_member.dart   ← src/utils/virtualMember.ts
+  member_footprint.dart ← src/utils/memberFootprint.ts + memberRemoval.ts 的 prompt
 lib/data/
   mappers.dart          ← expenseService.ts 的 normalizeExpense 等
   firestore_refs.dart   ← 集中所有 Firestore 路徑
