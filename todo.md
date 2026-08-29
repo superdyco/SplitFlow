@@ -438,13 +438,58 @@ memberIds、加上 member 文件本身），是跨數十份文件的批次改寫
    付的那些。小明付的晚餐會連同他實際付出去的錢一起從帳上消失。這是刻意的決定，
    代價全部靠確認框揭露。
 
+## 已完成：新增支出推播通知（Android）
+
+有人記了一筆帳，同任務的其他人手機會跳通知。規格與計畫在
+`docs/superpowers/`（2026-08-28）。
+
+- **Firestore 觸發器，不是 client 呼叫。** 兩個理由，第二個才是關鍵：client
+  可以說謊（沒記帳也能叫別人的手機響），而且**離線記帳根本不會觸發** ——
+  排隊中的寫入是 Firestore SDK 之後自己送出的，那時 client 的程式碼早就沒在跑了。
+- **收件人是 `memberIds` 減掉 `createdBy`，不是減掉 `paidBy`。** 小明幫阿華記
+  一筆阿華付的錢，阿華要收到 —— 有人替他登了一筆帳，那正是他需要知道的。
+- 虛擬成員與已被移除的成員自動被排除，不需要特別判斷：前者沒有帳號就沒有
+  token 文件，後者在觸發當下已經不在 `memberIds` 裡。
+- token 存 `users/{uid}/tokens/{token}`，**文件 ID 就是 token 本身** ——
+  重新註冊時自動覆蓋，而 FCM 回報失效時函式手上正好有那串 token。
+  規則鎖成只有本人讀寫（函式用 Admin SDK 繞過規則）。
+- **登出必須在 `signOut()` 之前刪 token。** 順序反了規則會擋下刪除
+  （`isSelf(uid)` 不成立），而留著會讓下一個在這支手機登入的人收到前一個人的
+  旅程通知。這是真的隱私外洩，不是潔癖。
+- **權限在第一次進到任務時才問**，不在開 App 當下。那時使用者還不知道這 App
+  要幹嘛，直接按拒絕的機率很高，而 Android 拒絕兩次之後就再也不會跳系統對話框
+  —— 一旦踩到，那個人實務上等於永遠收不到通知。
+- 點通知的導頁走一個 provider 傳遞待處理的 taskId，任務列表掛載後才 push。
+  太早導會疊在登入頁上面，而那時讀任務會被規則擋下。**沒有重構成 go_router** ——
+  那是另一件事。
+- 前景收到通知刻意不做任何事：Firestore 的 listener 已經讓畫面自己更新了。
+
+⚠️ **iOS 沒做。** 現在連建置都做不到：沒有 Mac（iOS 只能在 macOS 編譯）、
+`ios/` 只是 `flutter create` 的預設骨架、沒有 `GoogleService-Info.plist`，
+而且 APNs 憑證要 Apple Developer Program（年費 US$99）。但**資料模型與函式
+都不綁死平台**（token 存 `platform` 欄位），之後補 iOS 不用改函式那半。
+
+⚠️ **網頁版不做**，使用者明確指定只要 App。
+
+⚠️ **已知負債：金額格式化現在有三份實作**（網頁版 `src/utils/currency.ts`、
+Flutter `lib/domain/currency.dart`、函式 `functions/src/amount.ts`）。
+沒有更好的辦法 —— 函式部署時只上傳 `functions/` 目錄，import 上層的 `src/`
+會在部署後找不到檔案；讓 client 先算好寫進文件更糟，那是可以被竄改的顯示字串。
+防止走鐘的是 `tests/currencyParity.test.ts`：它把網頁版與函式那兩份放在一起
+跑 153 組幣別×金額，不一致就紅。Flutter 那份語言不同對不進來，靠
+`flutter_app/test/` 裡對齊的案例守著。
+
+**還沒驗到的**：通知真的送達。那需要兩個帳號各一台裝置，而開發機上只有一個帳號。
+已驗的是觸發器會跑、沒有錯誤、權限時機正確、規則允許 token 寫入。
+
 ## 待辦：用 GitHub Actions 跑規則測試
 
-本機裝不了 JDK 21（公司擋 Microsoft Store，winget 取不到來源），但 GitHub 的 runner
-內建 Java。加一個 workflow 在每次 push 跑 `npm run test:rules`，就能繞過本機限制。
+**（原本的理由已經不成立：本機的 JDK 21 裝好了，`npm run test:rules` 跑得起來，
+164 + 13 個測試全過。）**
 
-這比裝 JDK 更值得做：規則會一直改，而規則出錯的代價是資料外洩或功能整個壞掉 ——
-那正是最該有自動化把關的地方，不該依賴某一台機器的環境。
+仍然值得做，但理由變成「不要依賴某一台機器的環境」：規則會一直改，而規則出錯的
+代價是資料外洩或功能整個壞掉 —— 那正是最該有自動化把關的地方。GitHub 的 runner
+內建 Java，加一個 workflow 在每次 push 跑 `npm run test:rules` 就好。
 
 ## 待辦：確認框統一
 

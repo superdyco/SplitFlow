@@ -8,7 +8,7 @@
 
 跑得起來的：登入與第一次取暱稱、任務列表（含封存／解除／刪除）、建立任務、
 支出列表與新增／編輯支出、成員管理（升降權限、移除）、結算與付款記錄／確認、
-地點搜尋與地圖、收據拍照、結算紀錄與分類圖表、邀請連結、個人設定。
+地點搜尋與地圖、收據拍照、結算紀錄與分類圖表、邀請連結、推播通知、個人設定。
 
 驗證方式是拿正式資料庫裡的越南任務（15 人、100 筆支出、含既有付款）
 在模擬器上實際操作 —— 不是只看畫面長出來，而是每個寫入都做完一次來回：
@@ -177,37 +177,50 @@ keytool -list -v -keystore ~/.android/debug.keystore   -alias androiddebugkey -s
 ## 已經搬過來的
 
 ```
-lib/domain/
+lib/domain/            純邏輯，不 import Flutter 也不 import Firebase
   currency.dart         ← src/utils/currency.ts
-  models.dart           ← src/types/expense.ts、payment.ts、settlement.ts
+  models.dart           ← src/types/ 底下的型別
   settlement.dart       ← src/utils/settlement.ts
   my_cost.dart          ← src/utils/myCost.ts
   task_status.dart      ← src/utils/taskStatus.ts + taskRole.ts
+  task_actions.dart     ← TaskListPage.vue 的封存／刪除確認邏輯
   expense_date.dart     ← src/utils/expenseDate.ts
   expense_groups.dart   ← src/utils/expenseGroups.ts
   category_totals.dart  ← src/utils/categoryTotals.ts
-  expense_actions.dart  ← src/utils/repeatExpense.ts + memberRemoval.ts
+  expense_actions.dart  ← src/utils/repeatExpense.ts
+  payment_actions.dart  ← SettlementPanel.vue 的 can* 權限判斷
   settlement_text.dart  ← src/utils/settlementText.ts
   auth_error.dart       ← src/utils/authError.ts
   receipt_policy.dart   ← src/utils/receiptPolicy.ts
   place_bias.dart       ← src/utils/placeBias.ts
+  place_search.dart     ← src/services/placeService.ts 不碰網路的那半
+  bias_memory.dart      ← placeService.ts 的 recall/rememberPlaceBias
+  invite.dart           ← src/utils/firestore.ts 的 buildInviteUrl
   validation.dart       ← src/utils/firestore.ts 的驗證函式
   offline_write.dart    ← src/utils/offlineWrite.ts
   virtual_member.dart   ← src/utils/virtualMember.ts
-  member_footprint.dart ← src/utils/memberFootprint.ts + memberRemoval.ts 的 prompt
-lib/data/
+  member_footprint.dart ← src/utils/memberFootprint.ts + memberRemoval.ts
+lib/data/              真的碰 Firestore / Storage / 系統服務的地方
   mappers.dart          ← expenseService.ts 的 normalizeExpense 等
   firestore_refs.dart   ← 集中所有 Firestore 路徑
   task_repository.dart  ← taskService.ts + memberService.ts
-  expense_repository.dart ← expenseService.ts + paymentService.ts
+  expense_repository.dart ← expenseService.ts + paymentService.ts + settlementService.ts
   auth_repository.dart  ← authService.ts + userService.ts
-test/                   （151 項，全過）
+  receipt_repository.dart ← receiptService.ts（沒有離線佇列，見下）
+  receipt_picker.dart   ← imageCompress.ts（改用 image_picker 的原生縮放）
+  place_service.dart    ← placeService.ts 的 REST 呼叫
+  bias_store.dart       ← 那份記憶存進 SharedPreferences
+  geolocation.dart      ← src/services/geolocation.ts
+  rate_service.dart     ← src/services/rateService.ts
+  push_repository.dart  ← 原生獨有：FCM token 的註冊與清除
+  app_identity.dart     ← 原生獨有：套件名與簽章，給 Places 的 REST 請求署名
+test/                   （247 項，全過）
 ```
 
 **測試涵蓋率不平均，而且是刻意的。** `lib/domain/` 與 `mappers.dart`
 測得很密（那裡是算錢與吞舊資料的地方）；repository 一項都沒有，因為那需要
 模擬器或實機。等有裝置之後，這個 repo 已經有 Firestore 模擬器的設定
-（根目錄 `firebase.json`），現有的 137 條安全規則測試也是跑在同一個模擬器上。
+（根目錄 `firebase.json`），現有的安全規則測試（164 條 Firestore + 13 條 Storage）也是跑在同一個模擬器上。
 
 **記帳需要的純邏輯到此搬完。** 網頁版剩下沒搬的，理由都在下一節。
 
@@ -390,7 +403,13 @@ JS 往正無窮（-0.5 → -0），Dart 往遠離零（-0.5 → -1）。目前�
 | | 在哪裡 |
 | --- | --- |
 | 記帳、支出、成員、結算 | Flutter 原生 |
+| **新增支出的推播通知** | **只有原生有**（網頁版不做，見下）|
 | 公開報告 `/r/...`、探索、收藏 | **留在現有網頁版** |
+
+推播是**反過來的一項**：其他功能都是網頁版有、原生補上，這一項是原生獨有。
+網頁推播要處理 service worker、各家瀏覽器的權限模型與 Safari 的一堆限制，
+而使用者明確指定只要 App。伺服器端（`functions/`）不綁死平台，哪天想補
+網頁或 iOS，函式那半不用改。
 
 好處是這個 Flutter 專案不用編 Web、不用管 SEO 與連結預覽，可以專心做
 「手機上記帳」這件它真正贏的事 —— 而那也正是量測顯示網頁版最吃虧的地方
