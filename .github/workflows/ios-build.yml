@@ -1,0 +1,65 @@
+name: iOS Build Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "flutter_app/**"
+      - ".github/workflows/ios-build.yml"
+  pull_request:
+    paths:
+      - "flutter_app/**"
+      - ".github/workflows/ios-build.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Analyze, test and build iOS
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: flutter_app
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.1"
+          channel: stable
+          cache: true
+
+      - name: Install Dart dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart code
+        run: dart analyze
+
+      - name: Run tests
+        run: dart test --reporter compact
+
+      - name: Install iOS dependencies
+        working-directory: flutter_app/ios
+        run: pod install
+
+      - name: Build iOS without code signing
+        run: flutter build ios --release --no-codesign
+
+      - name: Upload unsigned app
+        uses: actions/upload-artifact@v4
+        with:
+          name: simple-split-ios-unsigned
+          path: flutter_app/build/ios/iphoneos/Runner.app
+          retention-days: 7
+          if-no-files-found: error
