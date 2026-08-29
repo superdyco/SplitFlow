@@ -89,6 +89,13 @@ a {
   height: 38px;
 }
 
+.brand-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
 .avatar {
   width: 42px;
   height: 42px;

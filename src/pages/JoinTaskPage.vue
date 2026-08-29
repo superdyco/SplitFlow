@@ -109,7 +109,7 @@ onMounted(load);
       <ErrorState v-else :message="error" />
 
       <div v-if="invite && !error" class="card stack invite-card">
-        <p class="tiny">JOIN SPLITFLOW</p>
+        <p class="tiny">加入簡單分帳</p>
         <h1 class="title">{{ invite.taskName }}</h1>
         <p class="muted">主要幣別 {{ invite.defaultCurrency }} · {{ invite.startDate || "未設定日期" }} - {{ invite.endDate || "未設定日期" }}</p>
         <ProviderButtons v-if="!authStore.user" :pending="pending" action="登入" @select="login" />

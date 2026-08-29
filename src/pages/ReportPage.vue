@@ -288,7 +288,7 @@ onMounted(load);
 
       <p class="tiny center footer">
         <template v-if="generatedAt">產生於 {{ generatedAt }} · </template>
-        由 <a href="/">SplitFlow</a> 產生
+        由 <a href="/">簡單分帳</a> 產生
       </p>
     </template>
   </div>

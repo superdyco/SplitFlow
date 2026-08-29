@@ -30,7 +30,7 @@ class Geolocation {
     // 只能自己去系統設定改，這件事一定要說出來。
     if (permission == LocationPermission.deniedForever) {
       throw const LocationFailure(
-        '定位權限被永久拒絕了。到系統設定 → 應用程式 → SplitFlow → 權限，把位置打開。',
+        '定位權限被永久拒絕了。到系統設定 → 應用程式 → 簡單分帳 → 權限，把位置打開。',
       );
     }
     if (permission == LocationPermission.denied) {

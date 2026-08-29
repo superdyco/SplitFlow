@@ -12,8 +12,8 @@ const initial = computed(() => userStore.profile?.nickname?.charAt(0).toUpperCas
     <section class="shell">
       <header class="topbar">
         <RouterLink to="/tasks" class="brand">
-          <span class="brand-mark">分</span>
-          <span>SplitFlow</span>
+          <img src="/logo.png" alt="" class="brand-logo" />
+          <span>簡單分帳</span>
         </RouterLink>
         <RouterLink v-if="userStore.profile" to="/profile" class="avatar" aria-label="個人設定">
           {{ initial }}

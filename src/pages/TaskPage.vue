@@ -476,7 +476,7 @@ onMounted(load);
                 <span class="tiny muted block">
                   {{
                     reportState.report.value.active
-                      ? "讓所有 SplitFlow 使用者在「探索」找得到這趟旅程"
+                      ? "讓所有簡單分帳使用者在「探索」找得到這趟旅程"
                       : "連結關著的時候不能公開"
                   }}
                 </span>

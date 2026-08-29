@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "SplitFlow 分帳小夥伴",
-  "short_name": "分帳小夥伴",
+  "name": "簡單分帳",
+  "short_name": "簡單分帳",
   "description": "跟朋友一起記錄共同支出，自動算出誰該付誰多少。",
   "lang": "zh-Hant",
   "dir": "ltr",

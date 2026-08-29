@@ -45,7 +45,7 @@ function receiptLine(queued: number[] | null): string {
 
 export function buildDiagnosticsText(input: DiagnosticsInput): string {
   const lines = [
-    "SplitFlow 診斷資訊",
+    "簡單分帳診斷資訊",
     `版本 ${input.version}`,
     `使用者 ${input.uid || "未登入"}`,
     `登入方式 ${input.loginMethod || "查不到"}`,

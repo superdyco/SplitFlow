@@ -49,28 +49,20 @@ class _SignInPageState extends ConsumerState<SignInPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  child: const Text(
-                    '分',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                    ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: Image.asset(
+                    'assets/brand/app-logo.png',
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
                   ),
                 ),
                 const SizedBox(height: 24),
                 Text('一趟旅行\n一份帳單', style: text.headlineSmall),
                 const SizedBox(height: 12),
                 Text(
-                  '登入 SplitFlow，建立任務、邀請同行成員，記帳與結算都用真實資料。'
+                  '登入簡單分帳，建立任務、邀請同行成員，記帳與結算都用真實資料。'
                   '之後會請你取一個同行的人看得到的暱稱。',
                   style: text.bodyMedium?.copyWith(color: AppColors.muted),
                 ),

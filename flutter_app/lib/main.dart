@@ -61,7 +61,7 @@ class SplitFlowApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SplitFlow',
+      title: '簡單分帳',
       theme: buildAppTheme(),
       home: initError != null ? _FatalPage(message: initError!) : const _Root(),
     );

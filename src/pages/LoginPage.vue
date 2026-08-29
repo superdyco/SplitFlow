@@ -35,10 +35,10 @@ async function login(provider: SignInProvider) {
 <template>
   <AuthLayout>
     <div class="stack">
-      <div class="brand-mark logo">分</div>
+      <img src="/logo.png" alt="簡單分帳" class="logo" />
       <h1 class="title">一趟旅行<br />一份帳單</h1>
       <p class="muted">
-        登入 SplitFlow，建立任務、邀請同行成員，記帳與結算都用真實資料。
+        登入簡單分帳，建立任務、邀請同行成員，記帳與結算都用真實資料。
         用哪一種帳號登入都可以，之後會請你取一個同行的人看得到的暱稱。
       </p>
       <ErrorState :message="error" />
@@ -55,6 +55,6 @@ async function login(provider: SignInProvider) {
   width: 64px;
   height: 64px;
   border-radius: 22px;
-  font-size: 26px;
+  object-fit: cover;
 }
 </style>
