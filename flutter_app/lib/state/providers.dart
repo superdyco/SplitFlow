@@ -6,6 +6,7 @@ import '../data/bias_store.dart';
 import '../data/expense_repository.dart';
 import '../data/geolocation.dart';
 import '../data/place_service.dart';
+import '../data/push_repository.dart';
 import '../data/receipt_picker.dart';
 import '../data/receipt_repository.dart';
 import '../data/task_repository.dart';
@@ -41,6 +42,9 @@ final geolocationProvider = Provider((ref) => Geolocation());
 /// 收據。picker 是拍照／選圖，repository 是 Storage。
 final receiptPickerProvider = Provider((ref) => ReceiptPicker());
 final receiptRepositoryProvider = Provider((ref) => ReceiptRepository());
+
+/// 推播。註冊 token、清除 token、問通知權限。
+final pushRepositoryProvider = Provider((ref) => PushRepository());
 
 /// 一張收據的下載網址。
 ///

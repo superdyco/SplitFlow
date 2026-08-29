@@ -17,6 +17,10 @@ dependencies:
   cloud_firestore: ^5.4.4
   firebase_storage: ^12.3.4
 
+  # 推播。只註冊／清除 token 與問權限 —— 真正決定要通知誰的是
+  # Cloud Function（見 functions/src/index.ts）。
+  firebase_messaging: ^15.1.3
+
   # 狀態管理。選 Riverpod 是因為 provider 的取用不綁 widget tree，
   # 領域邏輯那層可以完全不知道 Flutter 存在 —— 跟現在 composables 的分法一致。
   flutter_riverpod: ^2.5.1

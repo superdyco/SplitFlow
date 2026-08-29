@@ -86,7 +86,21 @@ class AuthRepository {
     }
   }
 
-  Future<void> signOut() async {
+  /// 登出。
+  ///
+  /// [onBeforeSignOut] 在清掉 Firebase Auth **之前**跑，給推播 token 的清除
+  /// 用。順序不能反：auth 清掉之後 `isSelf(uid)` 就不成立，規則會擋下刪除，
+  /// 而留著會讓下一個在這支手機登入的人收到前一個人的通知。
+  ///
+  /// 清除失敗不該擋住登出 —— 使用者按了登出就是要離開，卡在那裡更糟。
+  Future<void> signOut({Future<void> Function()? onBeforeSignOut}) async {
+    if (onBeforeSignOut != null) {
+      try {
+        await onBeforeSignOut();
+      } catch (_) {
+        // 沒網路或 token 本來就不在 —— 都不該讓登出失敗。
+      }
+    }
     await GoogleSignIn.instance.signOut();
     await _auth.signOut();
   }

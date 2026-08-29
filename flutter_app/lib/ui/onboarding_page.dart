@@ -157,7 +157,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             TextButton(
               onPressed: _saving
                   ? null
-                  : () => ref.read(authRepositoryProvider).signOut(),
+                  : () => ref.read(authRepositoryProvider).signOut(
+                        onBeforeSignOut: () => ref
+                            .read(pushRepositoryProvider)
+                            .removeToken(widget.user.uid),
+                      ),
               child: const Text('用別的帳號登入'),
             ),
           ],

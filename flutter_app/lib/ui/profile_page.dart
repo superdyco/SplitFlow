@@ -173,7 +173,14 @@ class _FormState extends ConsumerState<_Form> {
         OutlinedButton(
           style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
           onPressed: () async {
-            await ref.read(authRepositoryProvider).signOut();
+            // 先刪這台裝置的推播 token，再清 auth。反過來的話規則會擋下刪除，
+            // 而留著會讓下一個在這支手機登入的人收到前一個人的旅程通知。
+            final uid = ref.read(authStateProvider).value?.uid;
+            await ref.read(authRepositoryProvider).signOut(
+                  onBeforeSignOut: uid == null
+                      ? null
+                      : () => ref.read(pushRepositoryProvider).removeToken(uid),
+                );
             if (context.mounted) Navigator.of(context).pop();
           },
           child: const Text('登出'),

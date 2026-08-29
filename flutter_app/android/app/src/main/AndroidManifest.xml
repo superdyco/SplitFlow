@@ -12,6 +12,10 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
+    <!-- Android 13 起通知是 runtime permission。宣告在這裡只是讓系統認得，
+         真正要不要跳對話框由程式決定 —— 見 PushRepository.requestPermission。 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:label="splitflow"
         android:name="${applicationName}"
