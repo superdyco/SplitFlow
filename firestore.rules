@@ -99,6 +99,25 @@ service cloud.firestore {
         && request.resource.data.keys().size() <= 16;
     }
 
+    /*
+      這台裝置的推播 token。**純私人資料**，形狀跟收藏一樣的理由也一樣 ——
+      別人不該知道你用哪台裝置，更不該寫得進你的名下。
+
+      Cloud Function 用 Admin SDK 讀，繞過規則，所以這裡可以鎖死成只有本人。
+
+      文件 ID 就是 token 本身：重新註冊時自動覆蓋（冪等），而 FCM 回報某個
+      token 失效時函式手上正好有那串 token，直接刪那份文件就好。
+
+      欄位數上限跟收藏同一個理由：這個集合沒有人讀得到（除了本人與函式），
+      不擋的話就是一塊免費的私人儲存空間。
+    */
+    match /users/{uid}/tokens/{token} {
+      allow read, delete: if isSelf(uid);
+      allow create, update: if isSelf(uid)
+        && request.resource.data.platform is string
+        && request.resource.data.keys().size() <= 8;
+    }
+
     match /users/{uid} {
       allow read: if isSelf(uid);
       allow create: if isSelf(uid)

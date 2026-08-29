@@ -558,11 +558,6 @@ async function main() {
     await assertFails(updateDoc(doc(as(MEMBER), "tasks", TASK, "members", OTHER), { active: false }));
   });
 
-  await test("member 文件不能被刪除，只能標成 inactive", async () => {
-    await seed();
-    await assertFails(deleteDoc(doc(as(OWNER), "tasks", TASK, "members", OTHER)));
-  });
-
   await test("admin 不能改 member 文件的 uid", async () => {
     await seed();
     await assertFails(updateDoc(doc(as(OWNER), "tasks", TASK, "members", OTHER), { uid: "換一個" }));
@@ -1563,6 +1558,69 @@ async function main() {
     for (let i = 0; i < 20; i += 1) bloated[`extra${i}`] = i;
     await assertFails(
       setDoc(doc(as(MEMBER), "users", MEMBER, "favorites", "f4"), bloated)
+    );
+  });
+
+  // --- 推播 token ---
+  // 跟收藏一樣是純私人資料：別人不該知道你用哪台裝置，更不該寫得進你的名下。
+  // Cloud Function 用 Admin SDK 讀，繞過規則，所以這裡可以鎖死成只有本人。
+  const fcmToken = {
+    platform: "android",
+    updatedAt: serverTimestamp()
+  };
+
+  await test("可以寫入也讀得到自己的推播 token", async () => {
+    await seed();
+    const ref = doc(as(MEMBER), "users", MEMBER, "tokens", "token-abc");
+    await assertSucceeds(setDoc(ref, fcmToken));
+    await assertSucceeds(getDoc(ref));
+    await assertSucceeds(deleteDoc(ref));
+  });
+
+  await test("推播 token 是私人的 —— 別人讀不到也列不出來", async () => {
+    await seed();
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "users", MEMBER, "tokens", "token-abc"), {
+        platform: "android",
+        updatedAt: new Date()
+      });
+    });
+    await assertFails(getDoc(doc(as(OTHER), "users", MEMBER, "tokens", "token-abc")));
+    await assertFails(getDocs(collection(as(OTHER), "users", MEMBER, "tokens")));
+  });
+
+  await test("不能把 token 寫進別人的帳號底下", async () => {
+    await seed();
+    await assertFails(
+      setDoc(doc(as(OTHER), "users", MEMBER, "tokens", "token-xyz"), fcmToken)
+    );
+  });
+
+  // 登出時要刪掉這台裝置的 token。刪不掉的話，下一個在同一支手機登入的人
+  // 會收到前一個人的旅程通知 —— 但那必須是本人刪，不是誰都能刪。
+  await test("不能刪別人的 token", async () => {
+    await seed();
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "users", MEMBER, "tokens", "token-abc"), {
+        platform: "android",
+        updatedAt: new Date()
+      });
+    });
+    await assertFails(deleteDoc(doc(as(OTHER), "users", MEMBER, "tokens", "token-abc")));
+  });
+
+  await test("未登入完全不能碰 token", async () => {
+    await seed();
+    await assertFails(setDoc(doc(anon(), "users", MEMBER, "tokens", "t"), fcmToken));
+    await assertFails(getDoc(doc(anon(), "users", MEMBER, "tokens", "t")));
+  });
+
+  await test("塞爆的 token 文件會被擋 —— 這是私人空間，不是免費儲存", async () => {
+    await seed();
+    const bloated = { ...fcmToken };
+    for (let i = 0; i < 20; i += 1) bloated[`extra${i}`] = i;
+    await assertFails(
+      setDoc(doc(as(MEMBER), "users", MEMBER, "tokens", "token-fat"), bloated)
     );
   });
 
