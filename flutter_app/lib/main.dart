@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'firebase_options.dart';
+import 'state/pending_task.dart';
 import 'state/providers.dart';
 import 'ui/onboarding_page.dart';
 import 'ui/sign_in_page.dart';
@@ -26,7 +30,27 @@ Future<void> main() async {
     error = err.toString();
   }
 
-  runApp(ProviderScope(child: SplitFlowApp(initError: error)));
+  // App 完全關閉時點通知，訊息會在這裡拿到 —— 之後的 onMessageOpenedApp
+  // 不會再送一次，所以兩個都要接。
+  String? pendingTaskId;
+  if (error == null) {
+    try {
+      final initial = await FirebaseMessaging.instance.getInitialMessage();
+      pendingTaskId = initial?.data['taskId'] as String?;
+    } catch (_) {
+      // 沒有 Google Play 服務的裝置這裡會丟。收不到通知不該讓 App 開不起來。
+    }
+  }
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        if (pendingTaskId != null)
+          pendingTaskIdProvider.overrideWith((ref) => pendingTaskId),
+      ],
+      child: SplitFlowApp(initError: error),
+    ),
+  );
 }
 
 class SplitFlowApp extends StatelessWidget {
@@ -59,11 +83,47 @@ class SplitFlowApp extends StatelessWidget {
 /// 用 stream 而不是一次性讀取：Firebase 還原登入狀態是非同步的，開 App 當下
 /// `currentUser` 可能還是 null，等一下才變成使用者。只看第一眼的話，
 /// 已登入的人會先閃一下登入頁。
-class _Root extends ConsumerWidget {
+class _Root extends ConsumerStatefulWidget {
   const _Root();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_Root> createState() => _RootState();
+}
+
+class _RootState extends ConsumerState<_Root> {
+  StreamSubscription<RemoteMessage>? _opened;
+  StreamSubscription<String>? _refreshed;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // App 還活著但在背景時點通知走這條。完全關閉那條在 main() 的
+    // getInitialMessage —— 兩條都要接，它們不會互相補位。
+    _opened = FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      final taskId = message.data['taskId'] as String?;
+      if (taskId != null) {
+        ref.read(pendingTaskIdProvider.notifier).state = taskId;
+      }
+    });
+
+    // token 會自己輪替。不接的話換發之後伺服器手上那份就是死的，
+    // 而使用者完全不會察覺 —— 只是再也收不到通知。
+    _refreshed = ref.read(pushRepositoryProvider).onTokenRefresh().listen((_) {
+      final uid = ref.read(authStateProvider).value?.uid;
+      if (uid != null) ref.read(pushRepositoryProvider).registerToken(uid);
+    });
+  }
+
+  @override
+  void dispose() {
+    _opened?.cancel();
+    _refreshed?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final auth = ref.watch(authStateProvider);
 
     return auth.when(

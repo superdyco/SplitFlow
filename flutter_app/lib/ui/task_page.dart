@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/expense_groups.dart';
 import '../domain/models.dart';
@@ -33,6 +34,47 @@ class _TaskPageState extends ConsumerState<TaskPage> {
   /// 記「收合了哪幾天」而不是「展開了哪幾天」，這樣預設全展開，
   /// 新的一天出現時也會是展開的，不用另外處理。
   final Set<String> _collapsed = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // 不 await —— 問權限不該擋住任務載入，而且對話框是系統畫的，
+    // 跟這一頁的 build 沒有先後關係。
+    _askPushPermissionOnce();
+  }
+
+  /// 第一次進任務時問一次通知權限，問過就不再問。
+  ///
+  /// 不在開 App 當下問是因為那時使用者還不知道這 App 要幹嘛，直接按拒絕的
+  /// 機率很高 —— 而 Android 拒絕兩次之後就再也不會跳系統對話框。走到這一頁
+  /// 代表他已經在跟人分帳了，「有人記帳要不要通知你」是個看得懂的問題。
+  Future<void> _askPushPermissionOnce() async {
+    final uid = ref.read(authStateProvider).value?.uid;
+    if (uid == null) return;
+
+    final push = ref.read(pushRepositoryProvider);
+
+    // 已經給過權限的人不必再問，但**還是要註冊 token** —— 換裝置、重灌、
+    // 或 token 輪替時它會變，而那些情況都不會再跳一次對話框。
+    if (await push.hasPermission()) {
+      await push.registerToken(uid);
+      return;
+    }
+
+    // prefs 讀不到就當作沒問過。多問一次比永遠不問好 —— 系統那邊本來就
+    // 只會跳兩次。
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('asked_push_permission') == true) return;
+    } catch (_) {
+      prefs = null;
+    }
+    await prefs?.setBool('asked_push_permission', true);
+
+    if (!await push.requestPermission()) return;
+    await push.registerToken(uid);
+  }
 
   Future<void> _reload() async {
     ref.invalidate(taskProvider(widget.taskId));

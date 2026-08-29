@@ -7,6 +7,7 @@ import '../domain/my_cost.dart';
 import '../domain/offline_write.dart';
 import '../domain/task_actions.dart';
 import '../domain/task_status.dart';
+import '../state/pending_task.dart';
 import '../state/providers.dart';
 import 'create_task_page.dart';
 import 'profile_page.dart';
@@ -32,6 +33,25 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
   Map<String, int>? _costs;
   bool _costsBusy = false;
   String? _costsError;
+
+  @override
+  void initState() {
+    super.initState();
+    // 走到這一頁代表登入狀態已經確定了，這時導頁才安全。
+    // 用 addPostFrameCallback 是因為 initState 當下還不能 push。
+    WidgetsBinding.instance.addPostFrameCallback((_) => _consumePendingTask());
+  }
+
+  /// 點通知帶進來的任務，開一次就消費掉。
+  void _consumePendingTask() {
+    final taskId = ref.read(pendingTaskIdProvider);
+    if (taskId == null || !mounted) return;
+
+    ref.read(pendingTaskIdProvider.notifier).state = null;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => TaskPage(taskId: taskId)),
+    );
+  }
 
   /// 點卡片進任務頁。
   ///
@@ -126,6 +146,12 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
 
   @override
   Widget build(BuildContext context) {
+    // App 已經停在任務列表上時收到點擊，走的是這條 —— initState 那次
+    // 早就跑完了。
+    ref.listen<String?>(pendingTaskIdProvider, (_, next) {
+      if (next != null) _consumePendingTask();
+    });
+
     final tasks = ref.watch(tasksProvider);
     final text = Theme.of(context).textTheme;
 
