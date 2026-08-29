@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 
 import 'firestore_refs.dart';
 
@@ -40,13 +41,25 @@ class PushRepository {
   /// 拿不到 token 就安靜地什麼都不做 —— 沒有網路、或使用者拒絕了通知權限
   /// 都會是這個結果，那不該讓任何畫面失敗。
   Future<void> registerToken(String uid) async {
-    final token = await _messaging.getToken();
-    if (token == null) return;
+    try {
+      // iOS 的 FCM token 建立在 APNs token 之上。權限對話框剛關閉時 APNs
+      // 常常還沒回來，立刻 getToken 會丟 apns-token-not-set。短等一下不擋 UI
+      // （呼叫端本來就不 await 畫面），仍拿不到就交給 onTokenRefresh 補註冊。
+      if (defaultTargetPlatform == TargetPlatform.iOS &&
+          !await _waitForApnsToken()) {
+        return;
+      }
 
-    await _tokenRef(uid, token).set({
-      'platform': 'android',
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+      final token = await _messaging.getToken();
+      if (token == null) return;
+
+      await _tokenRef(uid, token).set({
+        'platform': pushPlatformName(defaultTargetPlatform),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // 推播是旁支。APNs/FCM 暫時不可用不能讓任務頁變成未處理例外。
+    }
   }
 
   /// token 會自己輪替，換新的就寫進去。
@@ -66,13 +79,34 @@ class PushRepository {
   /// 結果是對的，但中間那段時間伺服器手上還有一個指向這台裝置、卻掛在
   /// 前一個帳號下的 token。
   Future<void> removeToken(String uid) async {
-    final token = await _messaging.getToken();
-    if (token == null) return;
+    try {
+      final token = await _messaging.getToken();
+      if (token == null) return;
 
-    await _tokenRef(uid, token).delete();
-    await _messaging.deleteToken();
+      await _tokenRef(uid, token).delete();
+      await _messaging.deleteToken();
+    } catch (_) {
+      // 呼叫端仍會完成登出；伺服器送到失效 token 時也會自動清除。
+    }
+  }
+
+  Future<bool> _waitForApnsToken() async {
+    for (var attempt = 0; attempt < 10; attempt++) {
+      if (await _messaging.getAPNSToken() != null) return true;
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    return false;
   }
 
   DocumentReference<Map<String, dynamic>> _tokenRef(String uid, String token) =>
       usersRef.doc(uid).collection('tokens').doc(token);
 }
+
+String pushPlatformName(TargetPlatform platform) => switch (platform) {
+      TargetPlatform.android => 'android',
+      TargetPlatform.iOS => 'ios',
+      TargetPlatform.macOS => 'macos',
+      TargetPlatform.windows => 'windows',
+      TargetPlatform.linux => 'linux',
+      TargetPlatform.fuchsia => 'fuchsia',
+    };

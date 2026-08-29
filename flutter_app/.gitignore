@@ -46,3 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# iOS 的 Google Maps 金鑰。提交 Secrets.xcconfig.example，不提交正式值。
+/ios/Flutter/Secrets.xcconfig

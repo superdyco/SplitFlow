@@ -9,6 +9,8 @@
 /// 沒有 gapi。那正是把記帳搬到原生最直接的好處之一。
 library;
 
+import 'package:flutter/foundation.dart';
+
 import '../domain/auth_error.dart' as domain;
 import '../domain/models.dart';
 import 'firestore_refs.dart';
@@ -35,6 +37,10 @@ class SignInCancelled implements Exception {
 const String _serverClientId =
     '816128125030-tinjkkds5qmqqmfbldrhivdc217tmqpa.apps.googleusercontent.com';
 
+/// iOS 原生 OAuth client id。公開識別碼，不是私密金鑰；URL Scheme 是它的反向字串。
+const String _iosClientId =
+    '816128125030-418l0jhp8hel8golo7nb3c4ccv357pot.apps.googleusercontent.com';
+
 class AuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -43,7 +49,11 @@ class AuthRepository {
 
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
-    await GoogleSignIn.instance.initialize(serverClientId: _serverClientId);
+    await GoogleSignIn.instance.initialize(
+      clientId:
+          defaultTargetPlatform == TargetPlatform.iOS ? _iosClientId : null,
+      serverClientId: _serverClientId,
+    );
     _initialized = true;
   }
 
