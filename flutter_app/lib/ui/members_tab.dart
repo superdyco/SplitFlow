@@ -116,15 +116,26 @@ class _MembersTabState extends ConsumerState<MembersTab> {
         ref.read(paymentsProvider(widget.task.id)).value ?? const <Payment>[];
     final footprint = memberFootprint(member.uid, expenses, payments);
 
-    // 沒出現在 balances 代表他還沒參與任何一筆支出，當作已結清。
-    final balance = ref
-            .read(settlementProvider(widget.task.id))
-            .value
-            ?.balances
-            .where((b) => b.uid == member.uid)
-            .map((b) => b.balance)
-            .firstOrNull ??
-        0;
+    // **等結算算完再問**，不要用 `.value ?? 0`。
+    //
+    // AsyncValue 還在載入時 `.value` 是 null，跟「他不在 balances 裡」
+    // 長得一樣 —— 兩者都會變成 0，於是對話框在一個不可逆的決定前面
+    // 告訴使用者「他沒有欠款」，而其實有。
+    //
+    // 真的算不出來（離線、規則擋下）就傳 null，訊息會照實說算不出餘額。
+    int? balance;
+    try {
+      final settlement = await ref.read(settlementProvider(widget.task.id).future);
+      // 沒出現在 balances 代表他還沒參與任何一筆支出，那才真的是已結清。
+      balance = settlement.balances
+              .where((b) => b.uid == member.uid)
+              .map((b) => b.balance)
+              .firstOrNull ??
+          0;
+    } catch (_) {
+      balance = null;
+    }
+    if (!mounted) return;
 
     final choice = await showRemoveMemberDialog(
       context,
@@ -134,6 +145,8 @@ class _MembersTabState extends ConsumerState<MembersTab> {
         paymentCount: footprint.paymentIds.length,
         balance: balance,
         currency: widget.task.defaultCurrency,
+        virtual: member.virtual,
+        othersPaid: footprint.othersPaid,
       ),
     );
 

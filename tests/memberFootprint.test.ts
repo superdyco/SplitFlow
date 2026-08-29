@@ -72,9 +72,37 @@ describe("memberFootprint", () => {
     expect(result.paymentIds).toEqual(["p1", "p2"]);
   });
 
+  describe("othersPaid", () => {
+    // 真實移除會把整筆支出刪掉，所以只有「別人付的」才會連累到其他人。
+    // 對話框那句警告靠這個決定要不要出現，不該無條件嚇人。
+    it("有別人付、他只是被分攤的支出 → true", () => {
+      const result = memberFootprint("amma", [expense("e1", "ming", { amma: 100 })], []);
+      expect(result.othersPaid).toBe(true);
+    });
+
+    it("全部都是他自己付的 → false", () => {
+      const result = memberFootprint("amma", [expense("e1", "amma", { amma: 100 })], []);
+      expect(result.othersPaid).toBe(false);
+    });
+
+    it("混在一起時仍然是 true —— 只要有一筆會連累別人就要講", () => {
+      const result = memberFootprint(
+        "amma",
+        [expense("e1", "amma", { amma: 100 }), expense("e2", "ming", { amma: 50 })],
+        []
+      );
+      expect(result.othersPaid).toBe(true);
+    });
+
+    it("完全沒帳時是 false", () => {
+      const result = memberFootprint("amma", [expense("e1", "ming", { ming: 100 })], []);
+      expect(result.othersPaid).toBe(false);
+    });
+  });
+
   it("完全沒帳時兩個陣列都是空的", () => {
     const result = memberFootprint("amma", [expense("e1", "ming", { ming: 1000 })], []);
-    expect(result).toEqual({ expenseIds: [], paymentIds: [] });
+    expect(result).toEqual({ expenseIds: [], paymentIds: [], othersPaid: false });
   });
 });
 

@@ -319,7 +319,9 @@ function removeTaskMember(targetUid: string) {
       expenseCount: footprint.expenseIds.length,
       paymentCount: footprint.paymentIds.length,
       balance,
-      currency: settlement.value.currency
+      currency: settlement.value.currency,
+      virtual: target?.virtual === true,
+      othersPaid: footprint.othersPaid
     })
   };
 }

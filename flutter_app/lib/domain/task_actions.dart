@@ -4,7 +4,7 @@ import 'task_status.dart';
 /// 封存／解除封存／刪除任務的確認內容。
 /// `src/pages/TaskListPage.vue` 裡那組 `dialog*` computed 的 Dart 版。
 ///
-/// 抽成純函式的理由跟 `removeMemberMessage` 一樣：這些是**規則**不是畫面。
+/// 抽成純函式的理由跟 `removeMemberPrompt` 一樣：這些是**規則**不是畫面。
 /// 尤其是下面那條分級摩擦 —— 它決定使用者會不會誤刪掉一整趟旅程的帳，
 /// 值得有測試釘住。
 

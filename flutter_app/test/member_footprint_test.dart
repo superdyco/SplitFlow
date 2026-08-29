@@ -93,14 +93,13 @@ void main() {
       expect(prompt.message, contains('2 筆付款記錄'));
     });
 
-    test('風險揭露那兩句不能少', () {
+    test('講明結算紀錄裡他還在', () {
       final prompt = removeMemberPrompt(
           name: '阿嬤',
           expenseCount: 12,
           paymentCount: 0,
           balance: 0,
           currency: 'TWD');
-      expect(prompt.message, contains('別人付的'));
       expect(prompt.message, contains('結算紀錄'));
     });
 
@@ -123,6 +122,125 @@ void main() {
           balance: 0,
           currency: 'TWD');
       expect(prompt.title, contains('這位成員'));
+    });
+
+    RemoveMemberPrompt withRecords({
+      int? balance = 0,
+      bool virtual = false,
+      bool othersPaid = false,
+      String currency = 'TWD',
+    }) =>
+        removeMemberPrompt(
+          name: '阿嬤',
+          expenseCount: 3,
+          paymentCount: 0,
+          balance: balance,
+          currency: currency,
+          virtual: virtual,
+          othersPaid: othersPaid,
+        );
+
+    // 選項說明是陳述句。這裡曾經直接嵌入一份獨立的確認訊息，變成在選項裡
+    // 再問一次，而且餘額不是 0 時會在兩個項目符號之間插進空行與懸空的問句。
+    group('兩個選項的說明', () {
+      test('不是問句', () {
+        final message = withRecords(balance: -80000).message;
+        expect(message, isNot(contains('嗎？')));
+        expect(message, isNot(contains('確定要移除')));
+      });
+
+      test('兩個項目符號之間只有一個空行', () {
+        final message = withRecords(balance: -80000).message;
+        final between = message
+            .split('・保留結算資料：')[1]
+            .split('・真實移除：')[0];
+        expect(between, isNot(contains('\n\n\n')));
+        expect(between.trimRight().split('\n').length, 1);
+      });
+    });
+
+    group('餘額', () {
+      test('他還沒付時講出金額', () {
+        expect(withRecords(balance: -80000).message,
+            contains('他還有 TWD 800.00 沒付'));
+      });
+
+      test('還有人要付給他時是另一句', () {
+        expect(withRecords(balance: 125000).message,
+            contains('還有 TWD 1,250.00 要付給他'));
+      });
+
+      test('金額走 formatAmount，零小數幣別不會多出小數點', () {
+        expect(withRecords(balance: -125000, currency: 'KRW').message,
+            contains('KRW 125,000 沒付'));
+      });
+
+      test('已結清時不提金額', () {
+        final message = withRecords(balance: 0).message;
+        expect(message, isNot(contains('沒付')));
+        expect(message, isNot(contains('要付給')));
+      });
+
+      // 這一條是這次修的核心：算不出來跟已結清是兩回事，混為一談就是在
+      // 一個不可逆的決定前面謊報「他沒有欠款」。
+      test('算不出來時照實說，不能講得像已結清', () {
+        expect(withRecords(balance: null).message, contains('算不出他的結算餘額'));
+      });
+    });
+
+    group('虛擬成員', () {
+      test('不講「看不到這個任務」—— 他從來就沒有帳號', () {
+        expect(withRecords(virtual: true).message,
+            isNot(contains('看不到這個任務')));
+      });
+
+      test('真實成員照講', () {
+        expect(withRecords().message, contains('他之後看不到這個任務'));
+      });
+    });
+
+    group('會不會誤傷別人的帳', () {
+      // 這句是整個功能的風險揭露，該出現的時候少一句都不行。
+      test('有別人付的支出時要警告', () {
+        expect(withRecords(othersPaid: true).message, contains('別人付的'));
+      });
+
+      test('全部都是他自己付的就不要嚇人', () {
+        expect(withRecords(othersPaid: false).message,
+            isNot(contains('別人付的')));
+      });
+    });
+  });
+
+  group('othersPaid', () {
+    test('有別人付、他只是被分攤的支出 → true', () {
+      final result =
+          memberFootprint('amma', [_expense('e1', 'ming', {'amma': 1000})], []);
+      expect(result.othersPaid, isTrue);
+    });
+
+    test('全部都是他自己付的 → false', () {
+      final result =
+          memberFootprint('amma', [_expense('e1', 'amma', {'amma': 1000})], []);
+      expect(result.othersPaid, isFalse);
+    });
+
+    test('混在一起時仍然是 true —— 只要有一筆會連累別人就要講', () {
+      final result = memberFootprint(
+        'amma',
+        [
+          _expense('e1', 'amma', {'amma': 1000}),
+          _expense('e2', 'ming', {'amma': 500}),
+        ],
+        [],
+      );
+      expect(result.othersPaid, isTrue);
+    });
+
+    test('完全沒帳時是 false', () {
+      final result =
+          memberFootprint('amma', [_expense('e1', 'ming', {'ming': 1000})], []);
+      expect(result.othersPaid, isFalse);
     });
   });
 }

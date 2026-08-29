@@ -248,30 +248,4 @@ void main() {
     });
   });
 
-  group('removeMemberMessage', () {
-    test('結清的人訊息最短 —— 沒有後果要警告', () {
-      final message = removeMemberMessage(name: '阿明', balance: 0, currency: 'TWD');
-      expect(message, contains('阿明'));
-      expect(message, isNot(contains('沒付')));
-    });
-
-    test('他還沒付的時候要講「只能由管理員代記」', () {
-      final message =
-          removeMemberMessage(name: '阿明', balance: -50000, currency: 'TWD');
-      expect(message, contains('阿明 還有 TWD 500.00 沒付'));
-      expect(message, contains('管理員代記'));
-    });
-
-    test('別人欠他的時候要講「查不到誰還沒付他錢」', () {
-      final message =
-          removeMemberMessage(name: '小美', balance: 50000, currency: 'TWD');
-      expect(message, contains('還有 TWD 500.00 要付給 小美'));
-      expect(message, contains('查不到誰還沒付他錢'));
-    });
-
-    test('沒有暱稱時有備用稱呼，不會出現空白', () {
-      final message = removeMemberMessage(name: '', balance: 0, currency: 'TWD');
-      expect(message, contains('這位成員'));
-    });
-  });
 }

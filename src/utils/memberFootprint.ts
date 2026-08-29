@@ -13,6 +13,13 @@ import type { Payment } from "@/types/payment";
 export interface MemberFootprint {
   expenseIds: string[];
   paymentIds: string[];
+  /**
+   * 上面那些支出裡，有沒有**別人付的**。
+   *
+   * 真實移除會把整筆支出刪掉，所以只有這種時候才會連累到其他人 ——
+   * 他自己付的帳刪掉只影響他自己。對話框靠這個決定要不要出那句警告。
+   */
+  othersPaid: boolean;
 }
 
 function inSplits(expense: Expense, uid: string): boolean {
@@ -23,13 +30,14 @@ function inSplits(expense: Expense, uid: string): boolean {
 }
 
 export function memberFootprint(uid: string, expenses: Expense[], payments: Payment[]): MemberFootprint {
+  const involved = expenses.filter(expense => expense.paidBy === uid || inSplits(expense, uid));
+
   return {
-    expenseIds: expenses
-      .filter(expense => expense.paidBy === uid || inSplits(expense, uid))
-      .map(expense => expense.id),
+    expenseIds: involved.map(expense => expense.id),
     paymentIds: payments
       .filter(payment => payment.from === uid || payment.to === uid)
-      .map(payment => payment.id)
+      .map(payment => payment.id),
+    othersPaid: involved.some(expense => expense.paidBy !== uid)
   };
 }
 
