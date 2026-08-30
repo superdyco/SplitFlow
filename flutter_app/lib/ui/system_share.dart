@@ -35,3 +35,26 @@ Future<void> shareText(
     context,
   ).showSnackBar(const SnackBar(content: Text('這台裝置無法開啟分享，內容已複製')));
 }
+
+Future<void> shareFile(
+  BuildContext context, {
+  required String path,
+  required String fileName,
+  required String title,
+}) async {
+  final box = context.findRenderObject() as RenderBox?;
+  final origin = box == null || !box.hasSize
+      ? null
+      : box.localToGlobal(Offset.zero) & box.size;
+  final result = await SharePlus.instance.share(
+    ShareParams(
+      files: [XFile(path, mimeType: 'application/json')],
+      fileNameOverrides: [fileName],
+      title: title,
+      sharePositionOrigin: origin,
+    ),
+  );
+  if (result.status == ShareResultStatus.unavailable) {
+    throw StateError('這台裝置沒有可儲存檔案的應用程式');
+  }
+}

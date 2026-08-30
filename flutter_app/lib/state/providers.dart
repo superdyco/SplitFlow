@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/auth_repository.dart';
 import '../data/bias_store.dart';
+import '../data/data_export_repository.dart';
 import '../data/expense_repository.dart';
 import '../data/geolocation.dart';
 import '../data/place_service.dart';
@@ -45,6 +46,7 @@ final receiptRepositoryProvider = Provider((ref) => ReceiptRepository());
 
 /// 推播。註冊 token、清除 token、問通知權限。
 final pushRepositoryProvider = Provider((ref) => PushRepository());
+final dataExportRepositoryProvider = Provider((ref) => DataExportRepository());
 
 /// 一張收據的下載網址。
 ///

@@ -29,6 +29,9 @@ dependencies:
   # 呼叫 Android / iOS 原生分享選單，傳送邀請連結與結算文字。
   share_plus: ^13.3.0
 
+  # 完整資料匯出先寫到系統暫存目錄，再交給原生分享選單儲存。
+  path_provider: ^2.1.6
+
   # 狀態管理。選 Riverpod 是因為 provider 的取用不綁 widget tree，
   # 領域邏輯那層可以完全不知道 Flutter 存在 —— 跟現在 composables 的分法一致。
   flutter_riverpod: ^2.5.1

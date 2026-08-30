@@ -5,6 +5,7 @@ import '../domain/auth_error.dart' as auth;
 import '../domain/models.dart';
 import '../domain/validation.dart' as validate;
 import '../state/providers.dart';
+import 'system_share.dart';
 import 'theme.dart';
 
 /// 個人設定。`src/pages/ProfilePage.vue` 的 Flutter 版。
@@ -58,6 +59,8 @@ class _FormState extends ConsumerState<_Form> {
   bool _touched = false;
   bool _saving = false;
   bool _saved = false;
+  bool _exporting = false;
+  String _exportProgress = '';
   String? _error;
 
   @override
@@ -112,6 +115,37 @@ class _FormState extends ConsumerState<_Form> {
     }
   }
 
+  Future<void> _export(BuildContext shareContext) async {
+    if (_exporting) return;
+    setState(() {
+      _exporting = true;
+      _exportProgress = '正在整理分帳資料';
+      _error = null;
+    });
+    try {
+      final file = await ref
+          .read(dataExportRepositoryProvider)
+          .export(
+            widget.profile.uid,
+            onProgress: (progress) {
+              if (mounted) setState(() => _exportProgress = progress.message);
+            },
+          );
+      if (!mounted || !shareContext.mounted) return;
+      await shareFile(
+        shareContext,
+        path: file.path,
+        fileName: file.uri.pathSegments.last,
+        title: '簡單分帳資料匯出',
+      );
+      if (mounted) setState(() => _exportProgress = '匯出完成');
+    } catch (err) {
+      if (mounted) setState(() => _error = '匯出失敗：$err');
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
@@ -160,6 +194,36 @@ class _FormState extends ConsumerState<_Form> {
           Text(_error!,
               style: text.bodyMedium?.copyWith(color: AppColors.danger)),
         ],
+        const SizedBox(height: 20),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('資料匯出', style: text.titleMedium),
+                const SizedBox(height: 8),
+                Text(
+                  '匯出帳號、任務、成員、支出、付款、結算紀錄與 Base64 收據圖片。'
+                  '檔案包含私人帳務資料，收據較多時可能很大。',
+                  style: text.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                Builder(
+                  builder: (shareContext) => OutlinedButton.icon(
+                    onPressed: _exporting ? null : () => _export(shareContext),
+                    icon: const Icon(Icons.download_outlined, size: 18),
+                    label: Text(_exporting ? '匯出中...' : '匯出 JSON 資料'),
+                  ),
+                ),
+                if (_exportProgress.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(_exportProgress, style: text.bodySmall),
+                ],
+              ],
+            ),
+          ),
+        ),
         const SizedBox(height: 24),
         FilledButton(
           onPressed: (_saving || !_canSubmit) ? null : _save,

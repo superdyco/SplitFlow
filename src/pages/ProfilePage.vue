@@ -12,6 +12,7 @@ import { recentErrors } from "@/utils/debugLog";
 import { buildDiagnosticsText } from "@/utils/diagnostics";
 import { firebaseErrorMessage, required, textFieldError } from "@/utils/firestore";
 import { isInstalledApp } from "@/utils/platform";
+import { buildDataExport, downloadDataExport } from "@/services/dataExportService";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -32,6 +33,8 @@ const loginMethod = computed(() => {
   return id ? providerLabel(id) : "";
 });
 const canSubmit = computed(() => !!nickname.value.trim() && !nicknameError.value && isDirty.value);
+const exporting = ref(false);
+const exportProgress = ref("");
 
 async function save() {
   if (!authStore.user) return;
@@ -97,6 +100,26 @@ async function signOut() {
   userStore.clear();
   await router.push("/login");
 }
+
+async function exportData() {
+  const uid = authStore.user?.uid;
+  if (!uid || exporting.value) return;
+  exporting.value = true;
+  error.value = null;
+  exportProgress.value = "正在整理分帳資料";
+  try {
+    const data = await buildDataExport(uid, progress => {
+      exportProgress.value = progress.message;
+    });
+    downloadDataExport(data);
+    exportProgress.value = "匯出完成";
+  } catch (err) {
+    error.value = firebaseErrorMessage(err);
+    exportProgress.value = "";
+  } finally {
+    exporting.value = false;
+  }
+}
 </script>
 
 <template>
@@ -137,6 +160,17 @@ async function signOut() {
         <RouterLink to="/explore" class="btn btn-block">探索公開旅程</RouterLink>
       </div>
       <ErrorState :message="error" />
+      <div class="card stack">
+        <strong class="section-title">資料匯出</strong>
+        <p class="tiny">
+          下載你目前可讀取的帳號、任務、成員、支出、付款、結算紀錄與 Base64 收據圖片。
+          檔案含有私人帳務資料，請妥善保存；收據較多時檔案可能很大。
+        </p>
+        <button class="btn btn-block" :disabled="exporting" @click="exportData">
+          {{ exporting ? "匯出中..." : "匯出 JSON 資料" }}
+        </button>
+        <span v-if="exportProgress" class="tiny">{{ exportProgress }}</span>
+      </div>
       <button class="btn btn-primary btn-block" :disabled="loading || !canSubmit" @click="save">
         {{ loading ? "儲存中..." : saved ? "已儲存" : "儲存變更" }}
       </button>
