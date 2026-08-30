@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/currency.dart';
@@ -11,6 +12,7 @@ import '../state/providers.dart';
 import 'category_chart.dart';
 import 'payment_sheet.dart';
 import 'settlement_history.dart';
+import 'system_share.dart';
 import 'theme.dart';
 
 /// 結算分頁。`src/components/settlement/SettlementPanel.vue` 的 Flutter 版。
@@ -73,17 +75,21 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
     if (amount == null || !mounted) return;
 
     final uid = _uid;
-    await _run(() => ref.read(paymentRepositoryProvider).createPayment(
-          task.id,
-          paymentInput(
-            from: from,
-            to: to,
-            amount: amount,
-            currency: task.defaultCurrency,
-            currentUid: uid,
+    await _run(
+      () => ref
+          .read(paymentRepositoryProvider)
+          .createPayment(
+            task.id,
+            paymentInput(
+              from: from,
+              to: to,
+              amount: amount,
+              currency: task.defaultCurrency,
+              currentUid: uid,
+            ),
+            uid,
           ),
-          uid,
-        ));
+    );
   }
 
   Future<void> _delete(Payment payment, Map<String, String> names) async {
@@ -115,8 +121,11 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
     );
     if (ok != true) return;
 
-    await _run(() =>
-        ref.read(paymentRepositoryProvider).deletePayment(task.id, payment.id));
+    await _run(
+      () => ref
+          .read(paymentRepositoryProvider)
+          .deletePayment(task.id, payment.id),
+    );
   }
 
   Future<void> _saveSnapshot(
@@ -125,11 +134,11 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
     String note,
   ) async {
     final uid = _uid;
-    await _run(() => ref.read(settlementRepositoryProvider).create(
-          task.id,
-          toSnapshotInput(result, names, note),
-          uid,
-        ));
+    await _run(
+      () => ref
+          .read(settlementRepositoryProvider)
+          .create(task.id, toSnapshotInput(result, names, note), uid),
+    );
     ref.invalidate(snapshotsProvider(task.id));
   }
 
@@ -156,9 +165,9 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
     );
     if (ok != true) return;
 
-    await _run(() => ref
-        .read(settlementRepositoryProvider)
-        .delete(task.id, snapshot.id));
+    await _run(
+      () => ref.read(settlementRepositoryProvider).delete(task.id, snapshot.id),
+    );
     ref.invalidate(snapshotsProvider(task.id));
   }
 
@@ -203,8 +212,10 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
                       style: figureStyle,
                     ),
                     const SizedBox(height: 4),
-                    Text('列入 ${result.expenseCount} 筆支出',
-                        style: text.bodySmall),
+                    Text(
+                      '列入 ${result.expenseCount} 筆支出',
+                      style: text.bodySmall,
+                    ),
                   ],
                 ),
               ),
@@ -219,8 +230,10 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
 
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!,
-                  style: text.bodyMedium?.copyWith(color: AppColors.danger)),
+              Text(
+                _error!,
+                style: text.bodyMedium?.copyWith(color: AppColors.danger),
+              ),
             ],
 
             const SizedBox(height: 20),
@@ -231,23 +244,26 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
             else
               for (final transfer in result.transfers)
                 _TransferRow(
-                  label: '${names[transfer.from] ?? '已離開的成員'} → '
+                  label:
+                      '${names[transfer.from] ?? '已離開的成員'} → '
                       '${names[transfer.to] ?? '已離開的成員'}',
-                  amount: '${result.currency} '
+                  amount:
+                      '${result.currency} '
                       '${formatAmount(transfer.amount, result.currency)}',
                   busy: _busy,
-                  onRecord: canRecordPayment(
-                    canWrite: _canWrite,
-                    currentUid: uid,
-                    from: transfer.from,
-                    isAdmin: _isAdmin,
-                  )
+                  onRecord:
+                      canRecordPayment(
+                        canWrite: _canWrite,
+                        currentUid: uid,
+                        from: transfer.from,
+                        isAdmin: _isAdmin,
+                      )
                       ? () => _record(
-                            from: transfer.from,
-                            to: transfer.to,
-                            suggested: transfer.amount,
-                            names: names,
-                          )
+                          from: transfer.from,
+                          to: transfer.to,
+                          suggested: transfer.amount,
+                          names: names,
+                        )
                       : null,
                 ),
 
@@ -262,22 +278,26 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
                   names: names,
                   currency: task.defaultCurrency,
                   busy: _busy,
-                  onConfirm: canConfirmPayment(
-                    canWrite: _canWrite,
-                    currentUid: uid,
-                    payment: payment,
-                    isAdmin: _isAdmin,
-                  )
-                      ? () => _run(() => ref
-                          .read(paymentRepositoryProvider)
-                          .confirmPayment(task.id, payment.id))
+                  onConfirm:
+                      canConfirmPayment(
+                        canWrite: _canWrite,
+                        currentUid: uid,
+                        payment: payment,
+                        isAdmin: _isAdmin,
+                      )
+                      ? () => _run(
+                          () => ref
+                              .read(paymentRepositoryProvider)
+                              .confirmPayment(task.id, payment.id),
+                        )
                       : null,
-                  onDelete: canDeletePayment(
-                    canWrite: _canWrite,
-                    currentUid: uid,
-                    payment: payment,
-                    isAdmin: _isAdmin,
-                  )
+                  onDelete:
+                      canDeletePayment(
+                        canWrite: _canWrite,
+                        currentUid: uid,
+                        payment: payment,
+                        isAdmin: _isAdmin,
+                      )
                       ? () => _delete(payment, names)
                       : null,
                 ),
@@ -287,7 +307,8 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
             CategoryChart(
               // 用支出列表算，跟結算是同一份資料 —— 缺匯率的兩邊都排除，
               // 所以圖表的總和跟上面那個總花費對得起來。
-              expenses: ref.watch(expensesProvider(task.id)).value ??
+              expenses:
+                  ref.watch(expensesProvider(task.id)).value ??
                   const <Expense>[],
               currency: result.currency,
             ),
@@ -301,8 +322,10 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(names[balance.uid] ?? '已離開的成員',
-                          style: text.bodyMedium),
+                      child: Text(
+                        names[balance.uid] ?? '已離開的成員',
+                        style: text.bodyMedium,
+                      ),
                     ),
                     Text(
                       '${balance.balance >= 0 ? '應收 ' : '應付 '}'
@@ -319,6 +342,15 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
               ),
 
             const SizedBox(height: 24),
+            Builder(
+              builder: (shareContext) => FilledButton.icon(
+                icon: const Icon(Icons.share_outlined, size: 18),
+                label: const Text('分享結算'),
+                onPressed: () =>
+                    _share(shareContext, result, names, pending.length),
+              ),
+            ),
+            const SizedBox(height: 8),
             OutlinedButton.icon(
               icon: const Icon(Icons.copy, size: 18),
               label: const Text('複製結算文字'),
@@ -330,7 +362,7 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
               settlement: result,
               snapshots:
                   ref.watch(snapshotsProvider(task.id)).value ??
-                      const <SettlementSnapshot>[],
+                  const <SettlementSnapshot>[],
               taskName: task.name,
               canManage: _canWrite,
               busy: _busy,
@@ -343,36 +375,52 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
     );
   }
 
-  void _copy(
+  String _settlementText(
+    Settlement result,
+    Map<String, String> names,
+    int pending,
+  ) {
+    return buildSettlementText(
+      SettlementTextInput(
+        taskName: task.name,
+        currency: result.currency,
+        transfers: result.transfers,
+        memberNames: names,
+        expenseCount: result.expenseCount,
+        total: result.total,
+        unconvertedCount: result.unconverted.length,
+        pendingCount: pending,
+      ),
+    );
+  }
+
+  Future<void> _share(
     BuildContext context,
     Settlement result,
     Map<String, String> names,
     int pending,
   ) {
-    final text = buildSettlementText(SettlementTextInput(
-      taskName: task.name,
-      currency: result.currency,
-      transfers: result.transfers,
-      memberNames: names,
-      expenseCount: result.expenseCount,
-      total: result.total,
-      unconvertedCount: result.unconverted.length,
-      pendingCount: pending,
-    ));
-
-    // 剪貼簿之後接，先讓內容看得到 —— 這一段的重點是文字組得對不對。
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        content: SingleChildScrollView(child: SelectableText(text)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('關閉'),
-          ),
-        ],
-      ),
+    return shareText(
+      context,
+      text: _settlementText(result, names, pending),
+      title: '${task.name}結算',
+      subject: '${task.name}結算',
     );
+  }
+
+  Future<void> _copy(
+    BuildContext context,
+    Settlement result,
+    Map<String, String> names,
+    int pending,
+  ) async {
+    await Clipboard.setData(
+      ClipboardData(text: _settlementText(result, names, pending)),
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('已複製結算文字')));
   }
 }
 
@@ -509,10 +557,9 @@ class _Warning extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppColors.danger),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.danger),
             ),
           ),
         ],

@@ -10,5 +10,24 @@ library;
 /// 網頁版是用 `window.location.origin` 組的，原生版沒有那個東西，
 /// 所以這裡寫死。換網域的話這一行要改。
 const String webOrigin = 'https://splitflow-e39c0.web.app';
+const String inviteHost = 'splitflow-e39c0.web.app';
 
 String inviteUrl(String inviteCode) => '$webOrigin/join/$inviteCode';
+
+String inviteShareText({required String taskName, required String inviteCode}) {
+  return '邀請你加入「$taskName」的簡單分帳：\n${inviteUrl(inviteCode)}';
+}
+
+/// 從 Universal Link / App Link 取出邀請碼。
+///
+/// 只接受正式網站的 `/join/:code`，避免其他 https 網址或網站內一般頁面
+/// 誤觸原生加入流程。query 與 fragment 不影響邀請碼。
+String? inviteCodeFromUri(Uri uri) {
+  if (uri.scheme != 'https' || uri.host != inviteHost) return null;
+  if (uri.pathSegments.length != 2 || uri.pathSegments.first != 'join') {
+    return null;
+  }
+
+  final code = uri.pathSegments[1].trim();
+  return code.isEmpty ? null : code;
+}

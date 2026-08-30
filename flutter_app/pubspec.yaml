@@ -4,7 +4,8 @@ publish_to: "none"
 version: 0.1.0
 
 environment:
-  sdk: ">=3.4.0 <4.0.0"
+  # CI 使用 Flutter 3.47 / Dart 3.12。app_links 7.x 也以 Dart 3.12 為最低版本。
+  sdk: ">=3.12.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -20,6 +21,13 @@ dependencies:
   # 推播。只註冊／清除 token 與問權限 —— 真正決定要通知誰的是
   # Cloud Function（見 functions/src/index.ts）。
   firebase_messaging: ^15.1.3
+
+  # 接收 Android App Links 與 iOS Universal Links。邀請網址仍是同一條
+  # https 網址；有安裝 App 才由系統轉進原生版，沒安裝就照常開網頁。
+  app_links: ^7.2.1
+
+  # 呼叫 Android / iOS 原生分享選單，傳送邀請連結與結算文字。
+  share_plus: ^13.3.0
 
   # 狀態管理。選 Riverpod 是因為 provider 的取用不綁 widget tree，
   # 領域邏輯那層可以完全不知道 Flutter 存在 —— 跟現在 composables 的分法一致。

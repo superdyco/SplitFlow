@@ -5,6 +5,7 @@ import '../domain/currency.dart';
 import '../domain/models.dart';
 import '../domain/settlement.dart';
 import '../domain/settlement_text.dart';
+import 'system_share.dart';
 import 'theme.dart';
 
 /// 結算紀錄。`src/components/settlement/SettlementHistory.vue` 的 Flutter 版。
@@ -81,8 +82,9 @@ class _SettlementHistoryState extends State<SettlementHistory> {
             const Spacer(),
             if (widget.canManage && !_composing)
               TextButton(
-                onPressed:
-                    widget.busy ? null : () => setState(() => _composing = true),
+                onPressed: widget.busy
+                    ? null
+                    : () => setState(() => _composing = true),
                 child: const Text('儲存這次結算'),
               ),
           ],
@@ -92,11 +94,12 @@ class _SettlementHistoryState extends State<SettlementHistory> {
         // 這三句是互斥的狀態說明，而且中間那一句是重點：看到舊數字卻以為
         // 是現在的，比看不到還糟。
         if (widget.snapshots.isEmpty)
-          Text('還沒有結算紀錄。把目前的結果存下來，之後帳目再變動也查得到當時算出來是多少。',
-              style: text.bodySmall)
+          Text('還沒有結算紀錄。把目前的結果存下來，之後帳目再變動也查得到當時算出來是多少。', style: text.bodySmall)
         else if (_changedSinceLatest)
-          Text('上次結算之後帳目又變動了，下面的紀錄是當時的結果，不是現在的。',
-              style: text.bodySmall?.copyWith(color: AppColors.danger))
+          Text(
+            '上次結算之後帳目又變動了，下面的紀錄是當時的結果，不是現在的。',
+            style: text.bodySmall?.copyWith(color: AppColors.danger),
+          )
         else
           Text('目前的帳目跟最近一次結算紀錄一致。', style: text.bodySmall),
 
@@ -185,23 +188,37 @@ class _Entry extends StatelessWidget {
 
   String _name(String uid) => snapshot.data.memberNames[uid] ?? '已離開的成員';
 
-  void _copy(BuildContext context) {
+  String _shareText() {
     final data = snapshot.data;
     // 用快照自帶的名字，不是現在的成員名單 —— 複製出來的要是當時那份。
-    final text = buildSettlementText(SettlementTextInput(
-      taskName: taskName,
-      currency: data.currency,
-      transfers: data.transfers,
-      memberNames: data.memberNames,
-      expenseCount: data.expenseCount,
-      total: data.total,
-      unconvertedCount: 0,
-      pendingCount: 0,
-    ));
+    return buildSettlementText(
+      SettlementTextInput(
+        taskName: taskName,
+        currency: data.currency,
+        transfers: data.transfers,
+        memberNames: data.memberNames,
+        expenseCount: data.expenseCount,
+        total: data.total,
+        unconvertedCount: 0,
+        pendingCount: 0,
+      ),
+    );
+  }
 
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已複製當時的結算')),
+  Future<void> _copy(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: _shareText()));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('已複製當時的結算')));
+  }
+
+  Future<void> _share(BuildContext context) {
+    return shareText(
+      context,
+      text: _shareText(),
+      title: '$taskName 歷史結算',
+      subject: '$taskName 歷史結算',
     );
   }
 
@@ -224,9 +241,12 @@ class _Entry extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_when,
-                            style: text.bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w700)),
+                        Text(
+                          _when,
+                          style: text.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         const SizedBox(height: 2),
                         Text(
                           '${data.expenseCount} 筆 · 共 '
@@ -258,19 +278,22 @@ class _Entry extends StatelessWidget {
                       child: Row(
                         children: [
                           Expanded(
-                              child: Text(_name(item.uid),
-                                  style: text.bodyMedium)),
+                            child: Text(
+                              _name(item.uid),
+                              style: text.bodyMedium,
+                            ),
+                          ),
                           Text(
                             item.balance == 0
                                 ? '已結清'
                                 : '${item.balance > 0 ? '應收 ' : '應付 '}'
-                                    '${formatAmount(item.balance.abs(), data.currency)}',
+                                      '${formatAmount(item.balance.abs(), data.currency)}',
                             style: text.bodyMedium?.copyWith(
                               color: item.balance == 0
                                   ? AppColors.muted
                                   : (item.balance > 0
-                                      ? AppColors.success
-                                      : AppColors.danger),
+                                        ? AppColors.success
+                                        : AppColors.danger),
                             ),
                           ),
                         ],
@@ -282,9 +305,16 @@ class _Entry extends StatelessWidget {
                     children: [
                       Text('當時的轉帳建議', style: text.bodySmall),
                       const Spacer(),
+                      Builder(
+                        builder: (shareContext) => TextButton.icon(
+                          onPressed: () => _share(shareContext),
+                          icon: const Icon(Icons.share_outlined, size: 17),
+                          label: const Text('分享'),
+                        ),
+                      ),
                       TextButton(
                         onPressed: () => _copy(context),
-                        child: const Text('複製結算'),
+                        child: const Text('複製'),
                       ),
                     ],
                   ),
@@ -304,8 +334,9 @@ class _Entry extends StatelessWidget {
                             ),
                             Text(
                               formatAmount(transfer.amount, data.currency),
-                              style: text.bodyMedium
-                                  ?.copyWith(fontWeight: FontWeight.w700),
+                              style: text.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ],
                         ),

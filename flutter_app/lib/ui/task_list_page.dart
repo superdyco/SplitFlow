@@ -7,9 +7,11 @@ import '../domain/my_cost.dart';
 import '../domain/offline_write.dart';
 import '../domain/task_actions.dart';
 import '../domain/task_status.dart';
+import '../state/pending_invite.dart';
 import '../state/pending_task.dart';
 import '../state/providers.dart';
 import 'create_task_page.dart';
+import 'join_task_page.dart';
 import 'profile_page.dart';
 import 'confirm_dialog.dart';
 import 'task_card.dart';
@@ -39,7 +41,24 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     super.initState();
     // 走到這一頁代表登入狀態已經確定了，這時導頁才安全。
     // 用 addPostFrameCallback 是因為 initState 當下還不能 push。
-    WidgetsBinding.instance.addPostFrameCallback((_) => _consumePendingTask());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 使用者主動點的邀請優先於先前殘留的通知導頁。
+      if (!_consumePendingInvite()) _consumePendingTask();
+    });
+  }
+
+  /// 點 Universal Link / App Link 帶進來的邀請，登入與暱稱都完成後才開。
+  bool _consumePendingInvite() {
+    final inviteCode = ref.read(pendingInviteCodeProvider);
+    if (inviteCode == null || !mounted) return false;
+
+    ref.read(pendingInviteCodeProvider.notifier).state = null;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => JoinTaskPage(inviteCode: inviteCode),
+      ),
+    );
+    return true;
   }
 
   /// 點通知帶進來的任務，開一次就消費掉。
@@ -150,6 +169,9 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     // 早就跑完了。
     ref.listen<String?>(pendingTaskIdProvider, (_, next) {
       if (next != null) _consumePendingTask();
+    });
+    ref.listen<String?>(pendingInviteCodeProvider, (_, next) {
+      if (next != null) _consumePendingInvite();
     });
 
     final tasks = ref.watch(tasksProvider);

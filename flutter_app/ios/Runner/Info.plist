@@ -41,6 +41,9 @@
 	<string>816128125030-418l0jhp8hel8golo7nb3c4ccv357pot.apps.googleusercontent.com</string>
 	<key>GIDServerClientID</key>
 	<string>816128125030-tinjkkds5qmqqmfbldrhivdc217tmqpa.apps.googleusercontent.com</string>
+	<!-- Universal Links 由 app_links 接收，關掉 Flutter 內建 handler 避免重複處理。 -->
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
 	<key>GoogleMapsApiKey</key>
 	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>NSCameraUsageDescription</key>

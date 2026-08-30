@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'firebase_options.dart';
+import 'domain/invite.dart';
+import 'state/pending_invite.dart';
 import 'state/pending_task.dart';
 import 'state/providers.dart';
 import 'ui/onboarding_page.dart';
@@ -20,6 +23,22 @@ import 'ui/theme.dart';
 /// 遠比看一行字麻煩。
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 必須在 Firebase 等非同步初始化之前開始聽，否則 App 被連結冷啟動時，第一條
+  // Universal Link / App Link 可能在 widget tree 建好前就錯過。ProviderContainer
+  // 先替它保管邀請碼，畫面稍後才會消費。
+  final container = ProviderContainer();
+  AppLinks().uriLinkStream.listen(
+    (uri) {
+      final code = inviteCodeFromUri(uri);
+      if (code != null) {
+        container.read(pendingInviteCodeProvider.notifier).state = code;
+      }
+    },
+    onError: (_) {
+      // 不合法或系統無法解析的連結不能影響 App 正常啟動。
+    },
+  );
 
   String? error;
   try {
@@ -42,12 +61,13 @@ Future<void> main() async {
     }
   }
 
+  if (pendingTaskId != null) {
+    container.read(pendingTaskIdProvider.notifier).state = pendingTaskId;
+  }
+
   runApp(
-    ProviderScope(
-      overrides: [
-        if (pendingTaskId != null)
-          pendingTaskIdProvider.overrideWith((ref) => pendingTaskId),
-      ],
+    UncontrolledProviderScope(
+      container: container,
       child: SplitFlowApp(initError: error),
     ),
   );

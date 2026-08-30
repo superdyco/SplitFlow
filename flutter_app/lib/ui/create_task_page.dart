@@ -7,6 +7,7 @@ import '../domain/expense_date.dart';
 import '../domain/invite.dart';
 import '../domain/validation.dart' as validate;
 import '../state/providers.dart';
+import 'system_share.dart';
 import 'theme.dart';
 
 /// 建立分帳任務。`src/pages/CreateTaskPage.vue` 的 Flutter 版。
@@ -69,7 +70,9 @@ class _CreateTaskPageState extends ConsumerState<CreateTaskPage> {
       if (profile == null) {
         throw StateError('找不到個人資料，請先設定暱稱');
       }
-      final created = await ref.read(taskRepositoryProvider).createTask(
+      final created = await ref
+          .read(taskRepositoryProvider)
+          .createTask(
             name: validate.required(_name.text, '任務名稱'),
             defaultCurrency: _currency,
             startDate: _startDate.isEmpty ? null : _startDate,
@@ -136,8 +139,10 @@ class _CreateTaskPageState extends ConsumerState<CreateTaskPage> {
             onTapOutside: (_) => setState(() => _touched = true),
           ),
           if (_nameError != null)
-            Text(_nameError!,
-                style: text.bodySmall?.copyWith(color: AppColors.danger)),
+            Text(
+              _nameError!,
+              style: text.bodySmall?.copyWith(color: AppColors.danger),
+            ),
           const SizedBox(height: 16),
           Text('主要幣別', style: text.bodySmall),
           const SizedBox(height: 6),
@@ -151,10 +156,7 @@ class _CreateTaskPageState extends ConsumerState<CreateTaskPage> {
             onChanged: (value) =>
                 setState(() => _currency = value ?? _currency),
           ),
-          Text(
-            '所有支出最後都會換算成這個幣別結算。建立之後不能改。',
-            style: text.bodySmall,
-          ),
+          Text('所有支出最後都會換算成這個幣別結算。建立之後不能改。', style: text.bodySmall),
           const SizedBox(height: 20),
           Text('日期（選填）', style: text.bodySmall),
           const SizedBox(height: 6),
@@ -178,13 +180,17 @@ class _CreateTaskPageState extends ConsumerState<CreateTaskPage> {
           if (_dateError != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text(_dateError!,
-                  style: text.bodySmall?.copyWith(color: AppColors.danger)),
+              child: Text(
+                _dateError!,
+                style: text.bodySmall?.copyWith(color: AppColors.danger),
+              ),
             ),
           if (_error != null) ...[
             const SizedBox(height: 16),
-            Text(_error!,
-                style: text.bodyMedium?.copyWith(color: AppColors.danger)),
+            Text(
+              _error!,
+              style: text.bodyMedium?.copyWith(color: AppColors.danger),
+            ),
           ],
           const SizedBox(height: 28),
           FilledButton(
@@ -230,15 +236,31 @@ class _Created extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          Builder(
+            builder: (shareContext) => FilledButton.icon(
+              icon: const Icon(Icons.share_outlined, size: 18),
+              label: const Text('分享邀請'),
+              onPressed: () => shareText(
+                shareContext,
+                text: inviteShareText(
+                  taskName: taskName,
+                  inviteCode: inviteCode,
+                ),
+                title: '邀請加入簡單分帳',
+                subject: '邀請加入「$taskName」',
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           OutlinedButton.icon(
             icon: const Icon(Icons.copy, size: 18),
             label: const Text('複製邀請連結'),
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: url));
               if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('已複製')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('已複製')));
             },
           ),
           const SizedBox(height: 24),

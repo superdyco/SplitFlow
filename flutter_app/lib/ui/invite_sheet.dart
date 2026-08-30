@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/invite.dart';
+import 'system_share.dart';
 import 'theme.dart';
 
 /// 邀請連結的分享面板。
@@ -49,16 +50,31 @@ Future<void> showInviteSheet(
                 style: text.bodySmall,
               ),
               const SizedBox(height: 20),
-              FilledButton.icon(
+              Builder(
+                builder: (shareContext) => FilledButton.icon(
+                  icon: const Icon(Icons.share_outlined, size: 18),
+                  label: const Text('分享邀請'),
+                  onPressed: () => shareText(
+                    shareContext,
+                    text: inviteShareText(
+                      taskName: taskName,
+                      inviteCode: inviteCode,
+                    ),
+                    title: '邀請加入簡單分帳',
+                    subject: '邀請加入「$taskName」',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
                 icon: const Icon(Icons.copy, size: 18),
                 label: const Text('複製邀請連結'),
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: url));
                   if (!context.mounted) return;
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('已複製邀請連結')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('已複製邀請連結')));
                 },
               ),
             ],

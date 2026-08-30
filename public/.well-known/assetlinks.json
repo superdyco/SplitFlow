@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.dyco.splitflow",
+      "sha256_cert_fingerprints": [
+        "30:03:72:A1:A9:C6:1C:39:56:D4:0D:3A:A0:FA:EE:55:67:E0:8F:AA:ED:A8:D6:49:F6:CC:5F:D6:05:E2:8D:6A"
+      ]
+    }
+  }
+]

@@ -43,9 +43,26 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- 連結由 app_links 接收；Flutter 3.27+ 內建 handler 若同時開著，
+                 會把同一條網址當 initialRoute 再處理一次。 -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- 同一條邀請網址：安裝 App 時開原生加入頁，沒安裝時由網頁處理。
+                 autoVerify 要等網站的 /.well-known/assetlinks.json 放入正式簽章
+                 SHA-256 後才會成為 verified。 -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="splitflow-e39c0.web.app"
+                    android:pathPrefix="/join/" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
