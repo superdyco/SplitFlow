@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
@@ -13,6 +13,10 @@ import { buildDiagnosticsText } from "@/utils/diagnostics";
 import { firebaseErrorMessage, required, textFieldError } from "@/utils/firestore";
 import { isInstalledApp } from "@/utils/platform";
 import { buildDataExport, downloadDataExport } from "@/services/dataExportService";
+import { deleteOwnAccount } from "@/services/accountService";
+import { listUserTasks } from "@/services/taskService";
+import type { Task } from "@/types/task";
+import { deleteAccountPrompt } from "@/utils/accountDeletion";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -101,6 +105,54 @@ async function signOut() {
   await router.push("/login");
 }
 
+// 刪除帳號的確認要講出「幾個任務」「幾個是你的」，所以這一頁需要任務清單。
+// 只讀一次就好 —— 這裡要的是數量，不是即時狀態。
+const tasks = ref<Task[]>([]);
+const deleting = ref(false);
+
+onMounted(async () => {
+  const id = authStore.user?.uid;
+  if (!id) return;
+  try {
+    tasks.value = await listUserTasks(id);
+  } catch {
+    // 讀不到就當作沒有任務。確認訊息會少講一段，但不該讓整頁壞掉，
+    // 而且刪除本身在雲端執行，不依賴這份清單。
+    tasks.value = [];
+  }
+});
+
+async function deleteAccount() {
+  if (deleting.value) return;
+
+  const prompt = deleteAccountPrompt({
+    nickname: userStore.profile?.nickname ?? "",
+    taskCount: tasks.value.length,
+    ownedTaskCount: tasks.value.filter(task => task.ownerId === authStore.user?.uid).length
+  });
+
+  if (prompt.requireText) {
+    const typed = window.prompt(`${prompt.message}
+
+請打出「${prompt.requireText}」以確認：`);
+    if (typed?.trim() !== prompt.requireText) return;
+  } else if (!window.confirm(prompt.message)) {
+    return;
+  }
+
+  deleting.value = true;
+  error.value = null;
+  try {
+    await deleteOwnAccount();
+    userStore.clear();
+    await router.push("/login");
+  } catch (err) {
+    error.value = firebaseErrorMessage(err);
+  } finally {
+    deleting.value = false;
+  }
+}
+
 async function exportData() {
   const uid = authStore.user?.uid;
   if (!uid || exporting.value) return;
@@ -176,6 +228,17 @@ async function exportData() {
       </button>
       <button class="btn btn-danger btn-block" @click="signOut">登出</button>
 
+      <div class="card stack danger-zone">
+        <strong class="section-title">刪除帳號</strong>
+        <p class="tiny">
+          你的支出與結算會留在同行的人那裡 —— 那些帳同時也是他們的紀錄。
+          你的帳號、個人資料與收藏會永久消失，無法復原。
+        </p>
+        <button class="btn btn-danger btn-block" :disabled="deleting" @click="deleteAccount">
+          {{ deleting ? "刪除中..." : "刪除帳號" }}
+        </button>
+      </div>
+
       <!--
         擺在登出下面、樣式刻意最輕：這是「出事了才會被叫來按」的東西，
         平常不該跟暱稱與登出搶注意力。
@@ -197,6 +260,10 @@ async function exportData() {
 </template>
 
 <style scoped>
+.danger-zone {
+  border-color: var(--danger, #d63939);
+}
+
 .warn {
   color: var(--color-danger);
 }
