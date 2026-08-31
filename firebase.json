@@ -23,6 +23,11 @@
         "comment": "有人直接打 /index.html 時也要 no-cache。上面那條 regex 因為含點不會命中它。",
         "source": "/index.html",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "comment": "Universal Links 的宣告檔。檔名沒有副檔名，Firebase Hosting 會當成 application/octet-stream 送出，而 iOS 只認 application/json —— 少了這條，entitlements 設得再對，連結一樣不會進 App。",
+        "source": "/.well-known/apple-app-site-association",
+        "headers": [{ "key": "Content-Type", "value": "application/json" }]
       }
     ]
   },

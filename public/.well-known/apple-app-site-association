@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TEAMID.com.dyco.splitflow"],
+        "components": [
+          {
+            "/": "/join/*",
+            "comment": "邀請連結。範圍刻意跟 Android 的 intent-filter pathPrefix 一致：只有 /join/ 底下進 App，其餘路徑留給瀏覽器，不然分享報告的連結會被 App 搶走。"
+          }
+        ]
+      }
+    ]
+  }
+}
