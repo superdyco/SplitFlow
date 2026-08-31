@@ -1,5 +1,5 @@
 import { collection, doc, getDoc, getDocs, Timestamp } from "firebase/firestore";
-import { getBytes, getStorage, ref as storageRef } from "firebase/storage";
+import { getDownloadURL, getStorage, ref as storageRef } from "firebase/storage";
 import { app, db } from "@/firebase/config";
 import { listUserTasks } from "@/services/taskService";
 import { MAX_UPLOAD_BYTES } from "@/utils/receiptPolicy";
@@ -11,6 +11,8 @@ export interface ExportProgress {
 }
 
 type ProgressCallback = (progress: ExportProgress) => void;
+
+const RECEIPT_DOWNLOAD_TIMEOUT_MS = 8000;
 
 /** Firestore Timestamp 與巢狀資料轉成 JSON 可攜格式。 */
 export function exportJsonValue(value: unknown): unknown {
@@ -35,6 +37,14 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+function timeoutAfter<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function documents(taskId: string, name: string): Promise<Record<string, unknown>[]> {
   const snap = await getDocs(collection(db, "tasks", taskId, name));
   return snap.docs.map(item => ({ id: item.id, ...item.data() }));
@@ -49,7 +59,21 @@ function receiptPathOf(expense: Record<string, unknown>): string | null {
 
 async function exportedReceipt(path: string): Promise<Record<string, unknown>> {
   try {
-    const buffer = await getBytes(storageRef(getStorage(app), path), MAX_UPLOAD_BYTES);
+    const url = await timeoutAfter(
+      getDownloadURL(storageRef(getStorage(app), path)),
+      RECEIPT_DOWNLOAD_TIMEOUT_MS,
+      "收據下載連結逾時"
+    );
+    const response = await timeoutAfter(
+      fetch(url),
+      RECEIPT_DOWNLOAD_TIMEOUT_MS,
+      "收據下載逾時，可能是 Firebase Storage CORS 設定尚未允許目前網域"
+    );
+    if (!response.ok) throw new Error(`收據下載失敗：HTTP ${response.status}`);
+    const length = Number(response.headers.get("content-length") || 0);
+    if (length > MAX_UPLOAD_BYTES) throw new Error("收據檔案超過匯出大小限制");
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > MAX_UPLOAD_BYTES) throw new Error("收據檔案超過匯出大小限制");
     const bytes = new Uint8Array(buffer);
     return {
       mimeType: "image/jpeg",
@@ -137,6 +161,9 @@ export function downloadDataExport(data: object, exportedAt = new Date()): void 
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = `簡單分帳-資料匯出-${date}.json`;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
