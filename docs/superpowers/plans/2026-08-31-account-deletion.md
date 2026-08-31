@@ -31,7 +31,7 @@
 **Interfaces:**
 - Produces: `pickSuccessor(adminIds: string[], members: SuccessorCandidate[], leavingUid: string): string | null`，以及 `interface SuccessorCandidate { uid: string; active: boolean; virtual: boolean }`。Task 2 會用它。`members` 必須已依 `joinedAt` 遞增排序，函式本身不排序。
 
-- [ ] **Step 1: 寫失敗的測試**
+- [x] **Step 1: 寫失敗的測試**
 
 `functions/src/successor.test.ts`：
 
@@ -99,12 +99,12 @@ describe("pickSuccessor", () => {
 });
 ```
 
-- [ ] **Step 2: 跑測試確認失敗**
+- [x] **Step 2: 跑測試確認失敗**
 
 Run: `cd functions && npx vitest run src/successor.test.ts`
 Expected: FAIL，`Failed to resolve import "./successor.js"`
 
-- [ ] **Step 3: 寫最小實作**
+- [x] **Step 3: 寫最小實作**
 
 `functions/src/successor.ts`：
 
@@ -143,12 +143,12 @@ export function pickSuccessor(
 }
 ```
 
-- [ ] **Step 4: 跑測試確認通過**
+- [x] **Step 4: 跑測試確認通過**
 
 Run: `cd functions && npx vitest run src/successor.test.ts`
 Expected: PASS，7 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add functions/src/successor.ts functions/src/successor.test.ts
@@ -166,7 +166,7 @@ git commit -m "Work out who inherits a trip when its owner leaves"
 - Consumes: `pickSuccessor`、`SuccessorCandidate`（Task 1）
 - Produces: callable `deleteAccount`，無參數，回傳 `{ deletedTasks: number; transferredTasks: number; leftTasks: number }`。Task 5、7 的用戶端會呼叫它。
 
-- [ ] **Step 1: 加入 imports 與函式**
+- [x] **Step 1: 加入 imports 與函式**
 
 在 `functions/src/index.ts` 的 import 區塊補上（`getAuth` 與 `onCall` 目前都還沒有）：
 
@@ -176,7 +176,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { pickSuccessor, type SuccessorCandidate } from "./successor.js";
 ```
 
-- [ ] **Step 2: 在檔案末端加上函式本體**
+- [x] **Step 2: 在檔案末端加上函式本體**
 
 ```typescript
 /**
@@ -279,7 +279,7 @@ export const deleteAccount = onCall({ region: REGION }, async request => {
 });
 ```
 
-- [ ] **Step 3: 補上 `FieldValue` 的 import**
+- [x] **Step 3: 補上 `FieldValue` 的 import**
 
 `index.ts` 目前只 import 了 `getFirestore`。把那一行改成：
 
@@ -287,12 +287,12 @@ export const deleteAccount = onCall({ region: REGION }, async request => {
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 ```
 
-- [ ] **Step 4: 型別檢查與既有測試**
+- [x] **Step 4: 型別檢查與既有測試**
 
 Run: `cd functions && npm run build && npx vitest run`
 Expected: `tsc` 無輸出即成功；測試 34 passed（既有 27 + Task 1 的 7）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add functions/src/index.ts
@@ -315,7 +315,7 @@ git commit -m "Let people delete their account without taking the books with the
 **Interfaces:**
 - Produces: `memberDisplayName(member: { nickname: string; active?: boolean; deleted?: boolean }): string`。Task 4 不需要它，但 Task 6 的 Dart 版本要對齊同樣的行為。
 
-- [ ] **Step 1: 寫失敗的測試**
+- [x] **Step 1: 寫失敗的測試**
 
 `tests/memberName.test.ts`：
 
@@ -350,12 +350,12 @@ describe("memberDisplayName", () => {
 });
 ```
 
-- [ ] **Step 2: 跑測試確認失敗**
+- [x] **Step 2: 跑測試確認失敗**
 
 Run: `npx vitest run tests/memberName.test.ts`
 Expected: FAIL，找不到 `@/utils/memberName`
 
-- [ ] **Step 3: 寫實作**
+- [x] **Step 3: 寫實作**
 
 `src/utils/memberName.ts`：
 
@@ -385,12 +385,12 @@ export function memberDisplayName(member: DisplayableMember): string {
 }
 ```
 
-- [ ] **Step 4: 跑測試確認通過**
+- [x] **Step 4: 跑測試確認通過**
 
 Run: `npx vitest run tests/memberName.test.ts`
 Expected: PASS，5 passed
 
-- [ ] **Step 5: 型別加上欄位**
+- [x] **Step 5: 型別加上欄位**
 
 `src/types/member.ts` 的 `TaskMember` 介面，在 `virtual?: boolean;` 之後加：
 
@@ -402,7 +402,7 @@ Expected: PASS，5 passed
   deleted?: boolean;
 ```
 
-- [ ] **Step 6: 換掉所有行內組字**
+- [x] **Step 6: 換掉所有行內組字**
 
 `src/pages/ExpenseFormPage.vue`：先在 script 區塊加 `import { memberDisplayName } from "@/utils/memberName";`，然後
 
@@ -433,12 +433,12 @@ Expected: PASS，5 passed
 
 三個檔案都要在 script 區塊加同一行 import。第 28 行的頭像縮寫維持用 `member.nickname`，不要換 —— 頭像要的是名字的第一個字，不是後綴。
 
-- [ ] **Step 7: 全套測試與型別檢查**
+- [x] **Step 7: 全套測試與型別檢查**
 
 Run: `npm test && npm run check`
 Expected: 測試全過（比之前多 5 個）、`vue-tsc` 無輸出
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/utils/memberName.ts tests/memberName.test.ts src/types/member.ts src/pages/ExpenseFormPage.vue src/pages/TaskPage.vue src/components/settlement/SettlementPanel.vue src/components/member/MemberRow.vue
@@ -459,7 +459,7 @@ git commit -m "Say why a name is greyed out, in one place instead of six"
   `DeleteAccountPrompt = { title: string; message: string; confirmLabel: string; requireText: string | null }`。
   Task 5 會用它；Task 7 的 Dart 版行為要一致。
 
-- [ ] **Step 1: 寫失敗的測試**
+- [x] **Step 1: 寫失敗的測試**
 
 `tests/accountDeletion.test.ts`：
 
@@ -512,12 +512,12 @@ describe("deleteAccountPrompt", () => {
 });
 ```
 
-- [ ] **Step 2: 跑測試確認失敗**
+- [x] **Step 2: 跑測試確認失敗**
 
 Run: `npx vitest run tests/accountDeletion.test.ts`
 Expected: FAIL，找不到 `@/utils/accountDeletion`
 
-- [ ] **Step 3: 寫實作**
+- [x] **Step 3: 寫實作**
 
 `src/utils/accountDeletion.ts`：
 
@@ -581,12 +581,12 @@ export function deleteAccountPrompt({
 }
 ```
 
-- [ ] **Step 4: 跑測試確認通過**
+- [x] **Step 4: 跑測試確認通過**
 
 Run: `npx vitest run tests/accountDeletion.test.ts`
 Expected: PASS，8 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/utils/accountDeletion.ts tests/accountDeletion.test.ts
@@ -605,7 +605,7 @@ git commit -m "Write what deleting an account will and won't take away"
 - Consumes: `deleteAccountPrompt`（Task 4）、callable `deleteAccount`（Task 2）
 - Produces: `deleteOwnAccount(): Promise<void>` —— 重新驗證、呼叫函式、登出，一路做完
 
-- [ ] **Step 1: 寫服務層**
+- [x] **Step 1: 寫服務層**
 
 `src/services/accountService.ts`：
 
@@ -639,7 +639,7 @@ export async function deleteOwnAccount(): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: 在個人設定頁加入危險區**
+- [x] **Step 2: 在個人設定頁加入危險區**
 
 `src/pages/ProfilePage.vue`。在 script 區塊加：
 
@@ -692,7 +692,7 @@ onMounted(async () => {
 });
 ```
 
-- [ ] **Step 3: 加上畫面**
+- [x] **Step 3: 加上畫面**
 
 放在登出按鈕之後，樣式上與其他區塊分開：
 
@@ -707,12 +707,12 @@ onMounted(async () => {
       </section>
 ```
 
-- [ ] **Step 4: 型別檢查與建置**
+- [x] **Step 4: 型別檢查與建置**
 
 Run: `npm run check && npm test`
 Expected: `vue-tsc` 無輸出、測試全過
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/accountService.ts src/pages/ProfilePage.vue
@@ -736,7 +736,7 @@ git commit -m "Give people a way out on the web"
 **Interfaces:**
 - Produces: `memberDisplayName(TaskMember member) -> String`，行為與 Task 3 的 TypeScript 版一致
 
-- [ ] **Step 1: 寫失敗的測試**
+- [x] **Step 1: 寫失敗的測試**
 
 `flutter_app/test/support_test.dart`，在 `group('登入供應商清單', ...)` 之後加：
 
@@ -780,7 +780,7 @@ git commit -m "Give people a way out on the web"
 
 檔案頂端補上 `import 'package:splitflow/domain/member_name.dart';`。
 
-- [ ] **Step 2: 加上模型欄位**
+- [x] **Step 2: 加上模型欄位**
 
 `flutter_app/lib/domain/models.dart` 的 `TaskMember`，在 `virtual` 之後加：
 
@@ -792,7 +792,7 @@ git commit -m "Give people a way out on the web"
 
 建構子加上 `this.deleted = false,`。
 
-- [ ] **Step 3: 寫實作**
+- [x] **Step 3: 寫實作**
 
 `flutter_app/lib/domain/member_name.dart`：
 
@@ -818,7 +818,7 @@ String memberDisplayName(TaskMember member) {
 }
 ```
 
-- [ ] **Step 4: 讓 mapper 讀那個欄位**
+- [x] **Step 4: 讓 mapper 讀那個欄位**
 
 `flutter_app/lib/data/mappers.dart` 裡建立 `TaskMember` 的地方，比照 `virtual` 的寫法加：
 
@@ -828,7 +828,7 @@ String memberDisplayName(TaskMember member) {
 
 用 `== true` 而不是 `as bool`：舊文件沒有這個欄位，讀到的是 null，強制轉型會直接丟例外。
 
-- [ ] **Step 5: 換掉所有行內組字**
+- [x] **Step 5: 換掉所有行內組字**
 
 `flutter_app/lib/ui/expense_form_page.dart` 第 598、630、646 行的
 `'${m.nickname}${m.active ? '' : '（已離開）'}'` → `memberDisplayName(m)`
@@ -842,7 +842,7 @@ String memberDisplayName(TaskMember member) {
 
 四個檔案都要 `import '../domain/member_name.dart';`。members_tab 第 383-385 行的頭像縮寫維持用 `member.nickname`，那要的是第一個字不是後綴。
 
-- [ ] **Step 6: Commit 並讓 CI 驗證**
+- [x] **Step 6: Commit 並讓 CI 驗證**
 
 這台機器沒有 Dart，`dart analyze` 與 `dart test` 只能在 CI 跑。
 
@@ -869,7 +869,7 @@ git push origin main
 - Consumes: callable `deleteAccount`（Task 2）
 - Produces: `deleteAccountPrompt({required String nickname, required int taskCount, required int ownedTaskCount}) -> DeleteAccountPrompt`，欄位與 Task 4 的 TypeScript 版相同：`title`、`message`、`confirmLabel`、`requireText`
 
-- [ ] **Step 1: 加相依**
+- [x] **Step 1: 加相依**
 
 `flutter_app/pubspec.yaml` 的 `dependencies`，在 `firebase_messaging` 之後加：
 
@@ -877,7 +877,7 @@ git push origin main
   cloud_functions: ^5.1.3
 ```
 
-- [ ] **Step 2: 寫失敗的測試**
+- [x] **Step 2: 寫失敗的測試**
 
 `flutter_app/test/support_test.dart` 加：
 
@@ -940,7 +940,7 @@ git push origin main
 
 檔案頂端補上 `import 'package:splitflow/domain/account_deletion.dart';`。
 
-- [ ] **Step 3: 寫實作**
+- [x] **Step 3: 寫實作**
 
 `flutter_app/lib/domain/account_deletion.dart`：
 
@@ -1001,7 +1001,7 @@ DeleteAccountPrompt deleteAccountPrompt({
 }
 ```
 
-- [ ] **Step 4: 在 auth_repository 加上呼叫**
+- [x] **Step 4: 在 auth_repository 加上呼叫**
 
 `flutter_app/lib/data/auth_repository.dart`，頂端加
 `import 'package:cloud_functions/cloud_functions.dart';`，然後在 `signOut` 之前加：
@@ -1040,7 +1040,7 @@ DeleteAccountPrompt deleteAccountPrompt({
   }
 ```
 
-- [ ] **Step 5: 在個人設定頁加入危險區**
+- [x] **Step 5: 在個人設定頁加入危險區**
 
 `flutter_app/lib/ui/profile_page.dart`，接在第 250 行的登出按鈕之後。
 
@@ -1174,7 +1174,7 @@ class _ConfirmDeleteDialogState extends State<_ConfirmDeleteDialog> {
 `tasks` 這一頁目前沒有。用與 `task_list_page.dart` 相同的來源取得使用者的任務清單，
 在建立畫面時讀一次即可 —— 這裡只需要總數與擁有的數量，不需要即時訂閱。
 
-- [ ] **Step 6: Commit 並讓 CI 驗證**
+- [x] **Step 6: Commit 並讓 CI 驗證**
 
 ```bash
 git add flutter_app/pubspec.yaml flutter_app/pubspec.lock flutter_app/lib/domain/account_deletion.dart flutter_app/lib/data/auth_repository.dart flutter_app/lib/ui/profile_page.dart flutter_app/test/support_test.dart
@@ -1190,7 +1190,7 @@ git push origin main
 
 **Files:** 無
 
-- [ ] **Step 1: 先部署函式**
+- [x] **Step 1: 先部署函式**
 
 ```bash
 cd functions && npm run build && npx vitest run
@@ -1201,7 +1201,7 @@ Expected: `deleteAccount(asia-east1)` **Successful create operation**
 
 **順序不能反。** 用戶端先上線的話，按鈕會出現但呼叫失敗（`not-found`）。
 
-- [ ] **Step 2: 再部署網頁**
+- [x] **Step 2: 再部署網頁**
 
 ```bash
 npm run deploy
