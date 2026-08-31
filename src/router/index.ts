@@ -52,6 +52,7 @@ const TaskListPage = () => import("@/pages/TaskListPage.vue");
 const CreateTaskPage = () => import("@/pages/CreateTaskPage.vue");
 const TaskPage = () => import("@/pages/TaskPage.vue");
 const ExpenseFormPage = () => import("@/pages/ExpenseFormPage.vue");
+const ExpenseDetailPage = () => import("@/pages/ExpenseDetailPage.vue");
 const JoinTaskPage = () => import("@/pages/JoinTaskPage.vue");
 const ProfilePage = () => import("@/pages/ProfilePage.vue");
 const ReportPage = () => import("@/pages/ReportPage.vue");
@@ -112,6 +113,8 @@ export const router = createRouter({
     { path: "/tasks/:taskId", component: TaskPage, meta: { requiresAuth: true, requiresProfile: true } },
     { path: "/tasks/:taskId/expenses/new", component: ExpenseFormPage, meta: { requiresAuth: true, requiresProfile: true } },
     { path: "/tasks/:taskId/expenses/:expenseId/edit", component: ExpenseFormPage, meta: { requiresAuth: true, requiresProfile: true } },
+    // `/edit` 排在前面，不然 `:expenseId` 會把 "edit" 當成 id 吃掉。
+    { path: "/tasks/:taskId/expenses/:expenseId", component: ExpenseDetailPage, meta: { requiresAuth: true, requiresProfile: true } },
     { path: "/join/:inviteCode", component: JoinTaskPage, meta: { public: true } },
     // 公開的旅費報告：不需要帳號，守衛在 `if (!user) return true` 就放行了。
     { path: "/r/:taskId/:reportId", component: ReportPage, meta: { public: true } },
