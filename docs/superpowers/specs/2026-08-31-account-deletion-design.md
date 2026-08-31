@@ -123,9 +123,12 @@ Firestore 觸發器（client 刪 `users/{uid}`、觸發器善後）比純用戶�
 
 ### 規模
 
-Firestore 批次上限 500 筆寫入，任務多的人會超過，用 `BulkWriter`。刪整個任務
-時用 `recursiveDelete()` 清 `members`／`expenses`／`payments`／`settlements`／
-`reports` 子集合。
+逐筆寫入，不用批次。Firestore 的 500 筆上限只在單一 batch 或 transaction 內
+成立，逐筆送就沒有那個限制 —— 而這裡也不需要原子性，整支函式本來就設計成
+可以重跑，那才是失敗時的復原手段。
+
+刪整個任務時用 `recursiveDelete()` 清 `members`／`expenses`／`payments`／
+`settlements`／`reports` 子集合。
 
 ## 用戶端
 
