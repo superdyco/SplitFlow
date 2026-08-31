@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
+import { memberDisplayName } from "@/utils/memberName";
 import AccessDenied from "@/components/common/AccessDenied.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
@@ -99,7 +100,7 @@ function generateReport() {
 }
 
 const memberNames = computed(() =>
-  Object.fromEntries(memberState.members.value.map(member => [member.uid, member.nickname]))
+  Object.fromEntries(memberState.members.value.map(member => [member.uid, memberDisplayName(member)]))
 );
 
 const expenseGroups = computed(() =>

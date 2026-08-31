@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
+import { memberDisplayName } from "@/utils/memberName";
 import AccessDenied from "@/components/common/AccessDenied.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
@@ -242,7 +243,7 @@ const canSubmit = computed(() => {
 function memberName(memberUid: string) {
   const member = selectableMembers.value.find(item => item.uid === memberUid);
   if (!member) return "已離開的成員";
-  return `${member.nickname}${member.active ? "" : "（已離開）"}`;
+  return memberDisplayName(member);
 }
 
 /**
@@ -798,7 +799,7 @@ onMounted(load);
             <span class="label">誰先付</span>
             <select v-model="paidBy" class="select">
               <option v-for="member in selectableMembers" :key="member.uid" :value="member.uid">
-                {{ member.nickname }}{{ member.uid === uid ? "（你）" : member.active ? "" : "（已離開）" }}
+                {{ member.uid === uid ? `${member.nickname}（你）` : memberDisplayName(member) }}
               </option>
             </select>
           </label>
@@ -829,7 +830,7 @@ onMounted(load);
                 :class="{ active: splitMemberIds.includes(member.uid) }"
                 @click="toggleSplit(member.uid)"
               >
-                {{ member.nickname }}{{ member.active ? "" : "（已離開）" }}
+                {{ memberDisplayName(member) }}
               </button>
             </div>
             <p v-if="Object.keys(evenSplits).length" class="tiny">
@@ -845,7 +846,7 @@ onMounted(load);
             <span class="label">每人金額（留白代表沒有參與）</span>
             <div class="stack custom-list">
               <div v-for="member in selectableMembers" :key="member.uid" class="custom-row">
-                <span class="who">{{ member.nickname }}{{ member.active ? "" : "（已離開）" }}</span>
+                <span class="who">{{ memberDisplayName(member) }}</span>
                 <input
                   :value="customAmounts[member.uid] ?? ''"
                   class="input custom-input"

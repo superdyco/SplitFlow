@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import type { TaskMember } from "@/types/member";
 import { ROLE_LABELS } from "@/types/member";
+import { memberDisplayName } from "@/utils/memberName";
 
 const props = defineProps<{
   member: TaskMember;
@@ -27,7 +28,7 @@ const showActions = computed(() => props.canManage && !isSelf.value && props.mem
   <div class="card member-row">
     <span class="avatar">{{ member.nickname.charAt(0).toUpperCase() }}</span>
     <div class="body">
-      <strong>{{ member.nickname }}</strong>
+      <strong>{{ memberDisplayName(member) }}</strong>
       <p class="tiny">
         {{ ROLE_LABELS[member.role] }}<span v-if="isSelf"> · 你</span><span v-if="isVirtual"> · 無帳號</span>
       </p>

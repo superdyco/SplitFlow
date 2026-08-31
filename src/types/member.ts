@@ -23,4 +23,10 @@ export interface TaskMember {
    * 舊文件沒有這個欄位，一律當成 false。
    */
   virtual?: boolean;
+
+  /**
+   * 這個人刪掉了自己的帳號。他的帳目留著，但他永遠不會回來。
+   * 舊文件沒有這個欄位，一律當成 false。
+   */
+  deleted?: boolean;
 }

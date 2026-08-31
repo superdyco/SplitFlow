@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import type { Expense } from "@/types/expense";
 import type { TaskMember } from "@/types/member";
+import { memberDisplayName } from "@/utils/memberName";
 import type { Payment } from "@/types/payment";
 import type { Settlement } from "@/types/settlement";
 import { amountToInput, formatAmount, parseAmountInput } from "@/utils/currency";
@@ -44,7 +45,7 @@ const draftError = ref<string | null>(null);
 const settlement = computed(() => props.settlement);
 
 const memberNames = computed(() =>
-  Object.fromEntries(props.members.map(member => [member.uid, member.nickname]))
+  Object.fromEntries(props.members.map(member => [member.uid, memberDisplayName(member)]))
 );
 
 const hasForeign = computed(() =>
