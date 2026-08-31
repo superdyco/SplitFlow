@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
+import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import { logout, providerLabel } from "@/services/authService";
 import { listQueued } from "@/services/receiptQueue";
@@ -109,6 +110,7 @@ async function signOut() {
 // 只讀一次就好 —— 這裡要的是數量，不是即時狀態。
 const tasks = ref<Task[]>([]);
 const deleting = ref(false);
+const confirmingDelete = ref(false);
 
 onMounted(async () => {
   const id = authStore.user?.uid;
@@ -122,23 +124,18 @@ onMounted(async () => {
   }
 });
 
-async function deleteAccount() {
-  if (deleting.value) return;
-
-  const prompt = deleteAccountPrompt({
+// 對話框的內容。要在畫面上綁定，所以是 computed 而不是按下去才算。
+const deletePrompt = computed(() =>
+  deleteAccountPrompt({
     nickname: userStore.profile?.nickname ?? "",
     taskCount: tasks.value.length,
     ownedTaskCount: tasks.value.filter(task => task.ownerId === authStore.user?.uid).length
-  });
+  })
+);
 
-  if (prompt.requireText) {
-    const typed = window.prompt(`${prompt.message}
-
-請打出「${prompt.requireText}」以確認：`);
-    if (typed?.trim() !== prompt.requireText) return;
-  } else if (!window.confirm(prompt.message)) {
-    return;
-  }
+async function deleteAccount() {
+  if (deleting.value) return;
+  confirmingDelete.value = false;
 
   deleting.value = true;
   error.value = null;
@@ -234,10 +231,21 @@ async function exportData() {
           你的支出與結算會留在同行的人那裡 —— 那些帳同時也是他們的紀錄。
           你的帳號、個人資料與收藏會永久消失，無法復原。
         </p>
-        <button class="btn btn-danger btn-block" :disabled="deleting" @click="deleteAccount">
+        <button class="btn btn-danger btn-block" :disabled="deleting" @click="confirmingDelete = true">
           {{ deleting ? "刪除中..." : "刪除帳號" }}
         </button>
       </div>
+
+      <ConfirmDialog
+        :open="confirmingDelete"
+        :title="deletePrompt.title"
+        :message="deletePrompt.message"
+        :confirm-label="deletePrompt.confirmLabel"
+        danger
+        :require-text="deletePrompt.requireText"
+        @confirm="deleteAccount"
+        @cancel="confirmingDelete = false"
+      />
 
       <!--
         擺在登出下面、樣式刻意最輕：這是「出事了才會被叫來按」的東西，

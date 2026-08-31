@@ -7,6 +7,7 @@ import '../domain/auth_error.dart' as auth;
 import '../domain/models.dart';
 import '../domain/validation.dart' as validate;
 import '../state/providers.dart';
+import 'confirm_dialog.dart';
 import 'system_share.dart';
 import 'theme.dart';
 
@@ -78,11 +79,16 @@ class _FormState extends ConsumerState<_Form> {
       ownedTaskCount: tasks.where((task) => task.ownerId == uid).length,
     );
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => _ConfirmDeleteDialog(prompt: prompt),
+    // 刪除帳號永遠是破壞性的 —— 沒有任務的人不必打字，但那不代表後果比較輕。
+    final confirmed = await showConfirmDialog(
+      context,
+      title: prompt.title,
+      message: prompt.message,
+      confirmLabel: prompt.confirmLabel,
+      requireText: prompt.requireText,
+      destructive: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed || !mounted) return;
 
     setState(() {
       _deleting = true;
@@ -301,68 +307,6 @@ class _FormState extends ConsumerState<_Form> {
           style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
           onPressed: _deleting ? null : _deleteAccount,
           child: Text(_deleting ? '刪除中...' : '刪除帳號'),
-        ),
-      ],
-    );
-  }
-}
-
-/// 刪除帳號的確認對話框。
-///
-/// `requireText` 是 null 時只要按確認；有值時要打對那串字才啟用按鈕。
-/// 分級摩擦沿用 taskActionPrompt 的原則：什麼都還沒有的人不該被刁難。
-class _ConfirmDeleteDialog extends StatefulWidget {
-  final DeleteAccountPrompt prompt;
-
-  const _ConfirmDeleteDialog({required this.prompt});
-
-  @override
-  State<_ConfirmDeleteDialog> createState() => _ConfirmDeleteDialogState();
-}
-
-class _ConfirmDeleteDialogState extends State<_ConfirmDeleteDialog> {
-  final _typed = TextEditingController();
-
-  @override
-  void dispose() {
-    _typed.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final require = widget.prompt.requireText;
-    final ready = require == null || _typed.text.trim() == require;
-
-    return AlertDialog(
-      title: Text(widget.prompt.title),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.prompt.message),
-            if (require != null) ...[
-              const SizedBox(height: 16),
-              Text('請打出「$require」以確認：'),
-              TextField(
-                controller: _typed,
-                autofocus: true,
-                onChanged: (_) => setState(() {}),
-              ),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-          onPressed: ready ? () => Navigator.of(context).pop(true) : null,
-          child: Text(widget.prompt.confirmLabel),
         ),
       ],
     );

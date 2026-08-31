@@ -121,7 +121,15 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
   /// 不做樂觀更新：失敗時要把卡片放回原狀，多一組狀態換一點點速度，
   /// 而這個操作一輩子按不到幾次。網頁版的取捨一樣。
   Future<void> _changeStatus(Task task, TaskStatus next) async {
-    final ok = await showConfirmDialog(context, taskActionPrompt(task, next));
+    final prompt = taskActionPrompt(task, next);
+    final ok = await showConfirmDialog(
+      context,
+      title: prompt.title,
+      message: prompt.message,
+      confirmLabel: prompt.confirmLabel,
+      requireText: prompt.requireText,
+      destructive: prompt.destructive,
+    );
     if (!ok || !mounted) return;
 
     try {
