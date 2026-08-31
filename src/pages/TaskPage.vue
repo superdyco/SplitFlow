@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import { memberDisplayName } from "@/utils/memberName";
@@ -21,6 +21,10 @@ import { groupExpensesByDate } from "@/utils/expenseGroups";
 import type { Expense } from "@/types/expense";
 import type { AssignableRole } from "@/types/member";
 import { useAuthStore } from "@/stores/auth";
+import { guardStall } from "@/utils/stallGuard";
+import { recoverConnection } from "@/services/networkRecovery";
+import { reportTrace } from "@/services/perfService";
+import { finishTrace, markPhase } from "@/utils/perfTrace";
 import { useExpenses } from "@/composables/useExpenses";
 import { usePayments } from "@/composables/usePayments";
 import { useTask } from "@/composables/useTask";
@@ -172,16 +176,31 @@ function canManage(expense: Expense) {
   return taskState.isAdmin.value || expense.createdBy === uid || expense.paidBy === uid;
 }
 
+/**
+ * 兩段都包上守衛。任務列表那邊裝了之後，卡住的抱怨就跑到這一頁來了 ——
+ * 同一個病：連線死了但 SDK 不報錯，於是壓著本機快取不發、等一個不會來的回應。
+ * 這裡比列表更容易中，因為一次要發六趟讀取，任何一趟卡住整頁就停在骨架上。
+ *
+ * 分兩段是因為它們本來就是先後關係（要先知道是不是成員才讀得下去），
+ * 而守衛的計時只認得一個 promise。兩段各自算，第一段慢不會吃掉第二段的額度。
+ *
+ * `recoverConnection` 自己有防重入，所以兩段都觸發也只會真的切一次連線。
+ */
 async function load() {
-  await taskState.load();
+  await guardStall(taskState.load(), recoverConnection);
+  markPhase("task");
   if (!taskState.isMember.value) return;
-  await Promise.all([
-    memberState.load(),
-    expenseState.load(),
-    paymentState.load(),
-    settlementState.load(),
-    reportState.load()
-  ]);
+  await guardStall(
+    Promise.all([
+      memberState.load(),
+      expenseState.load(),
+      paymentState.load(),
+      settlementState.load(),
+      reportState.load()
+    ]),
+    recoverConnection
+  );
+  markPhase("rest");
 }
 
 async function runSettlementAction(action: () => Promise<unknown>) {
@@ -366,7 +385,19 @@ async function reload() {
   }
 }
 
-onMounted(load);
+/**
+ * 收尾在頁面而不是路由，理由跟任務列表那邊一樣：導航結束時畫面還是空的，
+ * 那時候回報等於少算了使用者真正在盯著骨架的那一段。
+ */
+onMounted(async () => {
+  markPhase("mount");
+  await load();
+  await nextTick();
+  markPhase("render");
+
+  const trace = finishTrace("task");
+  if (trace) reportTrace(trace);
+});
 </script>
 
 <template>

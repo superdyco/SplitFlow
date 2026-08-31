@@ -5,10 +5,22 @@ import { markPhase, startTrace, traceDetail } from "@/utils/perfTrace";
 import { backgroundContext } from "@/utils/visibility";
 
 /**
- * 只追這一頁。使用者說卡的是它，而每多追一頁就多一份寫入成本與雜訊 ——
- * 之後要追別頁，把路徑加進來、頁面自己收尾就好。
+ * 追兩頁：任務列表，以及點進去之後的單一任務。使用者一開始說卡的是列表，
+ * 後來確認卡的其實是點進任務那一下 —— 兩頁的讀取量差很多（列表一趟查詢，
+ * 內頁一次六趟），所以分開追，名字分開才對得起來。
+ *
+ * 每多追一頁就多一份寫入成本與雜訊，所以還是只有這兩頁。之後要追別頁，
+ * 在這裡認出它、頁面自己收尾就好。
  */
-const TRACED_PATH = "/tasks";
+const TRACE_NAMES: Array<[RegExp, string]> = [
+  [/^\/tasks$/, "tasks"],
+  [/^\/tasks\/[^/]+$/, "task"]
+];
+
+function traceNameFor(path: string): string | null {
+  const hit = TRACE_NAMES.find(([pattern]) => pattern.test(path));
+  return hit ? hit[1] : null;
+}
 
 /**
  * 冷啟動 = 這個文件的第一次 `/tasks` 導航，不是第一次導航。
@@ -27,8 +39,12 @@ const TRACED_PATH = "/tasks";
  */
 let navigationCount = 0;
 let firstPath = "";
-/** 這個文件進過幾次 `/tasks`。0 代表現在這次是第一次，也就是冷啟動。 */
-let tracedCount = 0;
+/**
+ * 每一種追蹤各自進過幾次。0 代表現在這次是第一次，也就是冷啟動。
+ * 分開數是因為列表與內頁的冷啟動不是同一件事 —— 從列表點進內頁時，
+ * chunk 與登入狀態早就備好了，那不叫冷。
+ */
+const tracedCounts: Record<string, number> = {};
 
 const LoginPage = () => import("@/pages/LoginPage.vue");
 const OnboardingPage = () => import("@/pages/OnboardingPage.vue");
@@ -117,10 +133,12 @@ router.beforeEach(async (to, from) => {
   const navIndex = navigationCount;
   navigationCount += 1;
 
-  if (to.path === TRACED_PATH) {
-    startTrace("tasks");
-    traceDetail("cold", tracedCount === 0);
-    tracedCount += 1;
+  const traceName = traceNameFor(to.path);
+  if (traceName) {
+    startTrace(traceName);
+    const seen = tracedCounts[traceName] ?? 0;
+    traceDetail("cold", seen === 0);
+    tracedCounts[traceName] = seen + 1;
     traceDetail("navIndex", navIndex);
     traceDetail("firstPath", firstPath);
     traceDetail("from", from.path);
@@ -191,5 +209,5 @@ router.beforeEach(async (to, from) => {
  * 分不出來的話，看到「進頁面要兩秒」很容易一路往查詢那邊找，然後什麼都找不到。
  */
 router.beforeResolve(to => {
-  if (to.path === TRACED_PATH) markPhase("chunk");
+  if (traceNameFor(to.path)) markPhase("chunk");
 });
