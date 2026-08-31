@@ -490,6 +490,16 @@ GitHub 的 runner 內建 JDK，不用自己裝。
 
 建置也留在裡面，因為 chunk 的循環相依只有建置時抓得到。
 
+第一次跑撞了三個坑，都記在 workflow 的註解裡，這裡留個索引：
+
+- **`npm ci` 說 lock 檔沒同步**（一整排 `Missing: @esbuild/*`）。lock 檔沒問題，
+  是 npm 版本差異：lock 是 npm 11 寫的，它不把選用的 peer 相依寫進去，
+  而 Node 22 帶的 npm 10 認為那些該在。改用 Node 24 對齊。
+- **`auth/invalid-api-key`**。`config.ts` 在被 import 的當下就 `getAuth()`，
+  CI 沒有 `.env` 就整個檔案掛在載入階段。workflow 自己寫一份假值進去。
+- **JDK 版本**。runner 內建的是 17，firebase-tools 要 21 —— 跟當初擋住本機的
+  是同一件事，得用 `actions/setup-java` 指定。
+
 ## 待辦：確認框統一
 
 `ExpenseFormPage` 的刪除支出仍用 `window.confirm`，跟新的 `ConfirmDialog` 不一致。
