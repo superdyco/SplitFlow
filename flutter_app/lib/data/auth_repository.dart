@@ -15,6 +15,7 @@ import '../domain/auth_error.dart' as domain;
 import '../domain/models.dart';
 import 'firestore_refs.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -128,6 +129,52 @@ class AuthRepository {
       );
       throw Exception(message ?? err.code);
     }
+  }
+
+  /// 刪除自己的帳號。App Store 指引 5.1.1(v) 要求 App 內就能發起。
+  ///
+  /// 真正的刪除全在雲端函式裡（`functions/src/index.ts`）。現行規則下成員刪不掉
+  /// 自己的成員文件，也改不了 `ownerId` —— 要在這裡做就得為一輩子用一次的操作
+  /// 永久開兩個洞，而且跑到一半斷線會停在沒有人收拾得了的半刪除狀態。
+  ///
+  /// 重新驗證不是形式：這個操作不可逆，而拿到一支沒鎖的手機的人不該能刪掉別人
+  /// 的帳號。改由伺服器端刪除雖然技術上不受 `user.delete()` 的 recent-login
+  /// 限制，但保護的理由沒變。
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('請先登入');
+
+    final providerId = user.providerData.isEmpty
+        ? 'google.com'
+        : user.providerData.first.providerId;
+
+    try {
+      if (providerId == 'apple.com') {
+        await user.reauthenticateWithProvider(AppleAuthProvider());
+      } else {
+        await _ensureInitialized();
+        final account = await GoogleSignIn.instance.authenticate();
+        await user.reauthenticateWithCredential(
+          GoogleAuthProvider.credential(idToken: account.authentication.idToken),
+        );
+      }
+    } on GoogleSignInException catch (err) {
+      if (err.code == GoogleSignInExceptionCode.canceled) {
+        throw const SignInCancelled();
+      }
+      rethrow;
+    } on FirebaseAuthException catch (err) {
+      if (domain.isCancelledSignIn(err.code)) throw const SignInCancelled();
+      rethrow;
+    }
+
+    // region 要跟函式一致，不然會打到 us-central1 然後找不到函式。
+    await FirebaseFunctions.instanceFor(region: 'asia-east1')
+        .httpsCallable('deleteAccount')
+        .call<void>();
+
+    await GoogleSignIn.instance.signOut();
+    await _auth.signOut();
   }
 
   /// 登出。

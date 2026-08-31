@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/auth_repository.dart';
+import '../domain/account_deletion.dart';
 import '../domain/auth_error.dart' as auth;
 import '../domain/models.dart';
 import '../domain/validation.dart' as validate;
@@ -61,7 +63,42 @@ class _FormState extends ConsumerState<_Form> {
   bool _saved = false;
   bool _exporting = false;
   String _exportProgress = '';
+  bool _deleting = false;
   String? _error;
+
+  Future<void> _deleteAccount() async {
+    // 任務清單還沒載完就當作沒有任務。確認訊息會少講一段，但不該擋住
+    // 這條路 —— 真正的刪除在雲端執行，不依賴這份清單。
+    final tasks = ref.read(tasksProvider).value ?? const <Task>[];
+    final uid = ref.read(authStateProvider).value?.uid;
+
+    final prompt = deleteAccountPrompt(
+      nickname: _nickname.text.trim(),
+      taskCount: tasks.length,
+      ownedTaskCount: tasks.where((task) => task.ownerId == uid).length,
+    );
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => _ConfirmDeleteDialog(prompt: prompt),
+    );
+    if (confirmed != true) return;
+
+    setState(() {
+      _deleting = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authRepositoryProvider).deleteAccount();
+      if (mounted) Navigator.of(context).pop();
+    } on SignInCancelled {
+      // 重新驗證時自己取消，不是錯誤。
+    } catch (err) {
+      if (mounted) setState(() => _error = err.toString());
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
 
   @override
   void initState() {
@@ -248,6 +285,84 @@ class _FormState extends ConsumerState<_Form> {
             if (context.mounted) Navigator.of(context).pop();
           },
           child: const Text('登出'),
+        ),
+        const SizedBox(height: 32),
+        const Divider(),
+        const SizedBox(height: 16),
+        Text('刪除帳號', style: text.titleMedium),
+        const SizedBox(height: 8),
+        Text(
+          '你的支出與結算會留在同行的人那裡 —— 那些帳同時也是他們的紀錄。'
+          '你的帳號、個人資料與收藏會永久消失，無法復原。',
+          style: text.bodySmall,
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
+          onPressed: _deleting ? null : _deleteAccount,
+          child: Text(_deleting ? '刪除中...' : '刪除帳號'),
+        ),
+      ],
+    );
+  }
+}
+
+/// 刪除帳號的確認對話框。
+///
+/// `requireText` 是 null 時只要按確認；有值時要打對那串字才啟用按鈕。
+/// 分級摩擦沿用 taskActionPrompt 的原則：什麼都還沒有的人不該被刁難。
+class _ConfirmDeleteDialog extends StatefulWidget {
+  final DeleteAccountPrompt prompt;
+
+  const _ConfirmDeleteDialog({required this.prompt});
+
+  @override
+  State<_ConfirmDeleteDialog> createState() => _ConfirmDeleteDialogState();
+}
+
+class _ConfirmDeleteDialogState extends State<_ConfirmDeleteDialog> {
+  final _typed = TextEditingController();
+
+  @override
+  void dispose() {
+    _typed.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final require = widget.prompt.requireText;
+    final ready = require == null || _typed.text.trim() == require;
+
+    return AlertDialog(
+      title: Text(widget.prompt.title),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.prompt.message),
+            if (require != null) ...[
+              const SizedBox(height: 16),
+              Text('請打出「$require」以確認：'),
+              TextField(
+                controller: _typed,
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+          onPressed: ready ? () => Navigator.of(context).pop(true) : null,
+          child: Text(widget.prompt.confirmLabel),
         ),
       ],
     );

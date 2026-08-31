@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 import 'package:splitflow/domain/auth_error.dart';
+import 'package:splitflow/domain/account_deletion.dart';
 import 'package:splitflow/domain/member_name.dart';
 import 'package:splitflow/domain/models.dart';
 import 'package:splitflow/domain/place_bias.dart';
@@ -247,6 +248,61 @@ void main() {
         memberDisplayName(member(nickname: '', active: false)),
         '（沒有暱稱）（已離開）',
       );
+    });
+  });
+
+  group('刪除帳號文案', () {
+    test('沒有任何任務就不要求打字', () {
+      final prompt = deleteAccountPrompt(
+        nickname: '小美',
+        taskCount: 0,
+        ownedTaskCount: 0,
+      );
+      expect(prompt.requireText, isNull);
+    });
+
+    test('有任務就要打出自己的暱稱', () {
+      final prompt = deleteAccountPrompt(
+        nickname: '小美',
+        taskCount: 3,
+        ownedTaskCount: 1,
+      );
+      expect(prompt.requireText, '小美');
+    });
+
+    test('講明帳目會留下', () {
+      final prompt = deleteAccountPrompt(
+        nickname: '小美',
+        taskCount: 3,
+        ownedTaskCount: 0,
+      );
+      expect(prompt.message, contains('留'));
+    });
+
+    test('有擁有的任務才提轉移', () {
+      final owned = deleteAccountPrompt(
+        nickname: '小美',
+        taskCount: 3,
+        ownedTaskCount: 2,
+      );
+      expect(owned.message, contains('轉給'));
+
+      final none = deleteAccountPrompt(
+        nickname: '小美',
+        taskCount: 3,
+        ownedTaskCount: 0,
+      );
+      expect(none.message, isNot(contains('轉給')));
+    });
+
+    test('不提未結清餘額 —— 付款確認不是強制流程，那個數字不是事實', () {
+      final prompt = deleteAccountPrompt(
+        nickname: '小美',
+        taskCount: 5,
+        ownedTaskCount: 1,
+      );
+      expect(prompt.message, isNot(contains('欠')));
+      expect(prompt.message, isNot(contains('未結清')));
     });
   });
 
