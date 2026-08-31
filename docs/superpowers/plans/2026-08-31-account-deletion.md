@@ -1207,7 +1207,7 @@ Expected: `deleteAccount(asia-east1)` **Successful create operation**
 npm run deploy
 ```
 
-- [ ] **Step 3: 在正式環境用一個測試帳號實際刪一次**
+- [x] **Step 3: 在正式環境用一個測試帳號實際刪一次**
 
 建一個測試帳號、建兩個任務（一個只有自己、一個多拉一個人進來），然後刪掉。確認：
 
