@@ -30,10 +30,15 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      # 24，因為 package-lock.json 是 npm 11 產的（Node 24 內建）。
+      # 22 帶的是 npm 10，而兩者對「選用的 peer 相依」處置不同 —— vitest 底下
+      # 那個 vite 把 esbuild 列為 optional peer，npm 11 不裝它、也不寫進 lock，
+      # npm 10 則認為它該在，於是 `npm ci` 報一整排 Missing: @esbuild/* 然後死掉。
+      # 鎖同一個大版本比在 lock 檔上追著補漏洞可靠。
       - name: Install Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
 
       - name: Install dependencies
