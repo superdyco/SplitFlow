@@ -21,7 +21,7 @@ import { groupExpensesByDate } from "@/utils/expenseGroups";
 import type { Expense } from "@/types/expense";
 import type { AssignableRole } from "@/types/member";
 import { useAuthStore } from "@/stores/auth";
-import { guardStall } from "@/utils/stallGuard";
+import { readWithRecovery } from "@/utils/stallGuard";
 import { recoverConnection } from "@/services/networkRecovery";
 import { reportTrace } from "@/services/perfService";
 import { finishTrace, markPhase } from "@/utils/perfTrace";
@@ -187,17 +187,18 @@ function canManage(expense: Expense) {
  * `recoverConnection` 自己有防重入，所以兩段都觸發也只會真的切一次連線。
  */
 async function load() {
-  await guardStall(taskState.load(), recoverConnection);
+  await readWithRecovery(() => taskState.load(), recoverConnection);
   markPhase("task");
   if (!taskState.isMember.value) return;
-  await guardStall(
-    Promise.all([
-      memberState.load(),
-      expenseState.load(),
-      paymentState.load(),
-      settlementState.load(),
-      reportState.load()
-    ]),
+  await readWithRecovery(
+    () =>
+      Promise.all([
+        memberState.load(),
+        expenseState.load(),
+        paymentState.load(),
+        settlementState.load(),
+        reportState.load()
+      ]),
     recoverConnection
   );
   markPhase("rest");

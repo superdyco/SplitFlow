@@ -46,3 +46,43 @@ export function guardStall<T>(
   const timer = setTimeout(onStall, timeoutMs);
   return read.finally(() => clearTimeout(timer));
 }
+
+
+/**
+ * 卡住就補救，補救之後那一趟死掉的話再讀一次。
+ *
+ * 為什麼需要重試：`guardStall` 不會取消原本那個讀取，而切斷重連有時候會把
+ * 那趟還在半路上的讀取一起弄死，Firestore 吐 `unavailable`。實測看得到 ——
+ * 補上守衛之後，30 秒的乾等消失了，但偶爾換成一句「連不上伺服器」。使用者
+ * 手動重整就好了，那正好證明重試一定會成功，那就別讓他自己重整。
+ *
+ * 收 `() => Promise<T>` 而不是 promise：要重試就得能再發一次，promise 發不了
+ * 第二次。`guardStall` 的 promise 版本留著，沒有補救可做的地方仍然用它。
+ *
+ * 只有守衛真的觸發過才重試。權限不足、文件不存在這種錯誤重試幾次都一樣，
+ * 多打一趟只是讓使用者多等 —— 而且會把真正的錯誤訊息延後到第二次才出現。
+ *
+ * 第二趟不包守衛：連線剛剛才重建，這時候再切一次只會把它拆掉。第二趟還是
+ * 失敗就是真的失敗，那句錯誤訊息就是誠實的。
+ */
+export async function readWithRecovery<T>(
+  read: () => Promise<T>,
+  onStall: () => void,
+  timeoutMs = STALL_TIMEOUT_MS
+): Promise<T> {
+  let stalled = false;
+
+  try {
+    return await guardStall(
+      read(),
+      () => {
+        stalled = true;
+        onStall();
+      },
+      timeoutMs
+    );
+  } catch (err) {
+    if (!stalled) throw err;
+    return read();
+  }
+}

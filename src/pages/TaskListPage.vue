@@ -22,7 +22,7 @@ import { firebaseErrorMessage } from "@/utils/firestore";
 import { finishTrace, markPhase, startTrace, traceDetail } from "@/utils/perfTrace";
 import { reportTrace } from "@/services/perfService";
 import { recoverConnection } from "@/services/networkRecovery";
-import { guardStall } from "@/utils/stallGuard";
+import { readWithRecovery } from "@/utils/stallGuard";
 
 const authStore = useAuthStore();
 const loading = ref(true);
@@ -44,7 +44,7 @@ async function load() {
       卡住就重連。量測顯示這一趟有 44% 的機率會等 30 秒 —— 不是查詢慢
       （健康時 49～99ms），是連線死了沒人宣告。guardStall 負責宣告。
     */
-    const tasks = await guardStall(listUserTasks(uid), recoverConnection).catch(err => {
+    const tasks = await readWithRecovery(() => listUserTasks(uid), recoverConnection).catch(err => {
       throw new Error(`讀取任務列表失敗：${firebaseErrorMessage(err)}`);
     });
     // 只有這一趟是 Firestore 的時間。守衛與 chunk 的等待記在導航那邊。

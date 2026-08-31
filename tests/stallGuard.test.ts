@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { STALL_TIMEOUT_MS, guardStall } from "../src/utils/stallGuard";
+import { STALL_TIMEOUT_MS, guardStall, readWithRecovery } from "../src/utils/stallGuard";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -73,5 +73,58 @@ describe("guardStall", () => {
     void guardStall(new Promise(() => {}), onStall, 100);
     await vi.advanceTimersByTimeAsync(100);
     expect(onStall).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("readWithRecovery", () => {
+  it("一次就成功的讀取只發一趟", async () => {
+    const read = vi.fn().mockResolvedValue("任務");
+    const onStall = vi.fn();
+
+    await expect(readWithRecovery(read, onStall)).resolves.toBe("任務");
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(onStall).not.toHaveBeenCalled();
+  });
+
+  it("卡住補救之後那趟死掉的話，自己再讀一次", async () => {
+    // 實際看到的樣子：切斷重連把還在半路的讀取一起弄死，Firestore 吐 unavailable。
+    const read = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise((_, reject) => setTimeout(() => reject(new Error("unavailable")), 2000)))
+      .mockResolvedValueOnce("任務");
+    const onStall = vi.fn();
+
+    const guarded = readWithRecovery(read, onStall);
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(guarded).resolves.toBe("任務");
+    expect(onStall).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledTimes(2);
+  });
+
+  it("守衛沒觸發過就不重試 —— 權限不足再讀一次也是一樣的答案", async () => {
+    const read = vi.fn().mockRejectedValue(new Error("permission-denied"));
+    const onStall = vi.fn();
+
+    await expect(readWithRecovery(read, onStall)).rejects.toThrow("permission-denied");
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(onStall).not.toHaveBeenCalled();
+  });
+
+  it("重試也失敗就把錯誤交出去，不會無限重來", async () => {
+    const read = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise((_, reject) => setTimeout(() => reject(new Error("第一趟")), 2000)))
+      .mockImplementationOnce(() => Promise.reject(new Error("第二趟")));
+    const onStall = vi.fn();
+
+    // 期待要在推時間之前掛上去。不然 guarded 會在沒有任何 handler 的那一刻
+    // 拒絕，Node 先記成 unhandled rejection，測試才慢一步接手。
+    const guarded = readWithRecovery(read, onStall);
+    const rejects = expect(guarded).rejects.toThrow("第二趟");
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await rejects;
+    expect(read).toHaveBeenCalledTimes(2);
   });
 });
