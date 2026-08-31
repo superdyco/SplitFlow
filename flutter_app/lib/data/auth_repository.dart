@@ -96,6 +96,40 @@ class AuthRepository {
     }
   }
 
+  /// Apple 登入。**iOS 上架的硬性要求**（App Store 指引 4.8：提供第三方登入
+  /// 就必須同時提供 Sign in with Apple）。
+  ///
+  /// 用 firebase_auth 自己的 `signInWithProvider` 而不是額外的套件：在 iOS 上
+  /// 這條路會走系統原生的授權畫面，nonce 由 SDK 處理，不必多一個相依。
+  ///
+  /// 姓名只有**第一次**授權時拿得到，之後每次登入都是空的。這裡不特別接 ——
+  /// 暱稱本來就在 onboarding 讓使用者自己填，拿不到也不影響。
+  ///
+  /// 注意使用者可以選「隱藏我的電子郵件」，那時拿到的是
+  /// `@privaterelay.appleid.com` 的轉發位址。那是一個合法的 email，個人設定頁
+  /// 照樣顯示得出來，但它跟同一個人的 Google 信箱**不是同一個** —— 所以那會
+  /// 是另一個帳號，Firebase 不會、也無法把兩者視為衝突。
+  Future<User> signInWithApple() async {
+    try {
+      final provider = AppleAuthProvider()
+        ..addScope('email')
+        ..addScope('name');
+
+      final result = await _auth.signInWithProvider(provider);
+      final user = result.user;
+      if (user == null) throw Exception('登入成功但沒有拿到使用者資料');
+      return user;
+    } on FirebaseAuthException catch (err) {
+      if (domain.isCancelledSignIn(err.code)) throw const SignInCancelled();
+      final message = domain.describeSignInError(
+        err.code,
+        domain.SignInProvider.apple,
+        err.message ?? err.code,
+      );
+      throw Exception(message ?? err.code);
+    }
+  }
+
   /// 登出。
   ///
   /// [onBeforeSignOut] 在清掉 Firebase Auth **之前**跑，給推播 token 的清除

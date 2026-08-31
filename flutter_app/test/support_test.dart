@@ -170,6 +170,46 @@ void main() {
     });
   });
 
+  group('登入供應商清單', () {
+    test('Apple 平台提供 Sign in with Apple', () {
+      // App Store 指引 4.8：提供第三方登入就必須同時提供 Apple 登入。
+      // 少了這個，iOS 版連審查都過不了。
+      expect(
+        enabledProvidersFor(isApplePlatform: true),
+        contains(SignInProvider.apple),
+      );
+    });
+
+    test('Apple 排在最前面', () {
+      // Apple 的人機介面指引要求 Sign in with Apple 至少跟其他登入方式一樣
+      // 顯眼，審查員會實際看畫面。排第一是最沒有爭議的做法。
+      expect(
+        enabledProvidersFor(isApplePlatform: true).first,
+        SignInProvider.apple,
+      );
+    });
+
+    test('非 Apple 平台不顯示 Apple 按鈕', () {
+      // Android 上的 Apple 登入只能走網頁 OAuth，體驗比 Google 差一截，
+      // 而且沒有任何規定要求 Android 提供。顯示了只是多一條會出錯的路。
+      expect(
+        enabledProvidersFor(isApplePlatform: false),
+        isNot(contains(SignInProvider.apple)),
+      );
+    });
+
+    test('Google 在每個平台都還在', () {
+      expect(
+        enabledProvidersFor(isApplePlatform: true),
+        contains(SignInProvider.google),
+      );
+      expect(
+        enabledProvidersFor(isApplePlatform: false),
+        contains(SignInProvider.google),
+      );
+    });
+  });
+
   group('收據政策', () {
     test('壓縮後的上限必須跟 storage.rules 一致', () {
       // 改這個數字就要改 storage.rules，反之亦然。網頁版與原生版共用同一份規則。

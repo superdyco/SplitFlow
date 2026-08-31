@@ -13,18 +13,25 @@ const Map<SignInProvider, String> providerLabels = {
   SignInProvider.facebook: 'Facebook',
 };
 
-/// 登入頁實際顯示的供應商。程式碼路徑都留著，之後要開哪個就把名字加回這個
-/// 清單，其餘不用改。
+/// 登入頁實際顯示的供應商，依平台而定。
 ///
-/// Apple 拿掉：要 Apple Developer Program（年費 US$99）才建得出 Services ID
-/// 與私密金鑰，沒有付費帳號時 Firebase Console 那格根本填不完。
+/// 收 bool 而不是 TargetPlatform：這一層刻意不 import Flutter —— CI 跑的是
+/// `dart test` 而不是 `flutter test`，混進 Flutter SDK 的 import 會讓整包測試
+/// 跑不起來。呼叫端自己算 `defaultTargetPlatform == TargetPlatform.iOS`。
 ///
-/// Facebook 拿掉：Meta 現在要求 App 上線前得連結商業檔案、填隱私政策與資料
+/// Apple 只開在 Apple 平台：那裡是硬性要求（App Store 指引 4.8 —— 提供第三方
+/// 登入就必須同時提供 Apple 登入），而 Android 上只能走網頁 OAuth，體驗比
+/// Google 差一截又沒有規定要求，顯示了只是多一條會出錯的路。
+///
+/// Apple 排第一：Apple 的人機介面指引要求 Sign in with Apple 至少跟其他登入
+/// 方式一樣顯眼，而審查員會實際看畫面。
+///
+/// Facebook 仍然拿掉：Meta 要求 App 上線前得連結商業檔案、填隱私政策與資料
 /// 刪除網址，流程太長，而 Google 登入沒有任何這類關卡。
-///
-/// 註：這個清單在原生版可能會變 —— iOS 上架時 Apple 會要求提供 Apple 登入。
-/// 真的要送 App Store 時記得回來處理。
-const List<SignInProvider> enabledProviders = [SignInProvider.google];
+List<SignInProvider> enabledProvidersFor({required bool isApplePlatform}) =>
+    isApplePlatform
+        ? const [SignInProvider.apple, SignInProvider.google]
+        : const [SignInProvider.google];
 
 /// Firebase 回傳的 providerId 對應到人看得懂的名稱。
 const Map<String, String> providerIdLabels = {

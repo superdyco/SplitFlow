@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ENABLED_PROVIDERS,
   describeSignInError,
   existingAccountMessage,
   isCancelledSignIn,
@@ -79,5 +80,11 @@ describe("existingAccountMessage", () => {
     const message = existingAccountMessage("", []);
     expect(message).not.toContain("（）");
     expect(message).toContain("別的方式");
+  });
+});
+
+describe("ENABLED_PROVIDERS", () => {
+  it("登入頁提供 Apple —— iOS 上架的硬性要求，而網頁登不進去就會變成兩個帳號", () => {
+    expect(ENABLED_PROVIDERS).toContain("apple");
   });
 });
