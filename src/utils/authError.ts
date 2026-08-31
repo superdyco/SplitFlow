@@ -14,15 +14,16 @@ export const PROVIDER_LABELS: Record<SignInProvider, string> = {
  * 登入頁實際顯示的供應商。程式碼路徑（`buildProvider` 的各個分支）都留著，
  * 之後要開哪個就把名字加回這個陣列，其餘不用改。
  *
- * Apple 打開：iOS 上架的硬性要求（App Store 指引 4.8 —— 提供第三方登入就
- * 必須同時提供 Sign in with Apple）。網頁版跟著開，不然用 Apple 註冊的人在
- * 桌機上登不進去，會以為自己的旅程不見了。需要 Apple Developer Program 的
- * Services ID、Return URL 與 .p8 私密金鑰，都填在 Firebase Console。
+ * Apple 先關掉：網頁版要跑 Sign in with Apple，得有 Services ID、Return URL
+ * 與 .p8 私密金鑰，這三樣都只有 Apple Developer Program（USD $99/年）的會員
+ * 能建。還沒付費，Firebase 會回 auth/operation-not-allowed —— 按鈕留在畫面上
+ * 只會讓人按了撞牆。等 iOS 要上架（指引 4.8 規定有第三方登入就必須提供 Apple
+ * 登入，屆時反正也得付同一筆會員費），把 "apple" 加回這個陣列、設定填完就通了。
  *
  * Facebook 拿掉：Meta 現在要求 App 上線前得連結商業檔案、填隱私政策與資料刪除
  * 網址，流程太長，而 Google 登入沒有任何這類關卡。
  */
-export const ENABLED_PROVIDERS: SignInProvider[] = ["google", "apple"];
+export const ENABLED_PROVIDERS: SignInProvider[] = ["google"];
 
 /** Firebase 回傳的 providerId 對應到人看得懂的名稱。 */
 export const PROVIDER_ID_LABELS: Record<string, string> = {

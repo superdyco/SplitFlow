@@ -84,7 +84,7 @@ describe("existingAccountMessage", () => {
 });
 
 describe("ENABLED_PROVIDERS", () => {
-  it("登入頁提供 Apple —— iOS 上架的硬性要求，而網頁登不進去就會變成兩個帳號", () => {
-    expect(ENABLED_PROVIDERS).toContain("apple");
+  it("登入頁只放真的登得進去的方式 —— Apple 要付費會員才設定得起來，先不顯示", () => {
+    expect(ENABLED_PROVIDERS).toEqual(["google"]);
   });
 });
