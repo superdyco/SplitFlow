@@ -4,7 +4,8 @@
 # —— 那是最不該只靠「某台筆電上跑得起來」的東西。這個 repo 的 rules 測試曾經
 # 因為本機 JDK 版本不夠而擱置了一段時間，正是這種依賴的例子。
 #
-# emulator 是 Java 程式，GitHub 的 runner 內建 JDK，所以這裡不用自己裝。
+# emulator 是 Java 程式。runner 內建的 JDK 是 17，而 firebase-tools 要 21 以上，
+# 所以還是得自己指定一個 —— 跟當初擋住本機的是同一件事。
 name: Checks
 
 on:
@@ -40,6 +41,14 @@ jobs:
         with:
           node-version: "24"
           cache: npm
+
+      # firebase-tools 從某一版起要求 JDK 21 以上，而 ubuntu-latest 內建的是 17。
+      # 只有 rules 那一步用得到，但裝在前面比較不會被之後搬動步驟時弄丟。
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
 
       - name: Install dependencies
         run: npm ci
