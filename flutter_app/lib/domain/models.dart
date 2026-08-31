@@ -322,12 +322,17 @@ class TaskMember {
   /// 他不會登入，所以任何「他自己來操作」的介面都不該對他出現。
   final bool virtual;
 
+  /// 這個人刪掉了自己的帳號。他的帳目留著，但他永遠不會回來。
+  /// 舊文件沒有這個欄位，一律當成 false。
+  final bool deleted;
+
   const TaskMember({
     required this.uid,
     required this.nickname,
     required this.role,
     required this.active,
     this.virtual = false,
+    this.deleted = false,
   });
 }
 

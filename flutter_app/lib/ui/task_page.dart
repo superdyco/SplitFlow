@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/expense_groups.dart';
+import '../domain/member_name.dart';
 import '../domain/models.dart';
 
 import '../domain/task_status.dart';
@@ -279,7 +280,7 @@ class _ExpensesTab extends ConsumerWidget {
 
           final names = {
             for (final m in members.value ?? const <TaskMember>[])
-              m.uid: m.nickname,
+              m.uid: memberDisplayName(m),
           };
           final groups = groupExpensesByDate(list, task.defaultCurrency);
 

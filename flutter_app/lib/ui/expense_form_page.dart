@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/rate_service.dart';
 import '../domain/currency.dart';
 import '../domain/expense_date.dart';
+import '../domain/member_name.dart';
 import '../domain/models.dart';
 import '../domain/offline_write.dart';
 // 'required' 這個名字跟 Flutter 的 @required 標註撞名，加前綴分開。
@@ -595,7 +596,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           DropdownMenuItem(
                             value: m.uid,
                             child: Text(
-                              '${m.nickname}${m.active ? '' : '（已離開）'}',
+                              memberDisplayName(m),
                             ),
                           ),
                       ],
@@ -627,7 +628,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               contentPadding: EdgeInsets.zero,
                               value: _splitWith.contains(m.uid),
                               title: Text(
-                                '${m.nickname}${m.active ? '' : '（已離開）'}',
+                                memberDisplayName(m),
                               ),
                               onChanged: (on) => setState(() {
                                 on == true
@@ -643,7 +644,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      '${m.nickname}${m.active ? '' : '（已離開）'}',
+                                      memberDisplayName(m),
                                     ),
                                   ),
                                   SizedBox(

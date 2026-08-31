@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 import 'package:splitflow/domain/auth_error.dart';
+import 'package:splitflow/domain/member_name.dart';
 import 'package:splitflow/domain/models.dart';
 import 'package:splitflow/domain/place_bias.dart';
 import 'package:splitflow/domain/receipt_policy.dart';
@@ -206,6 +207,45 @@ void main() {
       expect(
         enabledProvidersFor(isApplePlatform: false),
         contains(SignInProvider.google),
+      );
+    });
+  });
+
+  group('成員顯示名稱', () {
+    TaskMember member({
+      String nickname = '小美',
+      bool active = true,
+      bool deleted = false,
+    }) =>
+        TaskMember(
+          uid: 'u1',
+          nickname: nickname,
+          role: 'member',
+          active: active,
+          deleted: deleted,
+        );
+
+    test('正常成員就是暱稱本身', () {
+      expect(memberDisplayName(member()), '小美');
+    });
+
+    test('被移除的成員標成已離開', () {
+      expect(memberDisplayName(member(active: false)), '小美（已離開）');
+    });
+
+    test('刪除帳號的人標成已刪除，不是已離開', () {
+      // 兩件事對其他人意義不同：已離開的人可以用邀請連結回來，
+      // 刪掉帳號的人永遠不會。
+      expect(
+        memberDisplayName(member(active: false, deleted: true)),
+        '小美（已刪除）',
+      );
+    });
+
+    test('沒有暱稱時不要只留下一個括號', () {
+      expect(
+        memberDisplayName(member(nickname: '', active: false)),
+        '（沒有暱稱）（已離開）',
       );
     });
   });

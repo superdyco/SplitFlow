@@ -214,5 +214,8 @@ TaskMember memberFromMap(Map<String, dynamic> data) {
     role: (data['role'] as String?) ?? 'member',
     active: data['active'] != false,
     virtual: data['virtual'] == true,
+    // 用 == true 而不是 as bool：舊文件沒有這個欄位，讀到的是 null，
+    // 強制轉型會直接丟例外。
+    deleted: data['deleted'] == true,
   );
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/member_footprint.dart';
+import '../domain/member_name.dart';
 import '../domain/models.dart';
 import '../domain/offline_write.dart';
 import '../state/providers.dart';
@@ -396,7 +397,7 @@ class _MemberCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        member.nickname.isEmpty ? '（沒有暱稱）' : member.nickname,
+                        memberDisplayName(member),
                         style: text.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                           color:

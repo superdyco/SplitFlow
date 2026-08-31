@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/currency.dart';
+import '../domain/member_name.dart';
 import '../domain/models.dart';
 import '../domain/offline_write.dart';
 import '../domain/payment_actions.dart';
@@ -189,7 +190,7 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
       data: (result) {
         final names = {
           for (final m in members.value ?? const <TaskMember>[])
-            m.uid: m.nickname,
+            m.uid: memberDisplayName(m),
         };
         final all = payments.value ?? const <Payment>[];
         final pending = all.where((p) => p.status != 'confirmed').toList();
