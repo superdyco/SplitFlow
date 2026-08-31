@@ -1,3 +1,6 @@
+// defaultTargetPlatform 在 foundation，material 只轉出 TargetPlatform 型別
+// 而不轉出這個常數 —— 少了這行 dart analyze 會直接報 undefined_identifier。
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
