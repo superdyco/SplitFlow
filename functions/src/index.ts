@@ -12,13 +12,16 @@
  * 錯誤日誌之外，什麼也改變不了。
  */
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
 import { expenseNotification } from "./message.js";
 import { recipientIds } from "./recipients.js";
+import { pickSuccessor, type SuccessorCandidate } from "./successor.js";
 
 initializeApp();
 
@@ -122,3 +125,101 @@ export const onExpenseCreated = onDocumentCreated(
     }
   }
 );
+
+/**
+ * 刪除自己的帳號。App Store 指引 5.1.1(v) 要求 App 內就能發起。
+ *
+ * **帳目留下，身分標記為已刪除。** 一個人的支出不只是他自己的資料，也是同行者
+ * 的共同紀錄 —— 單方面抽掉會讓別人已經算好的帳突然對不上，而他付過的錢別人
+ * 可能還沒還。
+ *
+ * 為什麼在伺服器端做：現行規則下成員刪不掉自己的成員文件（`allow delete` 要
+ * admin），也沒有任何路徑改得了 `ownerId`。要在用戶端完成就得為一輩子用一次
+ * 的操作永久開兩個洞。而且用戶端跑到一半斷線會停在半刪除狀態，沒有人收拾得了。
+ */
+export const deleteAccount = onCall({ region: REGION }, async request => {
+  // uid 只從 auth context 拿。只要它來自參數，任何人就能刪任何人的帳號。
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "請先登入");
+  }
+
+  let deletedTasks = 0;
+  let transferredTasks = 0;
+  let leftTasks = 0;
+
+  const tasks = await db.collection("tasks").where("memberIds", "array-contains", uid).get();
+
+  for (const taskSnap of tasks.docs) {
+    const task = taskSnap.data();
+    const memberIds: string[] = task.memberIds ?? [];
+    const adminIds: string[] = task.adminIds ?? [];
+
+    // 冪等：上一次跑到一半就成功處理過的任務直接跳過。
+    if (!memberIds.includes(uid)) continue;
+
+    if (task.ownerId === uid) {
+      const membersSnap = await taskSnap.ref.collection("members").orderBy("joinedAt").get();
+      const candidates: SuccessorCandidate[] = membersSnap.docs.map(doc => ({
+        uid: doc.id,
+        active: doc.data().active !== false,
+        virtual: doc.data().virtual === true
+      }));
+
+      const successor = pickSuccessor(adminIds, candidates, uid);
+
+      if (successor === null) {
+        // 沒有真人接得了手，留著任務也沒有人看得到。
+        await db.recursiveDelete(taskSnap.ref);
+        deletedTasks += 1;
+        continue;
+      }
+
+      await taskSnap.ref.update({
+        ownerId: successor,
+        adminIds: [...new Set([...adminIds.filter(id => id !== uid), successor])],
+        memberIds: memberIds.filter(id => id !== uid),
+        memberCount: Math.max(0, memberIds.length - 1),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      // 接手的人角色也要跟著改，不然成員列上不會顯示他是擁有者。
+      await taskSnap.ref.collection("members").doc(successor).set({ role: "owner" }, { merge: true });
+      transferredTasks += 1;
+    } else {
+      await taskSnap.ref.update({
+        adminIds: adminIds.filter(id => id !== uid),
+        memberIds: memberIds.filter(id => id !== uid),
+        memberCount: Math.max(0, memberIds.length - 1),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      leftTasks += 1;
+    }
+
+    // 成員文件留著。支出的 splits 以 uid 當 key，刪掉之後成員列與結算只剩
+    // 一串裸 uid，其他人看不懂那筆帳是誰的。
+    //
+    // 暱稱不覆寫：畫面自己組「小美（已刪除）」。而且結算快照的 memberNames
+    // 本來就永久保存了當時的暱稱，覆寫並不會真的抹掉什麼。
+    await taskSnap.ref.collection("members").doc(uid).set(
+      { active: false, deleted: true },
+      { merge: true }
+    );
+  }
+
+  await db.recursiveDelete(db.collection("users").doc(uid).collection("tokens"));
+  await db.recursiveDelete(db.collection("users").doc(uid).collection("favorites"));
+  await db.collection("users").doc(uid).delete();
+
+  // Auth 放最後。反過來的話中途失敗使用者已經登不進來，永遠無法重試，資料就
+  // 卡在半刪除狀態。放最後，任何一步失敗他都還在，再按一次即可。
+  try {
+    await getAuth().deleteUser(uid);
+  } catch (error) {
+    // 已經刪掉了就是成功 —— 這是重試會走到的路。
+    const code = (error as { code?: string }).code;
+    if (code !== "auth/user-not-found") throw error;
+  }
+
+  logger.info("帳號已刪除", { uid, deletedTasks, transferredTasks, leftTasks });
+  return { deletedTasks, transferredTasks, leftTasks };
+});
