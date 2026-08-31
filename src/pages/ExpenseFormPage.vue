@@ -48,6 +48,7 @@ import { useReceipt } from "@/composables/useReceipt";
 import { useDictation } from "@/composables/useDictation";
 import { deleteReceipt, flushReceipts } from "@/services/receiptService";
 import { removeQueued } from "@/services/receiptQueue";
+import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -562,8 +563,10 @@ async function submit() {
   }
 }
 
+const confirmingRemove = ref(false);
+
 async function remove() {
-  if (!window.confirm("確定要刪除這筆支出嗎？")) return;
+  confirmingRemove.value = false;
   removing.value = true;
   error.value = null;
   try {
@@ -892,7 +895,12 @@ onMounted(load);
         <button class="btn btn-primary btn-block" :disabled="saving || !canSubmit" @click="submit">
           {{ saving ? "儲存中..." : isEdit ? "儲存變更" : "新增支出" }}
         </button>
-        <button v-if="isEdit" class="btn btn-danger btn-block" :disabled="removing" @click="remove">
+        <button
+          v-if="isEdit"
+          class="btn btn-danger btn-block"
+          :disabled="removing"
+          @click="confirmingRemove = true"
+        >
           {{ removing ? "刪除中..." : "刪除支出" }}
         </button>
         <button class="btn btn-block" @click="router.push(`/tasks/${taskId}`)">取消</button>
@@ -902,6 +910,16 @@ onMounted(load);
         :url="receiptState.previewUrl.value"
         :open="viewerOpen"
         @close="viewerOpen = false"
+      />
+
+      <ConfirmDialog
+        :open="confirmingRemove"
+        title="刪除這筆支出？"
+        message="這筆支出與它的收據都會消失，結算金額會跟著重算。刪掉就找不回來了。"
+        confirm-label="刪除支出"
+        danger
+        @confirm="remove"
+        @cancel="confirmingRemove = false"
       />
     </div>
   </AppLayout>

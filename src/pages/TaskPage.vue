@@ -42,6 +42,7 @@ import { buildInviteUrl, firebaseErrorMessage } from "@/utils/firestore";
 import { removeMemberPrompt, type RemoveMemberPrompt } from "@/utils/memberRemoval";
 import { memberFootprint, type MemberFootprint } from "@/utils/memberFootprint";
 import RemoveMemberDialog from "@/components/member/RemoveMemberDialog.vue";
+import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import { isInstalledApp } from "@/utils/platform";
 
 type Tab = "expenses" | "members" | "settlement";
@@ -222,8 +223,18 @@ function saveSettlement(note: string) {
   return runSettlementAction(() => createSettlement(taskId.value, input, uid));
 }
 
-function removeSettlement(settlementId: string) {
-  if (!window.confirm("確定要刪掉這筆結算紀錄嗎？刪掉就找不回來了。")) return;
+/*
+  刪除的確認一律走 ConfirmDialog，不用 window.confirm —— 後者在手機上是系統
+  對話框，按鈕位置不受控，「確定」常常就落在拇指下面。
+
+  存的是 id 而不是布林值：對話框要知道刪的是哪一筆，而列表上每一列都可能觸發它。
+*/
+const removingSettlement = ref<string | null>(null);
+
+function removeSettlement() {
+  const settlementId = removingSettlement.value;
+  if (!settlementId) return;
+  removingSettlement.value = null;
   return runSettlementAction(() => deleteSettlement(taskId.value, settlementId));
 }
 
@@ -251,8 +262,12 @@ function acceptPayment(paymentId: string) {
   return runPaymentAction(() => confirmPayment(taskId.value, paymentId));
 }
 
-function removePayment(paymentId: string) {
-  if (!window.confirm("確定要刪掉這筆付款紀錄嗎？結算餘額會跟著變回去。")) return;
+const removingPayment = ref<string | null>(null);
+
+function removePayment() {
+  const paymentId = removingPayment.value;
+  if (!paymentId) return;
+  removingPayment.value = null;
   return runPaymentAction(() => deletePayment(taskId.value, paymentId));
 }
 
@@ -687,7 +702,7 @@ onMounted(async () => {
               :busy="paymentBusy"
               @record="recordPayment"
               @confirm="acceptPayment"
-              @remove="removePayment"
+              @remove="(id: string) => (removingPayment = id)"
             />
             <SettlementHistory
               :settlement="settlement"
@@ -696,11 +711,31 @@ onMounted(async () => {
               :can-manage="canWrite"
               :busy="settlementBusy"
               @save="saveSettlement"
-              @remove="removeSettlement"
+              @remove="(id: string) => (removingSettlement = id)"
             />
           </template>
         </section>
       </template>
+
+      <ConfirmDialog
+        :open="removingPayment !== null"
+        title="刪掉這筆付款紀錄？"
+        message="結算餘額會跟著變回去，這筆付款就當作沒發生過。"
+        confirm-label="刪掉付款紀錄"
+        danger
+        @confirm="removePayment"
+        @cancel="removingPayment = null"
+      />
+
+      <ConfirmDialog
+        :open="removingSettlement !== null"
+        title="刪掉這筆結算紀錄？"
+        message="這是當時帳目的快照，刪掉就找不回來了。目前的帳目與結算不受影響。"
+        confirm-label="刪掉結算紀錄"
+        danger
+        @confirm="removeSettlement"
+        @cancel="removingSettlement = null"
+      />
     </div>
   </AppLayout>
 </template>

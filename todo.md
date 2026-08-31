@@ -500,21 +500,21 @@ GitHub 的 runner 內建 JDK，不用自己裝。
 - **JDK 版本**。runner 內建的是 17，firebase-tools 要 21 —— 跟當初擋住本機的
   是同一件事，得用 `actions/setup-java` 指定。
 
-## 待辦：確認框統一
+## 待辦：確認框統一（剩最後一處）
 
-`ExpenseFormPage` 的刪除支出仍用 `window.confirm`，跟新的 `ConfirmDialog` 不一致。
-`window.confirm` 在手機上是系統對話框、按鈕位置不受控，容易手滑。
+`window.confirm` 在手機上是系統對話框、按鈕位置不受控，「確定」常常就落在拇指
+下面 —— 那正是要避免的手滑。刪除類的三處已經全部換成 `ConfirmDialog`：
 
-成員移除已經換掉了（改用 `RemoveMemberDialog`，2026-08-28）。剩下四處
-（2026-09-01 重新清點過，之前寫「兩處」是漏數了）：
+- `ExpenseFormPage` 刪除支出
+- `TaskPage` 刪除結算紀錄
+- `TaskPage` 刪除付款紀錄
 
-- `ExpenseFormPage:566` 刪除支出
-- `TaskPage:226` 刪除結算紀錄
-- `TaskPage:255` 刪除付款紀錄
-- `TaskPage:312` 改虛擬成員名字，用的是 `window.prompt`
+後兩者存的是 id 而不是布林值，因為對話框要知道刪的是哪一筆，而列表上每一列
+都可能觸發它。
 
-前三個換成 `ConfirmDialog` 就好。最後一個要先做一個收文字輸入的對話框元件 ——
-`ConfirmDialog` 是確認框，不收輸入。
+**剩下 `TaskPage` 改虛擬成員名字用的 `window.prompt`。** 它需要的是輸入框而不是
+確認框，得先做一個收文字的對話框元件。`ConfirmDialog` 的 `requireText` 不能拿來
+頂替：那是「打對這串字才准按」的摩擦機制，不是自由輸入。
 
 ## 待辦：唯讀的支出詳情頁
 
