@@ -43,6 +43,7 @@ import { removeMemberPrompt, type RemoveMemberPrompt } from "@/utils/memberRemov
 import { memberFootprint, type MemberFootprint } from "@/utils/memberFootprint";
 import RemoveMemberDialog from "@/components/member/RemoveMemberDialog.vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
+import PromptDialog from "@/components/common/PromptDialog.vue";
 import { isInstalledApp } from "@/utils/platform";
 
 type Tab = "expenses" | "members" | "settlement";
@@ -319,14 +320,21 @@ async function addVirtualMember() {
 /**
  * 改名只對虛擬成員開放 —— 真實成員的暱稱來自個人資料，他自己改。
  *
- * 用 window.prompt 是因為 ConfirmDialog 是確認框、不收文字輸入，目前沒有
- * 現成的輸入對話框元件。todo.md 的「確認框統一」那條要一起換掉。
+ * 存 uid 而不是布林值：成員列上每一列都能開這個對話框，它得知道改的是誰，
+ * 而且要拿現在的名字當預填值。
  */
-function renameTaskMember(targetUid: string) {
-  const target = memberState.members.value.find(member => member.uid === targetUid);
-  const next = window.prompt("改成什麼名字？", target?.nickname ?? "")?.trim();
-  if (!next || next === target?.nickname) return;
+const renaming = ref<string | null>(null);
 
+const renamingMember = computed(() =>
+  memberState.members.value.find(member => member.uid === renaming.value)
+);
+
+function renameTaskMember(next: string) {
+  const targetUid = renaming.value;
+  if (!targetUid) return;
+  renaming.value = null;
+
+  // 截字是最後一道 —— 對話框的 maxlength 擋得住打字，擋不住貼上。
   return runMemberAction(targetUid, () => renameMember(taskId.value, targetUid, next.slice(0, 20)));
 }
 
@@ -644,7 +652,7 @@ onMounted(async () => {
               @promote="changeRole($event, 'admin')"
               @demote="changeRole($event, 'member')"
               @remove="removeTaskMember"
-              @rename="renameTaskMember"
+              @rename="(memberUid: string) => (renaming = memberUid)"
             />
 
             <div v-if="taskState.isAdmin.value" class="card stack">
@@ -716,6 +724,20 @@ onMounted(async () => {
           </template>
         </section>
       </template>
+
+      <PromptDialog
+        :open="renaming !== null"
+        title="改成什麼名字？"
+        message="這個名字只在這個任務裡用，支出與結算上的顯示都會跟著換。"
+        label="名字"
+        confirm-label="改名"
+        :initial="renamingMember?.nickname ?? ''"
+        placeholder="例如：阿嬤"
+        :maxlength="20"
+        :busy="busyUid === renaming"
+        @confirm="renameTaskMember"
+        @cancel="renaming = null"
+      />
 
       <ConfirmDialog
         :open="removingPayment !== null"

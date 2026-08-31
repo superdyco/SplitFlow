@@ -500,21 +500,32 @@ GitHub 的 runner 內建 JDK，不用自己裝。
 - **JDK 版本**。runner 內建的是 17，firebase-tools 要 21 —— 跟當初擋住本機的
   是同一件事，得用 `actions/setup-java` 指定。
 
-## 待辦：確認框統一（剩最後一處）
+## 已完成：確認框統一
 
-`window.confirm` 在手機上是系統對話框、按鈕位置不受控，「確定」常常就落在拇指
-下面 —— 那正是要避免的手滑。刪除類的三處已經全部換成 `ConfirmDialog`：
+`window.confirm` / `window.prompt` 在手機上是系統對話框、按鈕位置不受控，
+「確定」常常就落在拇指下面 —— 那正是要避免的手滑。`src/` 底下已經一個都沒有。
 
-- `ExpenseFormPage` 刪除支出
-- `TaskPage` 刪除結算紀錄
-- `TaskPage` 刪除付款紀錄
+- `ExpenseFormPage` 刪除支出 → `ConfirmDialog`
+- `TaskPage` 刪除結算紀錄 → `ConfirmDialog`
+- `TaskPage` 刪除付款紀錄 → `ConfirmDialog`
+- `TaskPage` 改虛擬成員名字 → 新的 `PromptDialog`
+- 成員移除 → `RemoveMemberDialog`（2026-08-28 就換掉了）
 
-後兩者存的是 id 而不是布林值，因為對話框要知道刪的是哪一筆，而列表上每一列
-都可能觸發它。
+三個對話框元件的分工，不是重複而是各自回答不同的問題：
 
-**剩下 `TaskPage` 改虛擬成員名字用的 `window.prompt`。** 它需要的是輸入框而不是
-確認框，得先做一個收文字的對話框元件。`ConfirmDialog` 的 `requireText` 不能拿來
-頂替：那是「打對這串字才准按」的摩擦機制，不是自由輸入。
+- `ConfirmDialog` —— 要不要做。`requireText` 有值時要打對那串字才准按，
+  那是分級摩擦，**不是輸入框**（值是預先決定的）。
+- `PromptDialog` —— 做成什麼。值由使用者決定。因為上面那個 prop 長得像，
+  當初才會誤以為可以頂替。
+- `RemoveMemberDialog` —— 三個出口（取消／保留結算資料／真實移除），
+  另外兩個都只給兩個。
+
+存 id 而不是布林值是這幾處共同的模式：列表上每一列都能開同一個對話框，
+它得知道自己在講哪一筆，改名還要拿現在的名字當預填值。
+
+`PromptDialog` 開啟時會 focus 並全選 —— 改名幾乎都是整個換掉，不是在原字
+後面接。送出前擋掉「空的」與「沒改」：按下去什麼都不會發生的按鈕不該是可按的。
+截字仍留在呼叫端，因為 `maxlength` 擋得住打字，擋不住貼上。
 
 ## 待辦：唯讀的支出詳情頁
 
