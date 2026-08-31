@@ -215,6 +215,7 @@ function newExpense(overrides = {}) {
     place: null,
     receipt: null,
     note: "",
+    date: "2026-08-31",
     time: "",
     createdBy: MEMBER,
     createdAt: serverTimestamp(),
@@ -237,6 +238,7 @@ function editedExpense(overrides = {}) {
     place: null,
     receipt: null,
     note: "",
+    date: "2026-08-31",
     time: "",
     updatedAt: serverTimestamp(),
     ...overrides
@@ -990,6 +992,42 @@ async function main() {
     delete withoutTime.time;
     await assertSucceeds(
       updateDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "legacy"), withoutTime)
+    );
+  });
+
+  await test("日期可以留空，也可以是 YYYY-MM-DD", async () => {
+    await seed();
+    await assertSucceeds(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "d1"), newExpense({ date: "" }))
+    );
+    await assertSucceeds(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "d2"), newExpense({ date: "2026-08-31" }))
+    );
+  });
+
+  await test("不是 YYYY-MM-DD 的日期要被擋", async () => {
+    await seed();
+    await assertFails(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "d3"), newExpense({ date: "2026-8-31" }))
+    );
+    await assertFails(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "d4"), newExpense({ date: "31/08/2026" }))
+    );
+    await assertFails(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "d5"), newExpense({ date: "昨天" }))
+    );
+    await assertFails(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "d6"), newExpense({ date: 20260831 }))
+    );
+  });
+
+  // validDate 也用 .get()，理由跟 time 一樣：日期是後來才加的欄位。
+  await test("沒有 date 欄位的舊格式支出仍然編輯得動", async () => {
+    await seed();
+    const withoutDate = editedExpense();
+    delete withoutDate.date;
+    await assertSucceeds(
+      updateDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "legacy"), withoutDate)
     );
   });
 

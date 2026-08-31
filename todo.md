@@ -169,24 +169,20 @@ Meta 端的設定做到一半後決定不做了。卡點是 Meta 從 2023 年起
   等確認「完全離線開啟」是真需求再說。
 - 因此目前的能力是「網路爛不會壞」，不是「沒網路也能用」。
 
-## 待補：支出 date 欄位的 rules 驗證
+## 已完成：支出 date 欄位的 rules 驗證
 
-`date` 目前沒有寫進 `validExpenseShape()`，其他每個欄位都有驗，只有它沒有。
-不影響運作 —— rules 是逐欄位驗證不是 `hasOnly()` 白名單，所以新欄位本來就寫得進去。
+`validDate()` 進了 `validExpenseShape()`：日期要嘛是空字串，要嘛是 `YYYY-MM-DD`。
 
-沒有一起改是因為**這台機器跑不了 rules 測試**：firebase-tools 要 JDK 21，
-目前裝的是 11（`winget install Microsoft.OpenJDK.21`）。加一條沒驗證過的規則
-萬一寫錯，線上所有支出都會存不進去，比少驗一個欄位嚴重得多。
+用 `.get("date", "")` 而不是直接讀欄位，跟 `validPlace`／`validTime` 同一個理由 ——
+date 是後來才加的，沒有這個 key 的舊支出直接讀會是 evaluation error（不是 false），
+整條規則當場中斷，症狀是「只改收據路徑」這種局部更新在舊支出上會被擋掉。
+所以空字串要放行。表單一律送 `date.value || todayInput()`，新支出走不到那一支。
 
-裝好 JDK 21、`npm run test:rules` 能跑之後，補進 `validExpenseShape()`：
+正規表示式用 `[0-9]` 而不是 `\d`：規則檔的字串會再被跳脫一層。
 
-```
-&& data.date is string
-&& data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
-```
-
-補之前要先確認：表單一律會送 date（`date.value || todayInput()`），
-所以編輯舊支出也不會少這個欄位。
+原本擱置的理由（本機 JDK 只有 11，跑不了 rules 測試）已經不成立。
+順便把測試的 `newExpense()` / `editedExpense()` 補上 date 欄位 —— 沒有它的話，
+「沒有 date 欄位的舊格式支出仍然編輯得動」那個測試是空的，刪一個本來就不存在的 key。
 
 ## 已完成：支出收據照片
 
@@ -482,23 +478,33 @@ Flutter `lib/domain/currency.dart`、函式 `functions/src/amount.ts`）。
 **還沒驗到的**：通知真的送達。那需要兩個帳號各一台裝置，而開發機上只有一個帳號。
 已驗的是觸發器會跑、沒有錯誤、權限時機正確、規則允許 token 寫入。
 
-## 待辦：用 GitHub Actions 跑規則測試
+## 已完成：用 GitHub Actions 跑規則測試
 
-**（原本的理由已經不成立：本機的 JDK 21 裝好了，`npm run test:rules` 跑得起來，
-164 + 13 個測試全過。）**
+`.github/workflows/checks.yml`：每次 push 到 main 與每個 PR 跑型別檢查、單元測試、
+security rules 測試與建置。
 
-仍然值得做，但理由變成「不要依賴某一台機器的環境」：規則會一直改，而規則出錯的
-代價是資料外洩或功能整個壞掉 —— 那正是最該有自動化把關的地方。GitHub 的 runner
-內建 Java，加一個 workflow 在每次 push 跑 `npm run test:rules` 就好。
+rules 特別值得放上去：規則會一直改，改錯的代價是資料外洩或功能整個寫不進去，
+那是最不該只靠「某台筆電上跑得起來」的東西 —— 這個 repo 的 rules 測試曾經因為
+本機 JDK 版本不夠而擱置，正是這種依賴的例子。emulator 是 Java 程式，
+GitHub 的 runner 內建 JDK，不用自己裝。
+
+建置也留在裡面，因為 chunk 的循環相依只有建置時抓得到。
 
 ## 待辦：確認框統一
 
 `ExpenseFormPage` 的刪除支出仍用 `window.confirm`，跟新的 `ConfirmDialog` 不一致。
 `window.confirm` 在手機上是系統對話框、按鈕位置不受控，容易手滑。
 
-成員移除已經換掉了（改用 `RemoveMemberDialog`，2026-08-28）。剩下兩處：
-`ExpenseFormPage` 的刪除支出，以及 `TaskPage` 改虛擬成員名字用的 `window.prompt`
-—— 後者是因為 `ConfirmDialog` 是確認框、不收文字輸入，目前沒有現成的輸入對話框元件。
+成員移除已經換掉了（改用 `RemoveMemberDialog`，2026-08-28）。剩下四處
+（2026-09-01 重新清點過，之前寫「兩處」是漏數了）：
+
+- `ExpenseFormPage:566` 刪除支出
+- `TaskPage:226` 刪除結算紀錄
+- `TaskPage:255` 刪除付款紀錄
+- `TaskPage:312` 改虛擬成員名字，用的是 `window.prompt`
+
+前三個換成 `ConfirmDialog` 就好。最後一個要先做一個收文字輸入的對話框元件 ——
+`ConfirmDialog` 是確認框，不收輸入。
 
 ## 待辦：唯讀的支出詳情頁
 

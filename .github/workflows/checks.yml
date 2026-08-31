@@ -1,0 +1,54 @@
+# 單元測試、型別檢查與 Security Rules。
+#
+# Rules 特別值得放在 CI：規則會一直改，而改錯的代價是資料外洩或整個功能寫不進去
+# —— 那是最不該只靠「某台筆電上跑得起來」的東西。這個 repo 的 rules 測試曾經
+# 因為本機 JDK 版本不夠而擱置了一段時間，正是這種依賴的例子。
+#
+# emulator 是 Java 程式，GitHub 的 runner 內建 JDK，所以這裡不用自己裝。
+name: Checks
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Types, tests and rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx vue-tsc --noEmit
+
+      - name: Run unit tests
+        run: npm test
+
+      # 這一步會下載 Firestore 與 Storage 的 emulator，是整個 job 最慢的一段。
+      - name: Run security rules tests
+        run: npm run test:rules
+
+      # 建置本身也是一種檢查：chunk 的循環相依在這裡才會被抓到。
+      - name: Build
+        run: npm run build

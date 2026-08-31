@@ -265,6 +265,7 @@ service cloud.firestore {
             && validPlace()
             && validReceipt()
             && validNote()
+            && validDate()
             && validTime();
         }
 
@@ -307,6 +308,22 @@ service cloud.firestore {
 
         // 時間是選填的 "HH:MM"（24 小時制），空字串代表沒記。
         // 比照 note 用 .get()：這個功能之前建立的支出沒有這個欄位。
+        /*
+          日期是後來才加的欄位，所以走 `.get` 而不是直接讀 —— 沒有這個 key 的
+          舊支出直接讀會是 evaluation error（不是 false），整條規則當場中斷，
+          症狀跟 validPlace 註解裡寫的一樣：只改收據路徑那種局部更新會被擋掉。
+
+          所以空字串要放行：舊支出的 `.get` 拿到的就是預設值。表單一律會送
+          `date.value || todayInput()`，新支出不會走到那一支。
+
+          用 [0-9] 而不是 \d：規則檔裡的字串會再被跳脫一層，[0-9] 沒有這個問題。
+        */
+        function validDate() {
+          let date = request.resource.data.get("date", "");
+          return date is string
+            && (date == "" || date.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}"));
+        }
+
         function validTime() {
           let time = request.resource.data.get("time", "");
           return time is string
