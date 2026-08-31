@@ -783,6 +783,49 @@ async function main() {
     );
   });
 
+  await test("成員可以改自己在任務裡的暱稱（個人設定改名要同步過來）", async () => {
+    await seed();
+    await assertSucceeds(
+      updateDoc(doc(as(MEMBER), "tasks", TASK, "members", MEMBER), { nickname: "改過的名字" })
+    );
+  });
+
+  await test("離開過的人也能改自己的暱稱，舊帳目上的名字才會跟著對", async () => {
+    await seed();
+    await removeFromTask(OTHER);
+    await assertSucceeds(
+      updateDoc(doc(as(OTHER), "tasks", TASK, "members", OTHER), { nickname: "離開後改名" })
+    );
+  });
+
+  await test("改自己的暱稱不能順便升成 admin", async () => {
+    await seed();
+    await assertFails(
+      updateDoc(doc(as(MEMBER), "tasks", TASK, "members", MEMBER), {
+        nickname: "改過的名字",
+        role: "admin"
+      })
+    );
+  });
+
+  await test("改自己的暱稱不能順便把自己塞回任務", async () => {
+    await seed();
+    await removeFromTask(OTHER);
+    await assertFails(
+      updateDoc(doc(as(OTHER), "tasks", TASK, "members", OTHER), {
+        nickname: "偷偷回來",
+        active: true
+      })
+    );
+  });
+
+  await test("不能藉改暱稱去動別人的成員文件", async () => {
+    await seed();
+    await assertFails(
+      updateDoc(doc(as(MEMBER), "tasks", TASK, "members", OTHER), { nickname: "被改的人" })
+    );
+  });
+
   await test("重新加入時不能順便把自己升成 admin", async () => {
     await seed();
     await removeFromTask(OTHER);

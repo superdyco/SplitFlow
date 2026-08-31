@@ -169,6 +169,27 @@ service cloud.firestore {
         }
 
         /*
+          個人設定改暱稱時，本人把自己在每個任務裡的那份副本一起換掉。
+
+          成員文件的 nickname 是加入當下複製的一份，不是即時去讀 users/{uid}
+          —— 刪掉帳號的人與虛擬成員都只有這份可讀，副本拿不掉，只能在改名時
+          跟著更新。沒有這條路的話，一般成員改了暱稱，任務裡還是舊名字。
+
+          只准動 nickname：角色、active、virtual 都不能藉這條翻轉。
+          不看 active，離開過的人改名，舊帳目上的名字也該跟著對。
+
+          `hasAll` 是要求 nickname 真的變了。少了它，什麼都沒改的寫入（例如把
+          自己的 active: true 再寫一次）changedKeys 是空的，hasOnly 會放行 ——
+          那等於替本人開了一條「寫任何欄位只要值沒變就通過」的路，會讓
+          「還在任務裡的人不能自己動 active」那條防線看起來破了。
+        */
+        function renamesSelf() {
+          return isSelf(uid)
+            && request.resource.data.diff(resource.data).changedKeys().hasOnly(["nickname"])
+            && request.resource.data.diff(resource.data).changedKeys().hasAll(["nickname"]);
+        }
+
+        /*
           虛擬成員：沒有帳號的人（長輩），由 owner/admin 代為建立。
 
           `uid.matches` 那條是安全核心而不是格式潔癖。admin 本來就能往
@@ -207,7 +228,7 @@ service cloud.firestore {
               || taskAfterData(taskId).ownerId == request.auth.uid
             )
           ) || createsVirtualMember();
-        allow update: if managesMemberAsAdmin() || rejoinsSelf();
+        allow update: if managesMemberAsAdmin() || rejoinsSelf() || renamesSelf();
 
         /*
           真實刪除。軟刪（active: false）留給「他確實參與過，但不該再看到

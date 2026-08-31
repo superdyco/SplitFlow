@@ -11,6 +11,7 @@ import {
   runTransaction,
   serverTimestamp,
   updateDoc,
+  where,
   writeBatch
 } from "firebase/firestore";
 import { db } from "@/firebase/config";
@@ -97,6 +98,29 @@ export async function createVirtualMember(taskId: string, nickname: string): Pro
  *
  * 只動 member 文件，不碰 task。規則那邊走 managesMemberAsAdmin()。
  */
+/**
+ * 把新暱稱同步到這個人所有任務裡的成員文件。
+ *
+ * 成員文件的 nickname 是加入當下複製的一份副本，不是即時去讀 `users/{uid}`。
+ * 副本不能拿掉 —— 刪掉帳號的人與虛擬成員（沒有帳號的長輩）都只有這份名字可讀
+ * —— 所以只能在改名時一起更新，否則個人設定改了名，任務裡還是舊的。
+ *
+ * 兩件事刻意這樣：
+ *
+ * - 管理員在某個任務裡幫你改過的名字會被蓋掉。個人設定是本人自己改的，以本人為準。
+ * - 只掃 `memberIds` 查得到的任務，也就是還在裡面的。離開過的任務找不到（uid 已經
+ *   從陣列移除），那邊會留著舊名字配「（已離開）」；要撈到那些得用 collection group
+ *   查詢，為了一個離開後才改名的邊角情況多開一組索引與規則，不划算。
+ */
+export async function syncNicknameToTasks(uid: string, nickname: string): Promise<void> {
+  const snap = await getDocs(query(collection(db, "tasks"), where("memberIds", "array-contains", uid)));
+  if (snap.empty) return;
+
+  const batch = writeBatch(db);
+  snap.docs.forEach(task => batch.update(doc(db, "tasks", task.id, "members", uid), { nickname }));
+  await batch.commit();
+}
+
 export async function renameMember(taskId: string, uid: string, nickname: string): Promise<void> {
   await updateDoc(doc(db, "tasks", taskId, "members", uid), { nickname });
 }
