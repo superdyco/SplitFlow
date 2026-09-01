@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../domain/expense_actions.dart';
 import '../domain/expense_groups.dart';
 import '../domain/member_name.dart';
 import '../domain/models.dart';
@@ -9,6 +10,7 @@ import '../domain/models.dart';
 import '../domain/task_status.dart';
 import '../state/providers.dart';
 import 'expense_day_group.dart';
+import 'expense_detail_page.dart';
 import 'expense_form_page.dart';
 import 'expense_row.dart';
 import 'invite_sheet.dart';
@@ -245,15 +247,37 @@ class _ExpensesTab extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref, {
     Expense? existing,
+    RepeatFields? repeat,
   }) async {
     final saved = await Navigator.of(context).push<Object?>(
       MaterialPageRoute(
-        builder: (_) => ExpenseFormPage(taskId: task.id, existing: existing),
+        builder: (_) => ExpenseFormPage(
+          taskId: task.id,
+          existing: existing,
+          repeat: repeat,
+        ),
       ),
     );
     if (saved == null) return;
     ref.invalidate(expensesProvider(task.id));
     ref.invalidate(taskProvider(task.id));
+  }
+
+  /// 唯讀的詳情頁。純顯示，不會改到任何東西，回來不用重讀。
+  void _openDetail(
+    BuildContext context,
+    Expense expense,
+    Map<String, String> names,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ExpenseDetailPage(
+          expense: expense,
+          memberNames: names,
+          baseCurrency: task.defaultCurrency,
+        ),
+      ),
+    );
   }
 
   @override
@@ -284,6 +308,9 @@ class _ExpensesTab extends ConsumerWidget {
           };
           final groups = groupExpensesByDate(list, task.defaultCurrency);
 
+          final uid = ref.watch(authStateProvider).value?.uid ?? '';
+          final isAdmin = task.ownerId == uid || task.adminIds.contains(uid);
+
           return ListView(
             // 底部留白給浮動按鈕，不然最後一筆會被蓋住。
             padding: const EdgeInsets.only(bottom: 88),
@@ -295,15 +322,35 @@ class _ExpensesTab extends ConsumerWidget {
                   open: !collapsed.contains(group.date),
                   onToggle: () => onToggleDay(group.date),
                   children: [
-                    for (final expense in group.expenses)
-                      ExpenseRow(
+                    ...group.expenses.map((expense) {
+                      // 每個人都點得進去，差別只在點到哪：管得動的進編輯頁，
+                      // 其他人進唯讀的詳情頁。封存之後誰都管不動，於是整份
+                      // 帳變成大家都讀得到 —— 那正是要翻帳的時候。
+                      final manageable = canManageExpense(
+                        expense: expense,
+                        uid: uid,
+                        isAdmin: isAdmin,
+                        archived: archived,
+                      );
+
+                      return ExpenseRow(
                         expense: expense,
                         memberNames: names,
                         baseCurrency: task.defaultCurrency,
-                        onTap: archived
+                        onTap: manageable
+                            ? () => _openForm(context, ref, existing: expense)
+                            : () => _openDetail(context, expense, names),
+                        // 「再記一筆」是新增，不是修改 —— 管不動這一筆的人
+                        // 照樣做得到，只有封存的任務不行。
+                        onRepeat: archived
                             ? null
-                            : () => _openForm(context, ref, existing: expense),
-                      ),
+                            : () => _openForm(
+                                  context,
+                                  ref,
+                                  repeat: repeatFieldsOf(expense),
+                                ),
+                      );
+                    }),
                   ],
                 ),
             ],

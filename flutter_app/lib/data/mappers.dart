@@ -19,6 +19,7 @@ import '../domain/models.dart';
 /// | `splitMode` | 自訂分攤之前 | even |
 /// | `date` / `time` | 日期欄位之前 | null（date 退回 createdAt 的日期） |
 /// | `place` / `receipt` / `note` | 各自的功能之前 | null / null / 空字串 |
+/// | `createdBy` | 不會缺，第一版就在寫 | 空字串（讀不出來時誰都不算作者） |
 ///
 /// 補值的方向一律偏保守：寧可少一點資訊，也不要讓一筆支出因為缺欄位就
 /// 整個讀不出來。
@@ -57,6 +58,8 @@ Expense expenseFromMap(
     createdAt: createdAt,
     place: _placeFrom(data['place']),
     receipt: _receiptFrom(data['receipt']),
+    createdBy: (data['createdBy'] as String?) ?? '',
+    note: (data['note'] as String?) ?? '',
   );
 }
 

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../domain/models.dart';
 import '../state/providers.dart';
+import 'remote_receipt.dart';
 import 'theme.dart';
 
 /// 使用者對這一格做過什麼。表單存檔時要靠它決定要不要動 Storage
@@ -159,7 +160,7 @@ class _ReceiptFieldState extends ConsumerState<ReceiptField> {
             maxScale: 5,
             child: file != null
                 ? Image.file(file)
-                : _RemoteReceipt(path: path!, fit: BoxFit.contain),
+                : RemoteReceipt(path: path!, fit: BoxFit.contain),
           ),
         ),
       ),
@@ -272,7 +273,7 @@ class _Thumb extends StatelessWidget {
               child: file != null
                   ? Image.file(file!, fit: BoxFit.cover)
                   : (remotePath != null
-                      ? _RemoteReceipt(path: remotePath!, fit: BoxFit.cover)
+                      ? RemoteReceipt(path: remotePath!, fit: BoxFit.cover)
                       : Container(
                           color: AppColors.line,
                           alignment: Alignment.center,
@@ -295,44 +296,6 @@ class _Thumb extends StatelessWidget {
             ),
         ],
       ),
-    );
-  }
-}
-
-/// Storage 上的收據。網址要先問過才拿得到，所以中間有一段載入狀態。
-class _RemoteReceipt extends ConsumerWidget {
-  final String path;
-  final BoxFit fit;
-
-  const _RemoteReceipt({required this.path, required this.fit});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final url = ref.watch(receiptUrlProvider(path));
-
-    return url.when(
-      loading: () => const Center(
-        child: SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ),
-      // 讀不到就說讀不到。靜默失敗會讓人以為照片不見了。
-      error: (err, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Text(
-            '讀不到收據',
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: AppColors.danger),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
-      data: (value) => Image.network(value, fit: fit),
     );
   }
 }

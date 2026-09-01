@@ -22,12 +22,16 @@ class ExpenseRow extends StatelessWidget {
   final String baseCurrency;
   final VoidCallback? onTap;
 
+  /// 拿這一筆當範本再記一筆。null 就不顯示按鈕（封存的任務）。
+  final VoidCallback? onRepeat;
+
   const ExpenseRow({
     super.key,
     required this.expense,
     required this.memberNames,
     required this.baseCurrency,
     this.onTap,
+    this.onRepeat,
   });
 
   /// 只顯示月/日，年份在任務層級就知道了，列表裡每筆都印年份太吵。
@@ -83,6 +87,11 @@ class ExpenseRow extends StatelessWidget {
                       '$_shown · $paidBy 付 · $splitLabel'
                       '${expense.receipt == null ? '' : ' · 📎'}',
                       style: text.bodySmall),
+                  if (onRepeat != null) ...[
+                    const SizedBox(height: 6),
+                    // 巢狀按鈕自己會吃掉點擊，不用像網頁版那樣擋冒泡。
+                    _RepeatButton(onPressed: onRepeat!),
+                  ],
                 ],
               ),
             ),
@@ -109,6 +118,34 @@ class ExpenseRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 旅行支出重複性很高（每天的交通、便利商店、同一間餐廳），每次從頭填很煩。
+/// 帶走什麼、刻意不帶什麼見 `repeatFieldsOf`。
+class _RepeatButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _RepeatButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 28,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          foregroundColor: AppColors.muted,
+          side: const BorderSide(color: AppColors.lineStrong),
+          shape: const StadiumBorder(),
+          textStyle: Theme.of(context).textTheme.bodySmall,
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: const Text('再記一筆'),
       ),
     );
   }

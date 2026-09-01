@@ -111,6 +111,15 @@ class Expense {
 
   final ExpenseReceipt? receipt;
 
+  /// 記這筆帳的人。付錢的可以是別人 —— 小明幫阿華記一筆阿華付的錢，
+  /// `createdBy` 是小明、`paidBy` 是阿華，兩個人都動得了這一筆。
+  ///
+  /// 有預設值是因為結算與分組完全不看它，那些測試不需要編一個出來。
+  final String createdBy;
+
+  /// 選填的備註。沒寫就是空字串，不是 null —— 只有一種「沒有」比較好判斷。
+  final String note;
+
   const Expense({
     required this.id,
     required this.title,
@@ -126,6 +135,8 @@ class Expense {
     this.createdAt,
     this.place,
     this.receipt,
+    this.createdBy = '',
+    this.note = '',
   });
 }
 

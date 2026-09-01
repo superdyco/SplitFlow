@@ -26,6 +26,8 @@ void main() {
           'date': '2026-06-15',
           'time': '19:30',
           'place': {'name': '路邊攤', 'lat': 13.75, 'lng': 100.5},
+          'createdBy': 'a',
+          'note': '含服務費',
         },
         DateTime(2026, 6, 15, 20, 0),
       );
@@ -40,6 +42,38 @@ void main() {
       expect(expense.time, '19:30');
       expect(expense.place?.name, '路邊攤');
       expect(expense.place?.lat, 13.75);
+      expect(expense.createdBy, 'a');
+      expect(expense.note, '含服務費');
+    });
+
+    test('備註要讀得回來 —— 讀不回來的話編輯一次就把它清掉了', () {
+      // 表單存檔時一律寫入 note 欄位。這裡漏讀的期間，任何人編輯一筆
+      // 有備註的支出都會把備註洗成空字串。
+      final expense = expenseFromMap(
+        'e1',
+        {
+          'title': '晚餐',
+          'amount': 100,
+          'currency': 'TWD',
+          'paidBy': 'a',
+          'splits': {'a': 100},
+          'note': '這筆有拆帳爭議，回國再算',
+        },
+        null,
+      );
+
+      expect(expense.note, '這筆有拆帳爭議，回國再算');
+    });
+
+    test('備註功能之前的舊支出沒有 note，補空字串', () {
+      final expense = expenseFromMap(
+        'old',
+        {'title': '舊支出', 'amount': 100, 'currency': 'TWD', 'paidBy': 'a'},
+        null,
+      );
+
+      expect(expense.note, '');
+      expect(expense.createdBy, '');
     });
   });
 

@@ -22,6 +22,8 @@ void main() {
     String? time,
     DateTime? createdAt,
     ExpensePlace? place,
+    String createdBy = '',
+    String note = '',
   }) {
     return Expense(
       id: id,
@@ -37,8 +39,69 @@ void main() {
       time: time,
       createdAt: createdAt,
       place: place,
+      createdBy: createdBy,
+      note: note,
     );
   }
+
+  group('canManageExpense', () {
+    // 這一組對應 firestore.rules 的 expenses update/delete 條件。
+    // 兩邊講的話必須一樣：這裡放行而規則擋下，使用者就會填完才失敗。
+    test('自己建的可以動', () {
+      final e = expense(createdBy: 'me', paidBy: 'other');
+      expect(
+        canManageExpense(
+            expense: e, uid: 'me', isAdmin: false, archived: false),
+        isTrue,
+      );
+    });
+
+    test('自己先付的可以動 —— 就算是別人幫忙記的', () {
+      // 小明幫阿華記一筆阿華付的錢，阿華也要動得了。
+      final e = expense(createdBy: 'other', paidBy: 'me');
+      expect(
+        canManageExpense(
+            expense: e, uid: 'me', isAdmin: false, archived: false),
+        isTrue,
+      );
+    });
+
+    test('兩者都不是的一般成員不能動', () {
+      final e = expense(createdBy: 'other', paidBy: 'other');
+      expect(
+        canManageExpense(
+            expense: e, uid: 'me', isAdmin: false, archived: false),
+        isFalse,
+      );
+    });
+
+    test('管理員可以動別人的', () {
+      final e = expense(createdBy: 'other', paidBy: 'other');
+      expect(
+        canManageExpense(expense: e, uid: 'me', isAdmin: true, archived: false),
+        isTrue,
+      );
+    });
+
+    test('封存之後誰都不能動，管理員也一樣', () {
+      final mine = expense(createdBy: 'me', paidBy: 'me');
+      expect(
+        canManageExpense(
+            expense: mine, uid: 'me', isAdmin: true, archived: true),
+        isFalse,
+      );
+    });
+
+    test('createdBy 讀不出來時的空字串不會對上空的 uid', () {
+      // 未登入或讀取失敗時 uid 會是空字串。那時候不該因為「兩個都是空的」
+      // 就把一筆作者不明的支出交給他改。
+      final e = expense(createdBy: '', paidBy: 'other');
+      expect(
+        canManageExpense(expense: e, uid: '', isAdmin: false, archived: false),
+        isFalse,
+      );
+    });
+  });
 
   group('toDateInput / toTimeInput', () {
     test('用本地時區，不是 UTC —— 凌晨記的帳不能算成前一天', () {

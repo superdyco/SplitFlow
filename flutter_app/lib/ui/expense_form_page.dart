@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/rate_service.dart';
 import '../domain/currency.dart';
+import '../domain/expense_actions.dart';
 import '../domain/expense_date.dart';
 import '../domain/member_name.dart';
 import '../domain/models.dart';
 import '../domain/offline_write.dart';
+import '../domain/task_status.dart';
 // 'required' 這個名字跟 Flutter 的 @required 標註撞名，加前綴分開。
 import '../domain/validation.dart' as validate;
 import '../data/place_service.dart';
@@ -35,7 +37,18 @@ class ExpenseFormPage extends ConsumerStatefulWidget {
   /// null 代表新增。
   final Expense? existing;
 
-  const ExpenseFormPage({super.key, required this.taskId, this.existing});
+  /// 「再記一筆」帶過來的預填值。這仍然是**新增**，[existing] 是 null。
+  ///
+  /// 網頁版是用 `?from=<id>` 再讀一次來源，因為它的入口是一條 URL；
+  /// App 的導航本來就帶著物件走，直接把算好的欄位傳進來就好。
+  final RepeatFields? repeat;
+
+  const ExpenseFormPage({
+    super.key,
+    required this.taskId,
+    this.existing,
+    this.repeat,
+  });
 
   @override
   ConsumerState<ExpenseFormPage> createState() => _ExpenseFormPageState();
@@ -74,6 +87,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   bool get _isEdit => widget.existing != null;
 
+  /// 這個人動不動得了正在編輯的這一筆。條件跟 firestore.rules 一樣，
+  /// 判斷本身在 `domain/expense_actions.dart`，這裡只是把材料湊齊。
+  bool _canManage(Task task, Expense existing, String uid) {
+    return canManageExpense(
+      expense: existing,
+      uid: uid,
+      isAdmin: task.ownerId == uid || task.adminIds.contains(uid),
+      archived: taskStatusFrom(task.status) == TaskStatus.archived,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -92,11 +116,29 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       _date = existing.date ?? expenseDate(existing);
       _time = existing.time ?? '';
       _place = existing.place;
+      // 備註一定要回填。存檔時一律寫入 note 欄位，這裡不填就等於
+      // 每編輯一次就把原本的備註洗掉一次。
+      _note.text = existing.note;
       for (final entry in existing.splits.entries) {
         _custom[entry.key] = TextEditingController(
           text: amountToInput(entry.value, existing.currency),
         );
       }
+    }
+
+    // 「再記一筆」：金額、日期、時間、匯率刻意不帶，理由見 repeatFieldsOf。
+    final repeat = widget.repeat;
+    if (repeat != null) {
+      _title.text = repeat.title;
+      _category = repeat.category;
+      _currency = repeat.currency;
+      _paidBy = repeat.paidBy;
+      _splitMode = repeat.splitMode;
+      _place = repeat.place;
+      // 只帶「分攤給誰」，**不帶各人的金額**。自訂金額是跟著來源那筆的
+      // 總額算出來的，而新的一筆總額還沒填 —— 預填進去只會讓驗證對著
+      // 使用者根本沒打過的數字喊「合計對不上」。
+      _splitWith.addAll(repeat.splits.keys);
     }
   }
 
@@ -396,6 +438,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final task = ref.watch(taskProvider(widget.taskId)).value;
     final members = ref.watch(membersProvider(widget.taskId)).value ?? const [];
 
+    // 一律取一次，不要包在條件裡 —— 有條件的 watch 會讓訂閱時有時無。
+    final uid = ref.watch(authStateProvider).value?.uid ?? '';
+
+    // 第二道防線。列表已經依權限分流了，但這一頁自己也要擋 —— 少了它，
+    // 之後任何一個新的入口導進來，使用者都會整張表單填完才被規則打回票。
+    final existing = widget.existing;
+    final blocked =
+        existing != null && task != null && !_canManage(task, existing, uid);
+
     // 已被移除的成員若原本就在這筆支出裡，仍要留在選單上，
     // 不然編輯時會被迫把他踢掉。
     final selectable =
@@ -423,6 +474,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       appBar: AppBar(title: Text(_isEdit ? '編輯支出' : '新增支出')),
       body: task == null
           ? const Center(child: CircularProgressIndicator())
+          : blocked
+          ? const _Blocked()
           // SingleChildScrollView + Column 而不是 ListView，是因為 ListView
           // **會把捲出畫面的欄位整個 dispose 掉**。這一頁的欄位各自握著自己的
           // 狀態（挑好還沒上傳的收據、打到一半的地點），捲上去看一眼金額再捲
@@ -736,6 +789,42 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+/// 進得來但改不了。說清楚是誰改得了，不然使用者只會覺得 App 壞了。
+class _Blocked extends StatelessWidget {
+  const _Blocked();
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.lock_outline, size: 40, color: AppColors.muted),
+            const SizedBox(height: 12),
+            Text('這筆不是你記的', style: text.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              '你只能修改自己建立或自己先付的支出。'
+              '要改這一筆的話，找記帳的人或任務的管理員。',
+              style: text.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('返回'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
