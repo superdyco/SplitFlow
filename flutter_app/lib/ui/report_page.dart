@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/currency.dart';
+import '../domain/debug_log.dart';
 import '../domain/favorites.dart';
 import '../domain/models.dart';
 import '../domain/place_totals.dart';
@@ -48,10 +49,13 @@ class _ReportPageState extends ConsumerState<ReportPage> {
       report = await ref
           .read(reportRepositoryProvider)
           .getReport(widget.taskId, widget.reportId);
-    } catch (_) {
+    } catch (err) {
       // 讀失敗與「不存在」在這裡是同一件事：規則會讓已撤銷的報告讀取失敗，
       // 所以分不出「連結錯了」與「已關閉」。而且就算分得出來也不該分 ——
       // 回「這份報告已關閉」等於告訴人家「這個 ID 是真的，只是被關起來」。
+      //
+      // 但那是**畫面上**不該分，查問題時要分得出來，所以錯誤留一份。
+      logError('report', err);
       report = null;
     }
 

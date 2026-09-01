@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'firebase_options.dart';
+import 'domain/debug_log.dart';
 import 'domain/invite.dart';
 import 'state/pending_invite.dart';
 import 'state/pending_task.dart';
@@ -22,7 +23,24 @@ import 'ui/theme.dart';
 /// 對不上、google-services.json 沒更新，這些都會在這裡失敗，而在手機上看 log
 /// 遠比看一行字麻煩。
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+
+  // 沒人接住的錯誤全部記進 `recentErrors()`，個人設定頁的診斷資訊會連它
+  // 一起複製出去。**只記錄，不彈任何 UI** —— 這裡抓到的照定義就是沒人
+  // 接住的錯誤，對使用者說不出有用的話。
+  //
+  // 覆寫掉 Flutter 預設的 handler 會連 console 輸出一起蓋掉，所以自己補回去。
+  final presentError = FlutterError.presentError;
+  FlutterError.onError = (details) {
+    logError('flutter', details.exception);
+    presentError(details);
+  };
+  // Flutter 框架之外的（沒有 await 的 Future、平台通道）走這條。
+  binding.platformDispatcher.onError = (error, _) {
+    logError('platform', error);
+    // false 代表沒處理完，讓預設行為繼續印出來。
+    return false;
+  };
 
   // 必須在 Firebase 等非同步初始化之前開始聽，否則 App 被連結冷啟動時，第一條
   // Universal Link / App Link 可能在 widget tree 建好前就錯過。ProviderContainer
@@ -42,8 +60,10 @@ Future<void> main() async {
         container.read(pendingReportProvider.notifier).state = report;
       }
     },
-    onError: (_) {
-      // 不合法或系統無法解析的連結不能影響 App 正常啟動。
+    onError: (err) {
+      // 不合法或系統無法解析的連結不能影響 App 正常啟動 —— 但要留下紀錄，
+      // 不然「點連結沒反應」查不出是這裡壞的。
+      logError('app_links', err);
     },
   );
 

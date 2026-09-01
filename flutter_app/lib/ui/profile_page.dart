@@ -8,14 +8,14 @@ import '../domain/models.dart';
 import '../domain/validation.dart' as validate;
 import '../state/providers.dart';
 import 'confirm_dialog.dart';
+import 'diagnostics_section.dart';
 import 'system_share.dart';
 import 'theme.dart';
 
 /// 個人設定。`src/pages/ProfilePage.vue` 的 Flutter 版。
 ///
-/// 網頁版這一頁還有診斷資訊（版本、待上傳收據、錯誤清單）與「我的收藏／探索」
-/// 的入口。收藏與探索留在網頁版；診斷資訊等有東西可以診斷再說 ——
-/// 目前原生版還沒有離線佇列，抄過來的會是一份空表。
+/// 診斷資訊在 `diagnostics_section.dart`，預設收起。收藏與探索的入口在
+/// 「我的分帳」的標題列 —— 那是別人的旅程，跟這一頁的「我的帳號」不同類。
 ///
 /// 拆成外層等資料、內層畫表單兩個 widget，是因為表單的
 /// `TextEditingController` 要用暱稱當初始值。如果在 `initState` 裡讀
@@ -267,6 +267,10 @@ class _FormState extends ConsumerState<_Form> {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        // 排在資料匯出之後、儲存之前：這一區是「出問題時才看」的東西，
+        // 不該擋在使用者真正來這一頁要做的事前面。
+        DiagnosticsSection(provider: widget.profile.provider),
         const SizedBox(height: 24),
         FilledButton(
           onPressed: (_saving || !_canSubmit) ? null : _save,

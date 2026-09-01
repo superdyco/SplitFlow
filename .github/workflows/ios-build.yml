@@ -53,8 +53,11 @@ jobs:
         working-directory: flutter_app/ios
         run: pod install
 
+      # APP_VERSION 進診斷資訊那一區。這個 app 沒有自動更新，使用者手上那台
+      # 跑的是哪一版從外面看不出來 —— 而「他跑的是舊版」是回報問題時第一個
+      # 要排除的可能。沒帶的話畫面上會寫「未帶版本號（開發建置）」。
       - name: Build iOS without code signing
-        run: flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign --dart-define=APP_VERSION="${GITHUB_SHA::7} $(date -u +%Y-%m-%d)"
 
       - name: Upload unsigned app
         uses: actions/upload-artifact@v4

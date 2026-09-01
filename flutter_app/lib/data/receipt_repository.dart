@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:firebase_storage/firebase_storage.dart';
 
+import '../domain/debug_log.dart';
 import '../domain/receipt_policy.dart';
 
 /// 收據照片的上傳、下載網址與刪除。`src/services/receiptService.ts` 的
@@ -59,8 +60,10 @@ class ReceiptRepository {
     _urlCache.remove(path);
     try {
       await _storage.ref(path).delete();
-    } catch (_) {
-      // 見上面。
+    } catch (err) {
+      // 見上面。留下紀錄是因為「Storage 一直刪不掉」跟「這張圖本來就不在」
+      // 在畫面上長得一模一樣，而前者會慢慢累積孤兒檔案。
+      logError('storage', err);
     }
   }
 }

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
+import '../domain/debug_log.dart';
 import 'firestore_refs.dart';
 
 /// 推播 token 的註冊與清除。
@@ -36,6 +37,20 @@ class PushRepository {
         settings.authorizationStatus == AuthorizationStatus.provisional;
   }
 
+  /// 現在拿不拿得到 token。給診斷資訊用 —— 「收不到通知」從畫面上完全
+  /// 看不出來，而它跟權限是兩件事（給了權限但 token 沒發出去也會這樣）。
+  ///
+  /// 問不到就回 null：沒有 Google Play 服務的裝置會直接丟例外，
+  /// 那本身就是一條線索，不該跟「有權限但沒 token」混為一談。
+  Future<bool?> hasToken() async {
+    try {
+      final token = await _messaging.getToken();
+      return token != null && token.isNotEmpty;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 把這台裝置的 token 寫進這個帳號底下。
   ///
   /// 拿不到 token 就安靜地什麼都不做 —— 沒有網路、或使用者拒絕了通知權限
@@ -57,8 +72,10 @@ class PushRepository {
         'platform': pushPlatformName(defaultTargetPlatform),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-    } catch (_) {
-      // 推播是旁支。APNs/FCM 暫時不可用不能讓任務頁變成未處理例外。
+    } catch (err) {
+      // 推播是旁支。APNs/FCM 暫時不可用不能讓任務頁變成未處理例外 ——
+      // 但要留下紀錄：使用者只會發現「都沒收到通知」，那從畫面上查不出來。
+      logError('push', err);
     }
   }
 

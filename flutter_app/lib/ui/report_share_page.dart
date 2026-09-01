@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/report_repository.dart';
 import '../data/static_map.dart';
+import '../domain/debug_log.dart';
 import '../domain/models.dart';
 import '../domain/offline_write.dart';
 import '../domain/report.dart';
@@ -82,6 +83,7 @@ class _ReportSharePageState extends ConsumerState<ReportSharePage> {
             mapPath = await repo.uploadMap(_taskId, reportId, bytes);
           } catch (err) {
             warning = '地圖上傳失敗：$err';
+            logError('map', err);
           }
         }
       }
