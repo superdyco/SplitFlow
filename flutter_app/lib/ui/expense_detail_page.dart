@@ -142,7 +142,7 @@ class ExpenseDetailPage extends StatelessWidget {
                   if (place.lat != null && place.lng != null) ...[
                     const SizedBox(height: 8),
                     PlaceMap.enabled
-                        ? PlaceMap(
+                        ? PlaceMap.single(
                             center: domain.LatLng(place.lat!, place.lng!),
                             title: place.name,
                           )

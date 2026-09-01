@@ -299,7 +299,7 @@ class _PlaceFieldState extends ConsumerState<PlaceField> {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: PlaceMap.enabled
-                ? PlaceMap(center: marker, title: markerTitle)
+                ? PlaceMap.single(center: marker, title: markerTitle)
                 : const PlaceMapUnavailable(),
           ),
       ],

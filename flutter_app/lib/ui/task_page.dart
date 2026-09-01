@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/expense_actions.dart';
 import '../domain/expense_groups.dart';
+import '../domain/expense_markers.dart';
 import '../domain/member_name.dart';
 import '../domain/models.dart';
 
@@ -15,6 +16,7 @@ import 'expense_form_page.dart';
 import 'expense_row.dart';
 import 'invite_sheet.dart';
 import 'members_tab.dart';
+import 'place_map.dart';
 import 'settlement_tab.dart';
 import 'theme.dart';
 
@@ -228,7 +230,10 @@ class _Loaded extends ConsumerWidget {
 
 // ---------------------------------------------------------------- 支出
 
-class _ExpensesTab extends ConsumerWidget {
+/// 支出頁籤的兩種看法。地圖是同一批支出的另一種排法，不是另一份資料。
+enum _ExpenseView { list, map }
+
+class _ExpensesTab extends ConsumerStatefulWidget {
   final Task task;
   final bool archived;
   final Set<String> collapsed;
@@ -241,11 +246,20 @@ class _ExpensesTab extends ConsumerWidget {
     required this.onToggleDay,
   });
 
+  @override
+  ConsumerState<_ExpensesTab> createState() => _ExpensesTabState();
+}
+
+class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
+  _ExpenseView _view = _ExpenseView.list;
+
+  Task get task => widget.task;
+  bool get archived => widget.archived;
+
   /// 開新增或編輯表單。存完之後把這個任務相關的東西全部作廢重讀 ——
   /// 支出列表、結算、任務本身的 expenseCount 都變了。
   Future<void> _openForm(
-    BuildContext context,
-    WidgetRef ref, {
+    BuildContext context, {
     Expense? existing,
     RepeatFields? repeat,
   }) async {
@@ -281,7 +295,7 @@ class _ExpensesTab extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final expenses = ref.watch(expensesProvider(task.id));
     final members = ref.watch(membersProvider(task.id));
 
@@ -292,7 +306,7 @@ class _ExpensesTab extends ConsumerWidget {
       floatingActionButton: archived
           ? null
           : FloatingActionButton.extended(
-              onPressed: () => _openForm(context, ref),
+              onPressed: () => _openForm(context),
               icon: const Icon(Icons.add),
               label: const Text('新增支出'),
             ),
@@ -311,51 +325,157 @@ class _ExpensesTab extends ConsumerWidget {
           final uid = ref.watch(authStateProvider).value?.uid ?? '';
           final isAdmin = task.ownerId == uid || task.adminIds.contains(uid);
 
-          return ListView(
-            // 底部留白給浮動按鈕，不然最後一筆會被蓋住。
-            padding: const EdgeInsets.only(bottom: 88),
-            children: [
-              for (final group in groups)
-                ExpenseDayGroup(
-                  group: group,
-                  currency: task.defaultCurrency,
-                  open: !collapsed.contains(group.date),
-                  onToggle: () => onToggleDay(group.date),
-                  children: [
-                    ...group.expenses.map((expense) {
-                      // 每個人都點得進去，差別只在點到哪：管得動的進編輯頁，
-                      // 其他人進唯讀的詳情頁。封存之後誰都管不動，於是整份
-                      // 帳變成大家都讀得到 —— 那正是要翻帳的時候。
-                      final manageable = canManageExpense(
-                        expense: expense,
-                        uid: uid,
-                        isAdmin: isAdmin,
-                        archived: archived,
-                      );
+          final markers = expenseMarkers(list);
+          // 沒有金鑰就畫不出地圖，一筆有座標的支出都沒有就沒東西可畫 ——
+          // 兩種情況都不要給切換鍵，按下去只會看到空白。
+          final mappable = PlaceMap.enabled && markers.isNotEmpty;
+          // 停在地圖檢視時把最後一筆有座標的支出刪掉，就落回清單。
+          final showMap = mappable && _view == _ExpenseView.map;
 
-                      return ExpenseRow(
-                        expense: expense,
-                        memberNames: names,
-                        baseCurrency: task.defaultCurrency,
-                        onTap: manageable
-                            ? () => _openForm(context, ref, existing: expense)
-                            : () => _openDetail(context, expense, names),
-                        // 「再記一筆」是新增，不是修改 —— 管不動這一筆的人
-                        // 照樣做得到，只有封存的任務不行。
-                        onRepeat: archived
-                            ? null
-                            : () => _openForm(
-                                  context,
-                                  ref,
-                                  repeat: repeatFieldsOf(expense),
-                                ),
-                      );
-                    }),
-                  ],
-                ),
+          final body = showMap
+              ? _MapView(markers: markers)
+              : _list(context, groups, names, uid, isAdmin);
+
+          if (!mappable) return body;
+
+          return Column(
+            children: [
+              _ViewToggle(
+                view: _view,
+                mapCount: markers.length,
+                onChanged: (view) => setState(() => _view = view),
+              ),
+              Expanded(child: body),
             ],
           );
         },
+      ),
+    );
+  }
+
+  /// 一天一組的支出清單。
+  Widget _list(
+    BuildContext context,
+    List<ExpenseGroup> groups,
+    Map<String, String> names,
+    String uid,
+    bool isAdmin,
+  ) {
+    return ListView(
+      // 底部留白給浮動按鈕，不然最後一筆會被蓋住。
+      padding: const EdgeInsets.only(bottom: 88),
+      children: [
+        for (final group in groups)
+          ExpenseDayGroup(
+            group: group,
+            currency: task.defaultCurrency,
+            open: !widget.collapsed.contains(group.date),
+            onToggle: () => widget.onToggleDay(group.date),
+            children: [
+              ...group.expenses.map((expense) {
+                // 每個人都點得進去，差別只在點到哪：管得動的進編輯頁，
+                // 其他人進唯讀的詳情頁。封存之後誰都管不動，於是整份
+                // 帳變成大家都讀得到 —— 那正是要翻帳的時候。
+                final manageable = canManageExpense(
+                  expense: expense,
+                  uid: uid,
+                  isAdmin: isAdmin,
+                  archived: archived,
+                );
+
+                return ExpenseRow(
+                  expense: expense,
+                  memberNames: names,
+                  baseCurrency: task.defaultCurrency,
+                  onTap: manageable
+                      ? () => _openForm(context, existing: expense)
+                      : () => _openDetail(context, expense, names),
+                  // 「再記一筆」是新增，不是修改 —— 管不動這一筆的人
+                  // 照樣做得到，只有封存的任務不行。
+                  onRepeat: archived
+                      ? null
+                      : () => _openForm(
+                            context,
+                            repeat: repeatFieldsOf(expense),
+                          ),
+                );
+              }),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+/// 清單／地圖切換。網頁版是兩顆 tab，這裡用 Material 的分段按鈕 ——
+/// 上面已經有一排真的頁籤了，再放一排長得一樣的會分不出哪一排在切什麼。
+class _ViewToggle extends StatelessWidget {
+  final _ExpenseView view;
+
+  /// 地圖上有幾個標記。**跟支出筆數不一樣**，所以要標出來 ——
+  /// 不然使用者會以為地圖漏掉了幾筆。
+  final int mapCount;
+
+  final void Function(_ExpenseView view) onChanged;
+
+  const _ViewToggle({
+    required this.view,
+    required this.mapCount,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: SizedBox(
+        width: double.infinity,
+        child: SegmentedButton<_ExpenseView>(
+          segments: [
+            const ButtonSegment(
+              value: _ExpenseView.list,
+              label: Text('清單'),
+              icon: Icon(Icons.list),
+            ),
+            ButtonSegment(
+              value: _ExpenseView.map,
+              label: Text('地圖（$mapCount）'),
+              icon: const Icon(Icons.map_outlined),
+            ),
+          ],
+          selected: {view},
+          showSelectedIcon: false,
+          onSelectionChanged: (selected) => onChanged(selected.first),
+        ),
+      ),
+    );
+  }
+}
+
+/// 整趟旅程的支出標在同一張圖上。
+class _MapView extends StatelessWidget {
+  final List<MapMarker> markers;
+
+  const _MapView({required this.markers});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return Padding(
+      // 底部一樣留白給浮動按鈕。
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 撐滿剩下的空間：這張圖是要看相對位置的，180px 看不出來。
+          Expanded(child: PlaceMap(markers: markers, height: null)),
+          const SizedBox(height: 8),
+          Text(
+            '只顯示有座標的支出。從地點搜尋清單選出來的才有座標，自己打字的沒有。',
+            style: text.bodySmall,
+          ),
+        ],
       ),
     );
   }

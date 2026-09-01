@@ -48,6 +48,7 @@ class ExpenseRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final paidBy = memberNames[expense.paidBy] ?? '已離開的成員';
+    final place = expense.place;
     final splitCount = expense.splits.length;
     final splitLabel = expense.splitMode == SplitMode.custom
         ? '$splitCount 人自訂'
@@ -87,6 +88,19 @@ class ExpenseRow extends StatelessWidget {
                       '$_shown · $paidBy 付 · $splitLabel'
                       '${expense.receipt == null ? '' : ' · 📎'}',
                       style: text.bodySmall),
+                  // 地點與備註在列表就要看得到。要點進去才看得到的話，
+                  // 對帳時每一筆都得點一次 —— 那兩個欄位就等於白填。
+                  // 各自截成一行：它們是掃過去用的線索，不是內文。
+                  if (place != null)
+                    Text('📍 ${place.name}',
+                        style: text.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  if (expense.note.isNotEmpty)
+                    Text('📝 ${expense.note}',
+                        style: text.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                   if (onRepeat != null) ...[
                     const SizedBox(height: 6),
                     // 巢狀按鈕自己會吃掉點擊，不用像網頁版那樣擋冒泡。
