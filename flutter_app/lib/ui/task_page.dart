@@ -7,6 +7,7 @@ import '../domain/expense_groups.dart';
 import '../domain/expense_markers.dart';
 import '../domain/member_name.dart';
 import '../domain/models.dart';
+import '../domain/report_actions.dart';
 
 import '../domain/task_status.dart';
 import '../state/providers.dart';
@@ -17,6 +18,7 @@ import 'expense_row.dart';
 import 'invite_sheet.dart';
 import 'members_tab.dart';
 import 'place_map.dart';
+import 'report_share_page.dart';
 import 'settlement_tab.dart';
 import 'theme.dart';
 
@@ -25,7 +27,8 @@ import 'theme.dart';
 /// 三個分頁：支出、成員、結算。封存的任務唯讀 —— Firestore rules 已經擋死，
 /// 這裡收起寫入入口只是不要讓人按了才失敗。
 ///
-/// 報告與分享那一整區**不搬**（見 README 的範圍決定），那些留在網頁版。
+/// 報告與分享那一整區在 `report_share_page.dart`，從標題列的「報告」進去 ——
+/// 只有 owner 看得到那顆按鈕。
 class TaskPage extends ConsumerStatefulWidget {
   final String taskId;
 
@@ -182,6 +185,17 @@ class _Loaded extends ConsumerWidget {
                   inviteCode: task.inviteCode,
                 ),
                 child: const Text('邀請'),
+              ),
+            // 報告是旅程結束後的東西，只有 owner 做得了 —— rules 也是這樣寫的。
+            // 封存的任務更需要它，所以不看封存狀態。
+            if (canShareReport(task: task, uid: uid))
+              TextButton(
+                onPressed: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(
+                    builder: (_) => ReportSharePage(task: task),
+                  ),
+                ),
+                child: const Text('報告'),
               ),
           ],
           bottom: const TabBar(

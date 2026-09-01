@@ -31,3 +31,20 @@ String? inviteCodeFromUri(Uri uri) {
   final code = uri.pathSegments[1].trim();
   return code.isEmpty ? null : code;
 }
+
+/// 從 Universal Link / App Link 取出報告位置。
+///
+/// 只接受正式網站的 `/r/:taskId/:reportId`。報告連結是設計上就會被到處轉傳
+/// 的東西，所以裝了 App 的人點到它，應該直接在 App 裡打開 —— 那一頁不需要
+/// 登入，跟網頁版一樣。
+({String taskId, String reportId})? reportFromUri(Uri uri) {
+  if (uri.scheme != 'https' || uri.host != inviteHost) return null;
+  if (uri.pathSegments.length != 3 || uri.pathSegments.first != 'r') {
+    return null;
+  }
+
+  final taskId = uri.pathSegments[1].trim();
+  final reportId = uri.pathSegments[2].trim();
+  if (taskId.isEmpty || reportId.isEmpty) return null;
+  return (taskId: taskId, reportId: reportId);
+}

@@ -63,4 +63,47 @@ void main() {
       );
     });
   });
+
+  group('reportFromUri', () {
+    test('讀得出任務與報告 id', () {
+      final report = reportFromUri(
+        Uri.parse('https://splitflow-e39c0.web.app/r/t123/r456'),
+      );
+
+      expect(report?.taskId, 't123');
+      expect(report?.reportId, 'r456');
+    });
+
+    test('query 與 fragment 不影響', () {
+      final report = reportFromUri(
+        Uri.parse('https://splitflow-e39c0.web.app/r/t123/r456?from=line#top'),
+      );
+
+      expect(report?.taskId, 't123');
+    });
+
+    test('拒絕其他網域、非 https 與段數不對的路徑', () {
+      expect(reportFromUri(Uri.parse('https://example.com/r/t/r')), isNull);
+      expect(
+        reportFromUri(Uri.parse('http://splitflow-e39c0.web.app/r/t/r')),
+        isNull,
+      );
+      expect(
+        reportFromUri(Uri.parse('https://splitflow-e39c0.web.app/r/t123')),
+        isNull,
+      );
+      expect(
+        reportFromUri(Uri.parse('https://splitflow-e39c0.web.app/join/abc')),
+        isNull,
+      );
+    });
+
+    test('邀請連結不會被當成報告連結，反之亦然', () {
+      final invite = Uri.parse('https://splitflow-e39c0.web.app/join/abc');
+      final report = Uri.parse('https://splitflow-e39c0.web.app/r/t1/r1');
+
+      expect(reportFromUri(invite), isNull);
+      expect(inviteCodeFromUri(report), isNull);
+    });
+  });
 }

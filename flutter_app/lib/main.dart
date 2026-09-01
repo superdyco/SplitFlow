@@ -33,6 +33,13 @@ Future<void> main() async {
       final code = inviteCodeFromUri(uri);
       if (code != null) {
         container.read(pendingInviteCodeProvider.notifier).state = code;
+        return;
+      }
+
+      // 報告連結。跟邀請一樣先保管起來，等畫面掛好才開。
+      final report = reportFromUri(uri);
+      if (report != null) {
+        container.read(pendingReportProvider.notifier).state = report;
       }
     },
     onError: (_) {

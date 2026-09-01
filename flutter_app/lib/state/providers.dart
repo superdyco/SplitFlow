@@ -5,13 +5,17 @@ import '../data/auth_repository.dart';
 import '../data/bias_store.dart';
 import '../data/data_export_repository.dart';
 import '../data/expense_repository.dart';
+import '../data/favorite_repository.dart';
 import '../data/geolocation.dart';
 import '../data/place_service.dart';
 import '../data/push_repository.dart';
 import '../data/receipt_picker.dart';
 import '../data/receipt_repository.dart';
+import '../data/report_repository.dart';
 import '../data/task_repository.dart';
+import '../domain/favorites.dart';
 import '../domain/models.dart';
+import '../domain/report.dart';
 import '../domain/settlement.dart';
 
 /// 狀態層。`src/composables/` 與 `src/stores/` 的 Riverpod 版。
@@ -43,6 +47,10 @@ final geolocationProvider = Provider((ref) => Geolocation());
 /// 收據。picker 是拍照／選圖，repository 是 Storage。
 final receiptPickerProvider = Provider((ref) => ReceiptPicker());
 final receiptRepositoryProvider = Provider((ref) => ReceiptRepository());
+
+/// 公開旅費報告與收藏。報告是 owner 產生的快照，收藏是私人的。
+final reportRepositoryProvider = Provider((ref) => ReportRepository());
+final favoriteRepositoryProvider = Provider((ref) => FavoriteRepository());
 
 /// 推播。註冊 token、清除 token、問通知權限。
 final pushRepositoryProvider = Provider((ref) => PushRepository());
@@ -133,4 +141,44 @@ final settlementProvider =
     members.map((member) => member.uid).toList(),
     task?.defaultCurrency ?? 'TWD',
   );
+});
+
+
+// ---------------------------------------------------------------- 報告
+
+/// 這個任務既有的報告。沒產生過就是 null。
+///
+/// 產生、撤銷、改公開狀態之後都要 invalidate —— 那三個動作都會改到這份文件，
+/// 而畫面上的「連結開著沒」「有沒有列進探索」全看它。
+final taskReportProvider =
+    FutureProvider.family<TripReport?, String>((ref, taskId) {
+  return ref.watch(reportRepositoryProvider).findReport(taskId);
+});
+
+/// 報告地圖的下載網址。公開讀取，沒登入也拿得到。
+///
+/// 用 provider 而不是在 widget 裡 FutureBuilder，理由跟收據縮圖一樣：
+/// 同一份報告在同一次瀏覽裡不該重複問網址。
+final reportMapUrlProvider =
+    FutureProvider.family<String, (String, String)>((ref, key) {
+  return ref.watch(reportRepositoryProvider).mapUrl(key.$1, key.$2);
+});
+
+/// 探索頁：別人願意公開的旅程。
+final publicReportsProvider = FutureProvider<List<PublicReport>>((ref) {
+  return ref.watch(reportRepositoryProvider).listPublicReports();
+});
+
+/// 我的收藏。
+final favoritesProvider = FutureProvider<List<FavoriteReport>>((ref) async {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const [];
+  return ref.watch(favoriteRepositoryProvider).list(user.uid);
+});
+
+/// 收藏過的 id 集合。探索頁一次畫很多張卡，每張都問一次會是 N 趟往返。
+final favoritedIdsProvider = FutureProvider<Set<String>>((ref) async {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const {};
+  return ref.watch(favoriteRepositoryProvider).favoritedIds(user.uid);
 });

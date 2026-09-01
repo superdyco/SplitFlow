@@ -11,8 +11,11 @@ import '../state/pending_invite.dart';
 import '../state/pending_task.dart';
 import '../state/providers.dart';
 import 'create_task_page.dart';
+import 'explore_page.dart';
+import 'favorites_page.dart';
 import 'join_task_page.dart';
 import 'profile_page.dart';
+import 'report_page.dart';
 import 'confirm_dialog.dart';
 import 'task_card.dart';
 import 'task_page.dart';
@@ -42,8 +45,10 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     // 走到這一頁代表登入狀態已經確定了，這時導頁才安全。
     // 用 addPostFrameCallback 是因為 initState 當下還不能 push。
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 使用者主動點的邀請優先於先前殘留的通知導頁。
-      if (!_consumePendingInvite()) _consumePendingTask();
+      // 使用者主動點的連結優先於先前殘留的通知導頁。
+      if (_consumePendingInvite()) return;
+      if (_consumePendingReport()) return;
+      _consumePendingTask();
     });
   }
 
@@ -56,6 +61,23 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => JoinTaskPage(inviteCode: inviteCode),
+      ),
+    );
+    return true;
+  }
+
+  /// 點報告連結帶進來的報告，開一次就消費掉。
+  bool _consumePendingReport() {
+    final pending = ref.read(pendingReportProvider);
+    if (pending == null || !mounted) return false;
+
+    ref.read(pendingReportProvider.notifier).state = null;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ReportPage(
+          taskId: pending.taskId,
+          reportId: pending.reportId,
+        ),
       ),
     );
     return true;
@@ -189,6 +211,22 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
       appBar: AppBar(
         title: const Text('我的分帳'),
         actions: [
+          // 探索與收藏都是「別人的旅程」，跟這一頁的「我的任務」是兩回事，
+          // 所以放在標題列而不是混進下面的列表。
+          IconButton(
+            tooltip: '探索',
+            icon: const Icon(Icons.explore_outlined),
+            onPressed: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => const ExplorePage()),
+            ),
+          ),
+          IconButton(
+            tooltip: '我的收藏',
+            icon: const Icon(Icons.favorite_border),
+            onPressed: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => const FavoritesPage()),
+            ),
+          ),
           IconButton(
             tooltip: '個人設定',
             icon: const Icon(Icons.person_outline),

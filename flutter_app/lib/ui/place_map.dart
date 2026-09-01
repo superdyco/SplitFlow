@@ -147,7 +147,7 @@ class PlaceMapUnavailable extends StatelessWidget {
       ),
       child: Text(
         '座標已經記下來了，但這個版本沒有設定地圖金鑰，所以顯示不出地圖。'
-        '報告頁的地圖在網頁版看得到。',
+        '同一把金鑰也決定旅費報告有沒有地圖。',
         style: text.bodySmall,
       ),
     );
