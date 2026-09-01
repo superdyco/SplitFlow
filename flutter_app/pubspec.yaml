@@ -63,6 +63,11 @@ dependencies:
   # 網頁版那邊是 localStorage，同樣是可有可無的資料 —— 讀不到就沒有偏好。
   shared_preferences: ^2.3.0
 
+  # 支出名稱的語音輸入。Android 用 SpeechRecognizer、iOS 用 SFSpeechRecognizer，
+  # 兩邊都要麥克風權限（見 AndroidManifest 與 Info.plist）。
+  # 沒有辨識服務的裝置 initialize() 會回 false，那時按鈕不出現。
+  speech_to_text: ^7.4.0
+
   intl: ^0.19.0
 
 dev_dependencies:

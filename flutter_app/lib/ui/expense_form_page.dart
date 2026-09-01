@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/dictation_service.dart';
 import '../data/rate_service.dart';
 import '../domain/currency.dart';
 import '../domain/expense_actions.dart';
@@ -59,6 +60,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   final _amount = TextEditingController();
   final _rate = TextEditingController(text: '1');
   final _note = TextEditingController();
+
+  /// 支出名稱的語音輸入。第一次按下麥克風才會真的初始化。
+  final _dictation = DictationService();
 
   /// 地點欄位現在自己管字串，這裡只留它算出來的結果。
   ExpensePlace? _place;
@@ -144,6 +148,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   @override
   void dispose() {
+    _dictation.dispose();
     _title.dispose();
     _amount.dispose();
     _rate.dispose();
@@ -489,10 +494,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 children: [
                   _Field(
                     label: '支出名稱',
-                    child: TextField(
+                    child: _TitleField(
                       controller: _title,
-                      decoration: const InputDecoration(hintText: '例如：晚餐'),
-                      onChanged: (_) => setState(() {}),
+                      dictation: _dictation,
+                      // 講出來的內容**直接取代**欄位內容，不是接在後面 ——
+                      // 「晚」加上聽到的「晚餐」會變成「晚晚餐」，那比重打
+                      // 一次還煩。名稱本來就短，講錯再講一次就好。
+                      onText: (text) => setState(() {
+                        _title.text = text.length > 60
+                            ? text.substring(0, 60)
+                            : text;
+                      }),
+                      onChanged: () => setState(() {}),
                     ),
                   ),
                   _Field(
@@ -866,6 +879,69 @@ class _Field extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// 支出名稱欄位，右邊掛一顆麥克風。
+///
+/// 抽成獨立的 widget 是為了 `ListenableBuilder`：語音的狀態變化只該重畫
+/// 這一列，而不是整張表單 —— 那上面有十幾個各自握著狀態的欄位。
+class _TitleField extends StatelessWidget {
+  final TextEditingController controller;
+  final DictationService dictation;
+  final void Function(String text) onText;
+  final VoidCallback onChanged;
+
+  const _TitleField({
+    required this.controller,
+    required this.dictation,
+    required this.onText,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return ListenableBuilder(
+      listenable: dictation,
+      builder: (context, _) {
+        final listening = dictation.listening;
+        final error = dictation.error;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(hintText: '例如：晚餐'),
+                    onChanged: (_) => onChanged(),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // 聽的時候換成停止圖示，因為按下去就是停。
+                IconButton(
+                  tooltip: listening ? '停止語音輸入' : '用說的輸入支出名稱',
+                  onPressed: () => dictation.toggle(onText),
+                  color: listening ? AppColors.primary : AppColors.muted,
+                  icon: Icon(listening ? Icons.stop_circle : Icons.mic_none),
+                ),
+              ],
+            ),
+            if (listening)
+              Text('請說話...', style: text.bodySmall)
+            else if (error != null)
+              Text(
+                error,
+                style: text.bodySmall?.copyWith(color: AppColors.danger),
+              ),
+          ],
+        );
+      },
     );
   }
 }

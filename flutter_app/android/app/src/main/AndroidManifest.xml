@@ -16,6 +16,10 @@
          真正要不要跳對話框由程式決定 —— 見 PushRepository.requestPermission。 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- 支出名稱的語音輸入。系統會自己跳權限對話框，程式不主動要 —— 使用者
+         按下麥克風那一刻就是最好的時機，比開 App 就問成功率高得多。 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:label="簡單分帳"
         android:name="${applicationName}"
@@ -86,6 +90,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Android 11 起看不到沒宣告的服務。少了這段，語音辨識在新一點的
+             系統上會回報「這台裝置沒有辨識服務」，而實際上是有的。 -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
         </intent>
     </queries>
 </manifest>
