@@ -82,8 +82,6 @@ const saving = ref(false);
 const removing = ref(false);
 const loadError = ref<string | null>(null);
 const error = ref<string | null>(null);
-/** 離線排隊時要告訴使用者資料沒有不見，只是還沒送出去。 */
-const queuedNotice = ref(false);
 
 const title = ref("");
 /**
@@ -554,7 +552,19 @@ async function submit() {
       return;
     }
 
-    if (outcome === "queued") queuedNotice.value = true;
+    /*
+      離線排隊時應該要告訴使用者「已經存在這台裝置上，連上網會自動同步」——
+      那正是最需要安撫的時刻。原本有這段提示，但它壞了：設完旗標立刻導走，
+      元件跟著卸載，那個 <p> 沒有機會渲染。
+
+      刪掉壞的實作，把原意留在這裡。修法不只一種（延後導航、在任務頁顯示、
+      改用全域提示），每一種的影響範圍都超出這次改版 —— 但下一個人至少
+      知道有人想過這件事，不會以為從來沒有。
+
+      outcome 因此暫時沒有讀取者。留著它是刻意的：那兩行賦值是送出流程的
+      一部分，為了消掉一個沒人抱怨的未使用變數去改 settleWrite 的呼叫方式，
+      代價比留著大。
+    */
     await router.push(`/tasks/${taskId}`);
   } catch (err) {
     error.value = firebaseErrorMessage(err);
@@ -885,10 +895,6 @@ onMounted(load);
             </p>
           </div>
         </div>
-
-        <p v-if="queuedNotice" class="card tiny">
-          目前沒有連線，已經先存在這台裝置上，連上網路後會自動同步。
-        </p>
 
         <ErrorState :message="error" />
 

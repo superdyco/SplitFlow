@@ -284,7 +284,7 @@ await router.push(`/tasks/${taskId}`);
 **Files:**
 - Modify: `src/pages/ExpenseFormPage.vue`
 
-- [ ] **Step 1: 刪掉 `ref`**
+- [x] **Step 1: 刪掉 `ref`**
 
 刪掉 script 裡這兩行（含註解）：
 
@@ -293,7 +293,7 @@ await router.push(`/tasks/${taskId}`);
 const queuedNotice = ref(false);
 ```
 
-- [ ] **Step 2: 刪掉 template 那一段**
+- [x] **Step 2: 刪掉 template 那一段**
 
 刪掉：
 
@@ -303,7 +303,7 @@ const queuedNotice = ref(false);
 </p>
 ```
 
-- [ ] **Step 3: 改掉 `submit()` 裡設旗標的那一行**
+- [x] **Step 3: 改掉 `submit()` 裡設旗標的那一行**
 
 ```ts
 if (outcome === "queued") queuedNotice.value = true;
@@ -332,7 +332,7 @@ await router.push(`/tasks/${taskId}`);
 >
 > 不要為了消警告去改 `settleWrite` 的呼叫方式 —— `outcome` 的賦值那幾行是送出流程，不在這次範圍。
 
-- [ ] **Step 4: 確認搜不到殘留**
+- [x] **Step 4: 確認搜不到殘留**
 
 ```bash
 grep -n "queuedNotice" src/pages/ExpenseFormPage.vue
@@ -340,7 +340,7 @@ grep -n "queuedNotice" src/pages/ExpenseFormPage.vue
 
 Expected: 沒有任何結果。
 
-- [ ] **Step 5: 型別檢查**
+- [x] **Step 5: 型別檢查**
 
 ```bash
 npm run check
@@ -348,7 +348,7 @@ npm run check
 
 Expected: 通過。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/pages/ExpenseFormPage.vue
