@@ -109,6 +109,20 @@ function goMap(on: boolean) {
   router.replace({ query });
 }
 const copied = ref(false);
+
+/*
+  預設收起。這一塊只在「已封存且是 owner」時出現，本來就是低頻操作，
+  而它展開後是輸入框＋四顆按鈕＋checkbox＋兩種警告的一整片。
+*/
+const shareOpen = ref(false);
+
+/** 收起時最該知道的就是狀態，所以標頭右邊講它。 */
+const shareStatus = computed(() => {
+  const report = reportState.report.value;
+  if (!report) return "尚未產生";
+  if (!report.active) return "連結已關閉";
+  return report.listed ? "連結開著 · 已列入公開頁" : "連結開著";
+});
 const denied = computed(() => route.query.denied === "1");
 const actionError = ref<string | null>(null);
 const busyUid = ref<string | null>(null);
@@ -544,99 +558,117 @@ onMounted(async () => {
         </p>
 
         <section v-if="isArchived && taskState.isOwner.value" class="card stack">
-          <strong class="section-title">分享這趟旅程</strong>
+          <!--
+            照 ExpenseDayGroup 既有的收摺模式：button + aria-expanded + chevron。
+            全專案沒有用過 <details>，不在這裡開先例。
 
-          <p v-if="!expenseState.expenses.value.length" class="tiny warn">
-            這個任務還沒有支出，沒有東西可以報告。
-          </p>
-
-          <template v-else-if="reportState.report.value">
-            <div class="row wrap">
-              <input :value="reportState.shareUrl.value" class="input grow" readonly />
-              <button class="btn btn-sm" @click="copyShareUrl">
-                {{ reportCopied ? "已複製" : "複製" }}
-              </button>
-              <!--
-                只在連結開著時才給這顆。規則是
-                `active == true || isTaskMember(taskId)`，owner 是成員，所以連結
-                關掉之後 owner 自己還是讀得到完整報告 —— 這時給一顆「開啟」，
-                他會看到正常的頁面、以為連結還通著，但別人打開是「找不到」。
-                旁邊那句「目前已關閉，連結打不開」已經把狀態講清楚了。
-
-                用連結而不是 button + window.open()：中鍵開新分頁、長按選單、
-                「複製連結網址」都會是瀏覽器原生行為，也不會被彈出視窗封鎖擋掉。
-                RouterLink 一樣是渲染成 <a href>，這些行為都還在。
-              -->
-              <RouterLink
-                v-if="reportState.report.value.active"
-                class="btn btn-sm"
-                :to="reportState.sharePath.value"
-                :target="newTabTarget"
-                rel="noopener"
-              >
-                開啟
-              </RouterLink>
-            </div>
-            <p v-if="!reportState.report.value.active" class="tiny warn">
-              目前已關閉，連結打不開。
-            </p>
-            <!--
-              兩層是兩件事：連結是「拿到網址的人看不看得到」，公開是「陌生人
-              在探索頁找不找得到」。只想傳給朋友的人，連結開著但這個不勾。
-
-              連結關掉時整條停用並取消勾選 —— 列出去只會是一張點進去讀不到的
-              卡片，而那比沒列出去更糟。
-            -->
-            <label class="listed" :class="{ off: !reportState.report.value.active }">
-              <input
-                type="checkbox"
-                :checked="reportState.report.value.listed"
-                :disabled="!reportState.report.value.active || reportState.busy.value"
-                @change="reportState.setListed(!reportState.report.value.listed)"
-              />
-              <span>
-                列入公開頁
-                <span class="tiny muted block">
-                  {{
-                    reportState.report.value.active
-                      ? "讓所有簡單分帳使用者在「探索」找得到這趟旅程"
-                      : "連結關著的時候不能公開"
-                  }}
-                </span>
-              </span>
-            </label>
-
-            <div class="row">
-              <button class="btn btn-sm" :disabled="reportState.busy.value" @click="generateReport">
-                重新產生
-              </button>
-              <button
-                class="btn btn-sm"
-                :disabled="reportState.busy.value"
-                @click="reportState.setActive(!reportState.report.value.active)"
-              >
-                {{ reportState.report.value.active ? "關閉連結" : "重新開啟" }}
-              </button>
-            </div>
-          </template>
-
+            收起時右邊講狀態，因為那正是收起時唯一該知道的事。
+          -->
           <button
-            v-else
-            class="btn btn-primary btn-block"
-            :disabled="!canGenerateReport || reportState.busy.value"
-            @click="generateReport"
+            type="button"
+            class="share-head"
+            :aria-expanded="shareOpen"
+            @click="shareOpen = !shareOpen"
           >
-            {{ reportState.busy.value ? "產生中..." : "產生分享報告" }}
+            <span class="chevron" aria-hidden="true">{{ shareOpen ? "▾" : "▸" }}</span>
+            <strong class="section-title">分享這趟旅程</strong>
+            <span class="tiny share-status">{{ shareStatus }}</span>
           </button>
 
-          <p v-if="reportState.error.value" class="tiny warn">{{ reportState.error.value }}</p>
-          <!--
-            報告是成功的，只是沒有地圖 —— 用 muted 而不是 warn，
-            不然看起來像整份報告失敗了。
-          -->
-          <p v-if="reportState.mapWarning.value" class="tiny">
-            報告已產生，但沒有地圖：{{ reportState.mapWarning.value }}
-          </p>
+          <div v-if="shareOpen" class="stack">
+
+            <p v-if="!expenseState.expenses.value.length" class="tiny warn">
+              這個任務還沒有支出，沒有東西可以報告。
+            </p>
+
+            <template v-else-if="reportState.report.value">
+              <div class="row wrap">
+                <input :value="reportState.shareUrl.value" class="input grow" readonly />
+                <button class="btn btn-sm" @click="copyShareUrl">
+                  {{ reportCopied ? "已複製" : "複製" }}
+                </button>
+                <!--
+                  只在連結開著時才給這顆。規則是
+                  `active == true || isTaskMember(taskId)`，owner 是成員，所以連結
+                  關掉之後 owner 自己還是讀得到完整報告 —— 這時給一顆「開啟」，
+                  他會看到正常的頁面、以為連結還通著，但別人打開是「找不到」。
+                  旁邊那句「目前已關閉，連結打不開」已經把狀態講清楚了。
+
+                  用連結而不是 button + window.open()：中鍵開新分頁、長按選單、
+                  「複製連結網址」都會是瀏覽器原生行為，也不會被彈出視窗封鎖擋掉。
+                  RouterLink 一樣是渲染成 <a href>，這些行為都還在。
+                -->
+                <RouterLink
+                  v-if="reportState.report.value.active"
+                  class="btn btn-sm"
+                  :to="reportState.sharePath.value"
+                  :target="newTabTarget"
+                  rel="noopener"
+                >
+                  開啟
+                </RouterLink>
+              </div>
+              <p v-if="!reportState.report.value.active" class="tiny warn">
+                目前已關閉，連結打不開。
+              </p>
+              <!--
+                兩層是兩件事：連結是「拿到網址的人看不看得到」，公開是「陌生人
+                在探索頁找不找得到」。只想傳給朋友的人，連結開著但這個不勾。
+
+                連結關掉時整條停用並取消勾選 —— 列出去只會是一張點進去讀不到的
+                卡片，而那比沒列出去更糟。
+              -->
+              <label class="listed" :class="{ off: !reportState.report.value.active }">
+                <input
+                  type="checkbox"
+                  :checked="reportState.report.value.listed"
+                  :disabled="!reportState.report.value.active || reportState.busy.value"
+                  @change="reportState.setListed(!reportState.report.value.listed)"
+                />
+                <span>
+                  列入公開頁
+                  <span class="tiny muted block">
+                    {{
+                      reportState.report.value.active
+                        ? "讓所有簡單分帳使用者在「探索」找得到這趟旅程"
+                        : "連結關著的時候不能公開"
+                    }}
+                  </span>
+                </span>
+              </label>
+
+              <div class="row">
+                <button class="btn btn-sm" :disabled="reportState.busy.value" @click="generateReport">
+                  重新產生
+                </button>
+                <button
+                  class="btn btn-sm"
+                  :disabled="reportState.busy.value"
+                  @click="reportState.setActive(!reportState.report.value.active)"
+                >
+                  {{ reportState.report.value.active ? "關閉連結" : "重新開啟" }}
+                </button>
+              </div>
+            </template>
+
+            <button
+              v-else
+              class="btn btn-primary btn-block"
+              :disabled="!canGenerateReport || reportState.busy.value"
+              @click="generateReport"
+            >
+              {{ reportState.busy.value ? "產生中..." : "產生分享報告" }}
+            </button>
+
+            <p v-if="reportState.error.value" class="tiny warn">{{ reportState.error.value }}</p>
+            <!--
+              報告是成功的，只是沒有地圖 —— 用 muted 而不是 warn，
+              不然看起來像整份報告失敗了。
+            -->
+            <p v-if="reportState.mapWarning.value" class="tiny">
+              報告已產生，但沒有地圖：{{ reportState.mapWarning.value }}
+            </p>
+          </div>
         </section>
 
         <!-- 結算已經是次頁，不再是同層級的頁籤。 -->
@@ -860,6 +892,28 @@ onMounted(async () => {
 /* 主要動作吃掉剩餘寬度，切換靠右且不被壓縮。 */
 .grow-btn {
   flex: 1;
+}
+
+.share-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+}
+
+.chevron {
+  flex: none;
+  color: var(--color-muted);
+}
+
+/* 狀態靠右，因為收起時它是這一行唯一新增的資訊。 */
+.share-status {
+  margin: 0 0 0 auto;
+  text-align: right;
 }
 
 .back {
