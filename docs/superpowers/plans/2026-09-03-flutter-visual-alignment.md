@@ -332,7 +332,7 @@ Task 3 與 Task 4 要用到圓角與間距常數，所以先補齊。
 **Files:**
 - Modify: `flutter_app/lib/ui/theme.dart`
 
-- [ ] **Step 1: 補九個顏色常數**
+- [x] **Step 1: 補九個顏色常數**
 
 在 `AppColors` 裡補上網頁版有、這邊沒有的。放在對應的既有常數旁邊，
 不要全部堆在最後：
@@ -376,7 +376,7 @@ Task 3 與 Task 4 要用到圓角與間距常數，所以先補齊。
 > **會多出 unused 警告嗎？** 不會 —— `abstract final class` 的 static 常數
 > 沒有使用者不算 unused。Step 5 會確認 analyze 還是 1 issue。
 
-- [ ] **Step 2: 圓角四階**
+- [x] **Step 2: 圓角四階**
 
 在 `AppColors` 後面新增：
 
@@ -392,7 +392,7 @@ abstract final class AppRadius {
 }
 ```
 
-- [ ] **Step 3: 間距常數**
+- [x] **Step 3: 間距常數**
 
 ```dart
 /// 4px 網格。全 app 原本用了 6、10、14、18、20 這些不在網格上的值。
@@ -413,7 +413,7 @@ abstract final class AppSpace {
 > **這一輪只定義、只在動到的檔案裡用。** 不要去掃全 app 的 `SizedBox` ——
 > 那是第三輪的事，而且會讓這次的 diff 大到沒人能審。
 
-- [ ] **Step 4: 補一級字級，並把圓角套進去**
+- [x] **Step 4: 補一級字級，並把圓角套進去**
 
 `textTheme` 補上 `titleSmall`：
 
@@ -444,7 +444,7 @@ abstract final class AppSpace {
 那兩個 theme 上方的註解也要改 —— 它現在寫著「網頁版的 .btn 是 48px 高、
 16px 圓角」，而網頁版現在是 14。
 
-- [ ] **Step 5: analyze 與測試**
+- [x] **Step 5: analyze 與測試**
 
 ```powershell
 $env:PATH = "C:\dev\flutter\bin;$env:PATH"
@@ -455,7 +455,7 @@ flutter test
 
 Expected: analyze **1 issue**（基線），test **391 passed**。
 
-- [ ] **Step 6: 目視確認圓角沒有跑掉**
+- [x] **Step 6: 目視確認圓角沒有跑掉**
 
 跑起來看任務列表與任何一個對話框：卡片與按鈕的圓角應該**略小**於之前
 （20→18、16→14），但不該有任何一個角看起來是方的或過圓。
@@ -466,7 +466,7 @@ flutter run
 
 > 沒有裝置或模擬器的話這一步跳過，但**要在 commit 訊息裡說沒目視過**。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add flutter_app/lib/ui/theme.dart
