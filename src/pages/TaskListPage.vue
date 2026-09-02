@@ -122,8 +122,37 @@ const failedNote = computed(() => {
   return `有 ${names.length} 趟旅程沒讀到（${names.join("、")}），這個數字少算了那幾趟。`;
 });
 
-/** 0 → 1 的動畫進度。Task 9 會讓它在按下計算時從 0 跑到 1。 */
+/*
+  滾動計數只在使用者主動按下計算時跑。
+
+  綁在 render 上的話，每次資料更新都會重跑，而且平常進頁面讀金額會被
+  硬生生延後 0.6 秒 —— 金額正是這個 app 的重點。按了計算的人本來就在
+  等，那 0.6 秒是他自己要求的。
+
+  減少動態要自己判斷：requestAnimationFrame 是 JS，不受 CSS 那段
+  prefers-reduced-motion 管。
+*/
 const countProgress = ref(1);
+
+const reduceMotion =
+  typeof window !== "undefined" &&
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+
+function playCount() {
+  if (reduceMotion) {
+    countProgress.value = 1;
+    return;
+  }
+  countProgress.value = 0;
+  const start = performance.now();
+  const step = (now: number) => {
+    const p = Math.min((now - start) / 620, 1);
+    // ease-out cubic，跟 --dur-count 與 --ease 同一組手感。
+    countProgress.value = 1 - Math.pow(1 - p, 3);
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
 function myCostOf(taskId: string) {
   return costById.value.get(taskId) ?? null;
 }
@@ -185,6 +214,7 @@ async function loadCosts() {
       一顆可以重試的按鈕比給一張空卡片有用。
     */
     costsLoaded.value = ok.length > 0;
+    if (ok.length) playCount();
 
     // 失敗的那幾筆要留在 trace 裡：逾時而失敗通常就是最慢的那幾筆，
     // 濾掉它們會讓數字好看得不真實。
@@ -486,9 +516,17 @@ onMounted(async () => {
   overflow: hidden;
 }
 
+/*
+  用 flex-grow 而不是 width —— 每一段的寬度是彼此的比例，改 width
+  會讓它們各自算各自的，中途對不齊。
+
+  過渡用 --dur-base 而不是 --dur-count：countProgress 每一幀都在變，
+  再疊一個 620ms 的過渡會拖成一團糊。這裡只是把幀與幀之間抹平。
+*/
 .hero-bar i {
   display: block;
   flex-basis: 0;
+  transition: flex-grow var(--dur-base) var(--ease);
 }
 
 .hero-leg {
