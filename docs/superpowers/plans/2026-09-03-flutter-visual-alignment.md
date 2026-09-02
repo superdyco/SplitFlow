@@ -770,7 +770,7 @@ under the thumb*）講的就是手機：系統對話框「OK 落在哪不是我�
 
 附加好處：刪除需要刻意捲下去才找得到 —— 那正是它應得的摩擦。
 
-- [ ] **Step 1: 送出鈕與錯誤搬進 `bottomNavigationBar`**
+- [x] **Step 1: 送出鈕與錯誤搬進 `bottomNavigationBar`**
 
 `Scaffold` 現在是：
 
@@ -842,7 +842,7 @@ under the thumb*）講的就是手機：系統對話框「OK 落在哪不是我�
 > 所以拿得到。但 `task` 是 nullable，**`bottomNavigationBar` 的 null 判斷
 > 不能省** —— 讀取中或沒權限時不該有一列送出鈕。
 
-- [ ] **Step 2: 捲動流裡刪掉搬走的兩塊，刪除鈕留下**
+- [x] **Step 2: 捲動流裡刪掉搬走的兩塊，刪除鈕留下**
 
 原本的尾巴：
 
@@ -888,7 +888,7 @@ under the thumb*）講的就是手機：系統對話框「OK 落在哪不是我�
                     ),
 ```
 
-- [ ] **Step 3: 捲動區底部留白**
+- [x] **Step 3: 捲動區底部留白**
 
 `SingleChildScrollView` 的 padding 現在是 `fromLTRB(16, 8, 16, 32)`。
 最後一個元素（編輯時是刪除鈕，新增時是卡 3）不該被固定列蓋住 ——
@@ -905,7 +905,7 @@ under the thumb*）講的就是手機：系統對話框「OK 落在哪不是我�
 > **目視確認捲到底時最後一個元素完整可見。** 如果被蓋住，那代表
 > `bottomNavigationBar` 的高度沒有被算進去 —— 那會是別的問題，先查再加 padding。
 
-- [ ] **Step 4: analyze 與測試**
+- [x] **Step 4: analyze 與測試**
 
 ```powershell
 $env:PATH = "C:\dev\flutter\bin;$env:PATH"
@@ -916,7 +916,7 @@ flutter test
 
 Expected: analyze **1 issue**（基線），test **391 passed**。
 
-- [ ] **Step 5: 目視驗證（要有裝置或模擬器）**
+- [x] **Step 5: 目視驗證（要有裝置或模擬器）**
 
 ```powershell
 flutter run
@@ -934,7 +934,7 @@ flutter run
 > 第 3 項是這一步的重點。沒有裝置的話**要在 commit 訊息裡說沒驗過** ——
 > 不要因為 analyze 過了就宣稱鍵盤行為是對的。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add flutter_app/lib/ui/expense_form_page.dart

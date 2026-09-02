@@ -488,7 +488,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           //
           // 表單不是長列表，十幾個欄位一次全建起來沒有任何效能問題。
           : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpace.x4,
+                AppSpace.x2,
+                AppSpace.x4,
+                AppSpace.x8,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -800,20 +805,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       ),
                     ],
                   ),
-                  if (_error != null) ...[
-                    Text(_error!,
-                        style:
-                            text.bodyMedium?.copyWith(color: AppColors.danger)),
-                    const SizedBox(height: 12),
-                  ],
-                  FilledButton(
-                    onPressed: (_saving || !_canSubmit(task, selectable))
-                        ? null
-                        : () => _submit(task, selectable),
-                    child: Text(_saving ? '儲存中...' : '儲存'),
-                  ),
-                  if (_isEdit) ...[
-                    const SizedBox(height: 12),
+                  /*
+                    刪除留在捲動流裡，不進固定列。網頁版的 93be088 講的就是
+                    手機：系統對話框的 OK 落在哪不是我們能決定的，而它傾向
+                    落在拇指下 —— 螢幕底部那一列就是拇指的定位點，不可逆的
+                    操作不該常駐在那裡。
+
+                    附帶好處：刪除需要刻意捲下去才找得到，那正是它應得的摩擦。
+                  */
+                  if (_isEdit)
                     OutlinedButton(
                       onPressed: _saving ? null : _delete,
                       style: OutlinedButton.styleFrom(
@@ -821,8 +821,64 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       ),
                       child: const Text('刪除這筆支出'),
                     ),
-                  ],
                 ],
+              ),
+            ),
+      /*
+        送出鈕固定在畫面底部。記帳常常是在餐廳裡站著單手做的，而它原本在
+        十一個區塊之後。
+
+        用 bottomNavigationBar 而不是把它塞進捲動流底部：
+        resizeToAvoidBottomInset 預設是 true，鍵盤跳出來時 body 會縮、
+        這一列會被推到鍵盤正上方。這是框架直接管 view insets ——
+        網頁版為了同一件事得用 sticky 再繞開 iOS Safari 把 fixed 元素頂歪
+        的行為。這一項在 Flutter 是用對元件，不是 workaround。
+
+        錯誤訊息跟著進來：不然送出失敗時使用者停在表單上方，訊息印在捲動流
+        底部，他會按了送出、什麼都沒發生、也不知道為什麼。
+
+        背景是 card（白）不是 bg：danger 對頁面底色只有 4.10:1、對白底才有
+        4.66:1，而錯誤訊息就印在這一列上。這是 test/theme_contrast_test.dart
+        逼出來的結論，不是配色偏好。
+
+        SafeArea 是必要的（iPhone 底部那條橫槓）。讀取中與沒權限時不給這一列
+        —— 那兩個畫面上沒有東西可以送出。
+      */
+      bottomNavigationBar: (task == null || blocked)
+          ? null
+          : Container(
+              decoration: const BoxDecoration(
+                color: AppColors.card,
+                border: Border(top: BorderSide(color: AppColors.line)),
+              ),
+              child: SafeArea(
+                minimum: const EdgeInsets.fromLTRB(
+                  AppSpace.x4,
+                  AppSpace.x2,
+                  AppSpace.x4,
+                  AppSpace.x2,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_error != null) ...[
+                      Text(
+                        _error!,
+                        style: text.bodySmall?.copyWith(
+                          color: AppColors.danger,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpace.x2),
+                    ],
+                    FilledButton(
+                      onPressed: (_saving || !_canSubmit(task, selectable))
+                          ? null
+                          : () => _submit(task, selectable),
+                      child: Text(_saving ? '儲存中...' : '儲存'),
+                    ),
+                  ],
+                ),
               ),
             ),
     );
