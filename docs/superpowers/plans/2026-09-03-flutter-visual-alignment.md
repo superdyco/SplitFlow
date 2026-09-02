@@ -526,7 +526,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 **不要改成依主題分的四張卡。** 卡片的 padding 是有成本的，總高度會比現在更長 ——
 而縮短捲動距離正是目標。
 
-- [ ] **Step 1: 先確認行尾**
+- [x] **Step 1: 先確認行尾**
 
 ```bash
 file flutter_app/lib/ui/expense_form_page.dart
@@ -535,7 +535,7 @@ file flutter_app/lib/ui/expense_form_page.dart
 Expected: **沒有** "CRLF" —— 這個檔案是 LF。用腳本取代時樣板字串直接用 `\n`。
 （`theme.dart` 是 CRLF，兩個檔案不一樣，不要沿用上一個 Task 的做法。）
 
-- [ ] **Step 2: 加一個 `_Card` 私有 widget**
+- [x] **Step 2: 加一個 `_Card` 私有 widget**
 
 放在 `_Field` 旁邊：
 
@@ -585,7 +585,7 @@ class _Card extends StatelessWidget {
 > 兩邊都給 16 的話卡片底部會空出 32。**做完目視確認這一條對不對，
 > 不對就調成 `EdgeInsets.all(AppSpace.x4)` 並把 `_Field` 最後一個的 padding 拿掉。**
 
-- [ ] **Step 3: `_Field` 的三個間距對齊網格**
+- [x] **Step 3: `_Field` 的三個間距對齊網格**
 
 `_Field` 現在是 `bottom: 20` / `SizedBox(height: 6)` / `top: 4`。
 網頁版的 `.field` gap 是 8，卡片內欄位之間是 16。
@@ -610,7 +610,7 @@ class _Card extends StatelessWidget {
 
 > 20 與 6 都不在 4px 網格上；4 在網格上但網頁版的 `.field` 是統一的 8。
 
-- [ ] **Step 4: 把十一個欄位包進三張卡**
+- [x] **Step 4: 把十一個欄位包進三張卡**
 
 `SingleChildScrollView` 的 `Column.children` 從十一個 `_Field` 加尾巴，
 改成三個 `_Card`。
@@ -651,7 +651,7 @@ class _Card extends StatelessWidget {
 
 `_error`、`FilledButton`、刪除鈕暫時留在三張卡後面不動 —— Task 4 才處理。
 
-- [ ] **Step 5: 換算後金額併進匯率那一格**
+- [x] **Step 5: 換算後金額併進匯率那一格**
 
 現在它是一個獨立的 `Padding`，浮在 `_Field` 外面：
 
@@ -695,7 +695,7 @@ class _Card extends StatelessWidget {
 > 那一段之前。搬進 `_Field` 之後 `needsRate` 已經是外層條件，所以裡面只要
 > 判斷 `base != null`。**不要動 `base` 怎麼算的。**
 
-- [ ] **Step 6: analyze 與測試**
+- [x] **Step 6: analyze 與測試**
 
 ```powershell
 $env:PATH = "C:\dev\flutter\bin;$env:PATH"
@@ -706,7 +706,7 @@ flutter test
 
 Expected: analyze **1 issue**（基線），test **391 passed**。
 
-- [ ] **Step 7: 目視走一遍**
+- [x] **Step 7: 目視走一遍**
 
 ```powershell
 flutter run
@@ -718,7 +718,7 @@ flutter run
 - 卡片底部沒有空出過多的留白（見 Step 2 的註記）
 - 次要文字（label、hint）明顯比之前清楚 —— 那是 Task 1 的成果
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add flutter_app/lib/ui/expense_form_page.dart
