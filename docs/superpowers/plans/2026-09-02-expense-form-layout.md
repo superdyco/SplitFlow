@@ -1339,7 +1339,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Files:** 可能修改 `src/pages/ExpenseFormPage.vue`、`src/components/expense/PlaceField.vue`
 
-- [ ] **Step 1: 自動檢查**
+- [x] **Step 1: 自動檢查**
 
 ```bash
 npm run check
@@ -1349,19 +1349,20 @@ npm test
 
 Expected: 三個都通過。測試數應該是 381 + 10 = 391。
 
-- [ ] **Step 2: 掃描**
+- [x] **Step 2: 掃描**
 
 ```bash
 grep -n "queuedNotice" src/pages/ExpenseFormPage.vue          # 預期：無
 grep -n 'class="tabs' src/pages/ExpenseFormPage.vue           # 預期：無
-grep -n "120px" src/components/expense/PlaceField.vue         # 預期：無（維持 180px，見 spec §3.2）
+grep -n 'height="180px"' src/components/expense/PlaceField.vue  # 預期：1（維持原高度，見 spec §3.2；
+                                                              #        註解裡會提到被推翻的 120px，不能用它當判準）
 grep -c 'class="card stack"' src/pages/ExpenseFormPage.vue    # 預期：3
 wc -l src/pages/ExpenseFormPage.vue                           # 預期：明顯低於 1104
 ```
 
 > 行數沒有硬性目標。抽掉地點那一塊（script 約 90 行、template 約 55 行、style 約 60 行）大概會少 200 行上下，但三張卡與固定送出列又加回一些。**如果它還在 1000 行以上，回去看是不是有東西沒刪乾淨。**
 
-- [ ] **Step 3: 確認測試會失敗於錯誤實作**
+- [x] **Step 3: 確認測試會失敗於錯誤實作**
 
 驗收裡最容易造假的一項。把 `currentPlace` 的第三行暫時改成：
 
@@ -1377,38 +1378,38 @@ Expected: **「名字被改過之後，座標要丟掉」那個案例要紅。**
 
 **改回來，再跑一次確認綠。**
 
-- [ ] **Step 4: 走查 —— 新增一筆支出**
+- [x] **Step 4: 走查 —— 新增一筆支出**
 
 - 只打名稱與金額，**不捲動**就能按到送出
 - 送出後回到任務頁，那筆支出的金額、分類、日期都對
 
-- [ ] **Step 5: 走查 —— 地點的兩條契約**
+- [x] **Step 5: 走查 —— 地點的兩條契約**
 
 - 打字有建議、選一個會帶座標
 - **改掉名字之後座標要消失**：改完存檔，回去看那筆支出應該沒有地圖圖釘
 - **定位鈕抓到的位置不會被存成這筆支出的地點**
 
-- [ ] **Step 6: 走查 —— 編輯一筆支出**
+- [x] **Step 6: 走查 —— 編輯一筆支出**
 
 - 所有欄位帶入正確（含地點名稱與圖釘）
 - **刪除鈕要捲到底才看得到**，不在固定列裡
 - 改一個欄位存檔，其餘欄位沒有被改掉
 
-- [ ] **Step 7: 走查 —— 跨幣別與自訂分攤**
+- [x] **Step 7: 走查 —— 跨幣別與自訂分攤**
 
 - 選外幣 → 匯率欄位出現在卡 1，換算後金額是輸入框下面一行 `≈` 灰字
 - 匯率打成 `1.2.3` → 格式錯誤獨立一行、紅色
 - 切到「自訂金額」→ 分段控制是白底選中；均分的結果有帶進去；差額不為零時送出鈕是灰的
 
-- [ ] **Step 8: 走查 —— 「再記一筆」**
+- [x] **Step 8: 走查 —— 「再記一筆」**
 
 從支出列表按「再記一筆」進來，分類／幣別／付款人／分攤設定都有帶入，**地點也要帶入**（那是 `applyRepeatSource` 改過的地方）。
 
-- [ ] **Step 9: 減少動態**
+- [x] **Step 9: 減少動態**
 
 系統設定打開「減少動態」，定位鍵按下去時圖示不該閃爍，但顏色仍要變。
 
-- [ ] **Step 10: Commit（若有修正）**
+- [x] **Step 10: Commit（若有修正）**
 
 若前面步驟發現並修正了東西，各自 commit；沒有的話這一步跳過。
 
