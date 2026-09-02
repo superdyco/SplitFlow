@@ -107,6 +107,7 @@ const missingRate = computed(
   height: 42px;
   border-radius: var(--radius-md);
   background: var(--color-primary-soft);
+  /* emoji 的字符大小，綁的是這個 42px 方塊而不是排版尺度。不要套字級表。 */
   font-size: 20px;
 }
 

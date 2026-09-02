@@ -132,6 +132,6 @@ async function copy() {
   white-space: nowrap;
   flex: 1;
   color: var(--color-muted);
-  font-size: 13px;
+  font-size: var(--text-tiny);
 }
 </style>

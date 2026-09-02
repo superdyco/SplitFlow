@@ -34,7 +34,7 @@ const emit = defineEmits<{ (e: "retry"): void }>();
   border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
-  font-size: 13px;
+  font-size: var(--text-control-sm);
   font-weight: 700;
 }
 

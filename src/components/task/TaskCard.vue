@@ -146,7 +146,7 @@ const isArchived = computed(() => props.task.status === "archived");
   border-radius: var(--radius-pill);
   background: none;
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: var(--text-tiny);
   font-weight: 700;
   cursor: pointer;
 }
@@ -193,7 +193,7 @@ const isArchived = computed(() => props.task.status === "archived");
   background: var(--color-primary-soft);
   color: var(--color-primary-dark);
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: var(--text-tiny);
   font-weight: 700;
 }
 </style>

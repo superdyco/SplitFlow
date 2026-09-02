@@ -235,11 +235,12 @@ onMounted(load);
   height: 56px;
   border-radius: var(--radius-lg);
   background: var(--color-primary-soft);
+  /* emoji 的字符大小，綁的是這個 56px 方塊而不是排版尺度。不要套字級表。 */
   font-size: 26px;
 }
 
 .amount {
-  font-size: 26px;
+  font-size: var(--text-title);
 }
 
 .head .tiny {

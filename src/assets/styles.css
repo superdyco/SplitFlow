@@ -238,14 +238,14 @@ a {
 
 .title {
   margin: 0;
-  font-size: 30px;
+  font-size: var(--text-title);
   line-height: 1.15;
   font-weight: 900;
 }
 
 .section-title {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--text-section);
   font-weight: 900;
 }
 
@@ -383,7 +383,7 @@ a {
   min-height: 36px;
   border-radius: var(--radius-md);
   padding: 0 12px;
-  font-size: 13px;
+  font-size: var(--text-control-sm);
 }
 
 .btn:disabled {
@@ -399,7 +399,7 @@ a {
 
 .label {
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: var(--text-tiny);
   font-weight: 700;
 }
 
@@ -504,7 +504,7 @@ a {
   color: var(--color-danger);
   border-radius: var(--radius-md);
   padding: 12px 14px;
-  font-size: 13px;
+  font-size: var(--text-control-sm);
   line-height: 1.6;
 }
 

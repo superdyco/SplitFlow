@@ -328,7 +328,7 @@ onMounted(load);
   background: none;
   padding: 0;
   color: var(--color-primary-dark);
-  font-size: 13px;
+  font-size: var(--text-control-sm);
   font-weight: 700;
 }
 
@@ -346,7 +346,7 @@ onMounted(load);
 }
 
 .figure {
-  font-size: 46px;
+  font-size: var(--text-hero);
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }

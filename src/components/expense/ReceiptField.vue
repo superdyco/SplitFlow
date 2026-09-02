@@ -171,7 +171,7 @@ function onChange(event: Event) {
   border-radius: var(--radius-pill);
   background: var(--color-line-strong);
   color: var(--color-surface);
-  font-size: 11px;
+  font-size: var(--text-tiny);
   font-weight: 700;
 }
 

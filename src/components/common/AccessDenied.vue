@@ -40,6 +40,7 @@ withDefaults(
   height: 56px;
   border-radius: 50%;
   background: var(--color-primary-soft);
+  /* emoji 的字符大小，綁的是這個 56px 圓圈而不是排版尺度。不要套字級表。 */
   font-size: 26px;
 }
 

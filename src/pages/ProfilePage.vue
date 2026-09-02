@@ -286,7 +286,7 @@ async function exportData() {
   background: none;
   padding: 0;
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: var(--text-tiny);
   font-weight: 700;
 }
 
@@ -302,6 +302,7 @@ async function exportData() {
   border: 1px solid var(--color-line);
   background: var(--color-surface);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* 等寬字型的視覺大小比同尺寸的中文小，這塊除錯輸出刻意留在字級表外。 */
   font-size: 11px;
   line-height: 1.6;
   white-space: pre-wrap;

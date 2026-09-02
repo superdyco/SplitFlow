@@ -70,7 +70,7 @@ async function save() {
 .nickname-input {
   border: 0;
   background: transparent;
-  font-size: 21px;
+  font-size: var(--text-section);
   font-weight: 900;
 }
 

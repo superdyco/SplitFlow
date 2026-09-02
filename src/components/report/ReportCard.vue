@@ -66,7 +66,7 @@ const facts = computed(() => {
 
 .name {
   display: block;
-  font-size: 16px;
+  font-size: var(--text-card);
   font-weight: 700;
   color: inherit;
   text-decoration: none;
@@ -90,7 +90,7 @@ const facts = computed(() => {
 }
 
 .figure {
-  font-size: 18px;
+  font-size: var(--text-card);
   font-variant-numeric: tabular-nums;
 }
 

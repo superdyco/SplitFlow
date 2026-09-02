@@ -1022,7 +1022,7 @@ onMounted(load);
   background: none;
   padding: 0;
   color: var(--color-primary-dark);
-  font-size: 12px;
+  font-size: var(--text-tiny);
   font-weight: 700;
 }
 
