@@ -13,19 +13,7 @@ import { useTask } from "@/composables/useTask";
 import { useTaskMembers } from "@/composables/useTaskMembers";
 import { createExpense, deleteExpense, getExpense, updateExpense } from "@/services/expenseService";
 import { getRate } from "@/services/rateService";
-import {
-  autocompletePlaces,
-  getPlaceDetails,
-  newSessionToken,
-  placesEnabled,
-  recallPlaceBias,
-  rememberPlaceBias,
-  type PlaceSuggestion
-} from "@/services/placeService";
-import { geolocationAvailable, getCurrentLatLng } from "@/services/geolocation";
-import { biasFromPlaces, type LatLng } from "@/utils/placeBias";
-import { mapsEnabled } from "@/services/mapsLoader";
-import PlaceMap, { type MapMarker } from "@/components/map/PlaceMap.vue";
+import PlaceField from "@/components/expense/PlaceField.vue";
 import {
   CURRENCIES,
   allocate,
@@ -115,47 +103,8 @@ const rateUpdatedAt = ref("");
 const rateLoading = ref(false);
 const rateError = ref<string | null>(null);
 
-const placeQuery = ref("");
-const selectedPlace = ref<ExpensePlace | null>(null);
-const suggestions = ref<PlaceSuggestion[]>([]);
-const placeLoading = ref(false);
-const locating = ref(false);
-const placeError = ref<string | null>(null);
-const placeSearchable = placesEnabled();
-/** 按下定位鍵抓到的座標。只用來在地圖上標出「你在這」，不會存進支出裡。 */
-const myLocation = ref<LatLng | null>(null);
-/**
- * 搜尋的位置偏好。沒有它的話「星巴克」會回傳全世界的分店 ——
- * 人在曼谷卻搜到台北那間。第一筆支出還沒有參考點，就退回原本的全球搜尋。
- */
-const placeBias = ref<LatLng | null>(recallPlaceBias(taskId));
-const mapAvailable = mapsEnabled();
-/**
- * 定位鍵的用途就是把「你在這」畫在下面那張地圖上，沒有地圖金鑰就沒有地圖可畫，
- * 按了不會有任何反應 —— 那種按鈕不如不要出現。
- */
-const canLocate = mapAvailable && geolocationAvailable();
-let placeSession = newSessionToken();
-let placeTimer: number | undefined;
-
-/**
- * 地圖上永遠只有一個標記，而且選好的地點優先。
- *
- * 定位只是還沒決定地點時的參考 —— 一旦選了店，地圖要標的就是那家店。
- * 兩個一起畫的話，地圖上兩顆紅點誰是誰看不出來，存進支出的又只有其中一個。
- *
- * 目前位置是「隱藏」不是「清掉」：把地點欄位清空或改字之後，
- * 那個參考點會自己回來，不用再按一次定位。
- * 只打名字沒選建議的地點沒有座標，畫不出來，那時也是回頭標目前位置。
- */
-const placeMarkers = computed<MapMarker[]>(() => {
-  const place = selectedPlace.value;
-  if (place && place.lat !== null && place.lng !== null) {
-    return [{ id: place.placeId ?? "place", lat: place.lat, lng: place.lng, title: place.name }];
-  }
-  const here = myLocation.value;
-  return here ? [{ id: "me", lat: here.lat, lng: here.lng, title: "你目前的位置" }] : [];
-});
+/** 這筆支出的地點。搜尋、定位、地圖全在 PlaceField 裡，這裡只收結果。 */
+const place = ref<ExpensePlace | null>(null);
 
 const baseCurrency = computed(() => taskState.task.value?.defaultCurrency || "TWD");
 const needsRate = computed(() => currency.value !== baseCurrency.value);
@@ -245,95 +194,6 @@ function memberName(memberUid: string) {
   return memberDisplayName(member);
 }
 
-/**
- * 使用者可能只想打個名字不選建議，所以輸入本身就是有效的地點名稱。
- * 選了建議才會補上地址與座標。
- */
-function currentPlace(): ExpensePlace | null {
-  const text = placeQuery.value.trim();
-  if (!text) return null;
-  if (selectedPlace.value && selectedPlace.value.name === text) return selectedPlace.value;
-  return { name: text, address: null, lat: null, lng: null, placeId: null };
-}
-
-function onPlaceInput(value: string) {
-  placeQuery.value = value;
-  selectedPlace.value = null;
-  placeError.value = null;
-  if (!placeSearchable) return;
-
-  window.clearTimeout(placeTimer);
-  if (value.trim().length < 2) {
-    suggestions.value = [];
-    return;
-  }
-  // 每打一個字就打一次 API 太浪費，等使用者停下來再查。
-  placeTimer = window.setTimeout(searchPlaces, 350);
-}
-
-async function searchPlaces() {
-  placeLoading.value = true;
-  placeError.value = null;
-  try {
-    suggestions.value = await autocompletePlaces(placeQuery.value, placeSession, placeBias.value);
-  } catch (err) {
-    suggestions.value = [];
-    placeError.value = err instanceof Error ? err.message : String(err);
-  } finally {
-    placeLoading.value = false;
-  }
-}
-
-async function pickPlace(suggestion: PlaceSuggestion) {
-  placeLoading.value = true;
-  placeError.value = null;
-  try {
-    const detail = await getPlaceDetails(suggestion.placeId, placeSession);
-    selectedPlace.value = detail;
-    placeQuery.value = detail.name;
-    suggestions.value = [];
-    // 這個任務接下來的搜尋就以這裡為中心。選到沒有座標的地點時保留原本的偏好。
-    rememberPlaceBias(taskId, detail);
-    placeBias.value = biasFromPlaces([detail]) ?? placeBias.value;
-    // 一次 autocomplete + details 算一個 session，選完就換新的。
-    placeSession = newSessionToken();
-  } catch (err) {
-    placeError.value = err instanceof Error ? err.message : String(err);
-  } finally {
-    placeLoading.value = false;
-  }
-}
-
-/**
- * 定位鍵：抓現在的座標，標在下面那張地圖上。
- *
- * 刻意不去查附近有什麼店、也不動地點欄位 —— 這顆鍵只回答「我在哪」。
- * 順帶把搜尋的位置偏好換成這裡：人就在這，比上一筆支出的座標更準，
- * 而且這是 autocomplete 請求上的一個欄位，不會多花錢。
- */
-async function useCurrentLocation() {
-  locating.value = true;
-  placeError.value = null;
-  try {
-    const here = await getCurrentLatLng();
-    myLocation.value = here;
-    placeBias.value = here;
-  } catch (err) {
-    placeError.value = err instanceof Error ? err.message : String(err);
-  } finally {
-    locating.value = false;
-  }
-}
-
-function clearPlace() {
-  window.clearTimeout(placeTimer);
-  placeQuery.value = "";
-  selectedPlace.value = null;
-  suggestions.value = [];
-  placeError.value = null;
-  // 目前位置不清掉：那是「我在哪」，跟這一格填了什麼地點無關。
-}
-
 async function loadRate() {
   if (!needsRate.value) {
     rate.value = "1";
@@ -372,8 +232,7 @@ async function applyRepeatSource() {
   splitMemberIds.value = selectableMembers.value
     .map(member => member.uid)
     .filter(memberUid => memberUid in fields.splits);
-  selectedPlace.value = fields.place;
-  placeQuery.value = fields.place?.name ?? "";
+  place.value = fields.place;
 
   // 自訂分攤的金額跟著原金額走，但新的一筆金額還沒填，留空讓使用者重填。
   if (fields.splitMode === "custom") customAmounts.value = {};
@@ -437,10 +296,9 @@ async function load() {
         amountToInput(value, expense.currency)
       ])
     );
-    selectedPlace.value = expense.place;
-    placeQuery.value = expense.place?.name ?? "";
-    // 編輯這筆支出時，它自己的座標比 localStorage 裡那個更能代表要找的區域。
-    placeBias.value = biasFromPlaces([expense.place]) ?? placeBias.value;
+    place.value = expense.place;
+    // 「編輯時用這筆支出的座標當搜尋偏好」搬進 PlaceField 了 ——
+    // 它從初始值自己推得出來，母元件不必知道有位置偏好這件事。
     // 舊支出沒存日期，帶出 createdAt 換算的那天當預設，存回去就補上了。
     date.value = expenseDate(expense);
     // 時間沒有這種退路（見 expenseTime 的說明）：原本沒記就維持空白，
@@ -516,7 +374,7 @@ async function submit() {
       paidBy: paidBy.value,
       splitMode: splitMode.value,
       splits,
-      place: currentPlace(),
+      place: place.value,
       // 先寫既有的值；新選的照片要等下面拿到 id 之後才處理。
       receipt: receiptState.receipt.value,
       note: note.value.trim(),
@@ -721,64 +579,7 @@ onMounted(load);
             </span>
           </div>
 
-          <div class="field">
-            <div class="spread">
-              <span class="label">地點（選填）</span>
-              <button v-if="placeQuery" type="button" class="link" @click="clearPlace">清除</button>
-            </div>
-            <div class="place">
-              <div class="row">
-                <input
-                  :value="placeQuery"
-                  class="input grow"
-                  :placeholder="placeSearchable ? '輸入店名或地址，從清單選一個' : '輸入地點名稱'"
-                  autocomplete="off"
-                  @input="onPlaceInput(($event.target as HTMLInputElement).value)"
-                />
-                <!--
-                  只有一個圖示，所以 aria-label 是它唯一的名字，不能省。
-                  title 讓滑鼠停著也看得到說明。
-                -->
-                <button
-                  v-if="canLocate"
-                  type="button"
-                  class="btn icon-btn"
-                  :class="{ working: locating }"
-                  :disabled="locating"
-                  aria-label="標出我目前的位置"
-                  title="標出我目前的位置"
-                  @click="useCurrentLocation"
-                >
-                  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
-                    <circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="2" />
-                    <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-                    <path
-                      d="M12 1.5v3.5M12 19v3.5M1.5 12h3.5M19 12h3.5"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <ul v-if="suggestions.length" class="suggestions">
-                <li v-for="item in suggestions" :key="item.placeId">
-                  <button type="button" class="suggestion" @click="pickPlace(item)">
-                    <strong>{{ item.primary }}</strong>
-                    <span v-if="item.secondary" class="tiny">{{ item.secondary }}</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
-            <span v-if="locating" class="tiny">正在取得目前位置...</span>
-            <span v-else-if="placeLoading" class="tiny">搜尋中...</span>
-            <span v-else-if="placeError" class="tiny warn">{{ placeError }}</span>
-            <span v-else-if="selectedPlace?.address" class="tiny">{{ selectedPlace.address }}</span>
-            <span v-else-if="!placeSearchable" class="tiny">
-              沒有設定地點服務金鑰，目前只會存你打的名稱，不會有地址與座標。
-            </span>
-            <PlaceMap v-if="mapAvailable && placeMarkers.length" :markers="placeMarkers" height="180px" />
-          </div>
+          <PlaceField :task-id="taskId" v-model="place" />
 
           <ReceiptField
             :preview-url="receiptState.previewUrl.value"
@@ -1028,11 +829,7 @@ onMounted(load);
   font-weight: 700;
 }
 
-.place {
-  position: relative;
-}
-
-/* 只有圖示的方形按鈕（定位、語音），高度對齊旁邊的輸入框（.input 是 52px）。 */
+/* 只有圖示的方形按鈕（語音），高度對齊旁邊的輸入框（.input 是 52px）。 */
 .icon-btn {
   flex: none;
   width: 52px;
@@ -1043,7 +840,7 @@ onMounted(load);
 
 /*
   進行中的回饋：這種按鈕上沒有文字可以改成「定位中...」，只好讓圖示自己動。
-  抓 GPS 或等語音辨識動輒好幾秒，沒有任何動靜的話會被當成沒反應而一直重按。
+  等語音辨識動輒好幾秒，沒有任何動靜的話會被當成沒反應而一直重按。
 */
 .icon-btn.working {
   border-color: var(--color-primary);
@@ -1065,43 +862,6 @@ onMounted(load);
   .icon-btn.working svg {
     animation: none;
   }
-}
-
-.suggestions {
-  position: absolute;
-  z-index: 5;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  margin: 0;
-  padding: 6px;
-  list-style: none;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
-  background: var(--color-card);
-  box-shadow: var(--shadow-pop);
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.suggestion {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-text);
-  width: 100%;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: none;
-  text-align: left;
-}
-
-.suggestion:hover {
-  background: var(--color-primary-soft);
-}
-
-.suggestion .tiny {
-  line-height: 1.4;
 }
 
 .warn {

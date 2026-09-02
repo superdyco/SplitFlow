@@ -418,7 +418,7 @@ const selectedPlace = ref<ExpensePlace | null>(place.value);
 
 這樣安全，因為母元件的 template 是 `<template v-else>`（`loading` 是 false 才渲染），而 `load()` 與 `applyRepeatSource()` 都在 `loading` 還是 true 時就把地點設好了 —— PlaceField 掛載時 `place` 已經有值。**動 template 結構時不要破壞這個前提**（Task 4 與 Task 5 都不會，但要知道它在那裡）。
 
-- [ ] **Step 1: 建立元件**
+- [x] **Step 1: 建立元件**
 
 建立 `src/components/expense/PlaceField.vue`：
 
@@ -654,10 +654,10 @@ function clearPlace() {
       沒有設定地點服務金鑰，目前只會存你打的名稱，不會有地址與座標。
     </span>
     <!--
-      120px 而不是原本的 180px。這張圖的用途只是「確認選對地方了」，
-      不是拿來看的 —— 120px 還看得到圖釘與周邊，但少推 60px。
+      180px。規格本來要壓成 120px，實作後目視覺得太扁而推翻 —— 見
+      spec §3.2 與 Task 3 Step 5 的驗證結果。
     -->
-    <PlaceMap v-if="mapAvailable && placeMarkers.length" :markers="placeMarkers" height="120px" />
+    <PlaceMap v-if="mapAvailable && placeMarkers.length" :markers="placeMarkers" height="180px" />
   </div>
 </template>
 
@@ -765,7 +765,7 @@ function clearPlace() {
 
 > **注意 `.icon-btn`、`.row`、`.grow`、`.warn`、`.link` 在母元件裡還有別的使用者**（語音輸入鈕用 `.icon-btn`，金額列用 `.row`／`.grow`，金額錯誤用 `.warn`，分攤成員的「全選」用 `.link`）。所以這裡是**複製**不是搬移 —— 母元件那幾條要留著。Step 2 只刪母元件裡「只有地點在用」的那些。
 
-- [ ] **Step 2: 母元件接上，刪掉搬走的東西**
+- [x] **Step 2: 母元件接上，刪掉搬走的東西**
 
 在 `ExpenseFormPage.vue`：
 
@@ -855,7 +855,7 @@ place: place.value,
 `.icon-btn`（含 `.working`、`@keyframes icon-pulse`、reduced-motion 那段）**留著** —— 語音輸入鈕還在用。
 `.link`、`.warn`、`.row`、`.grow` 也留著，見 Step 1 的注意事項。
 
-- [ ] **Step 3: 確認沒有殘留引用**
+- [x] **Step 3: 確認沒有殘留引用**
 
 ```bash
 grep -nE "placeQuery|selectedPlace|placeBias|placeMarkers|placeSession|placeTimer|currentPlace|pickPlace|searchPlaces|useCurrentLocation|clearPlace|mapAvailable|canLocate|placeSearchable" src/pages/ExpenseFormPage.vue
@@ -869,7 +869,7 @@ grep -nE "\.suggestions|\.suggestion|\.place \{" src/pages/ExpenseFormPage.vue
 
 Expected: 沒有任何結果。
 
-- [ ] **Step 4: 型別檢查與 build**
+- [x] **Step 4: 型別檢查與 build**
 
 ```bash
 npm run check
@@ -880,20 +880,20 @@ Expected: 都通過，含 `check-chunks.mjs`。
 
 > 多一個元件不影響 chunk 切分（`manualChunks` 分的是 `node_modules`，不是 `src/`），但還是要跑 —— build 是唯一會抓到「template 裡引用了已刪除的變數」的地方，`vue-tsc --noEmit` 對 template 的覆蓋不完整。
 
-- [ ] **Step 5: 手動驗證地點**
+- [x] **Step 5: 手動驗證地點**
 
 `npm run dev`，開一筆支出：
 
 1. 地點打「拉」→ 不該有請求（少於兩個字）
 2. 打「拉麵」→ 停 350ms 後出現建議
-3. 選一個 → 名稱帶入、地址顯示在下面、地圖出現圖釘、**地圖高度明顯比之前矮**
+3. 選一個 → 名稱帶入、地址顯示在下面、地圖出現圖釘
 4. **把名字改掉**（例如改成「晚餐」）→ 圖釘應該消失或退回目前位置
 5. 存檔，回去編輯那筆 → 名稱是「晚餐」、**沒有圖釘**
 6. 按定位鍵 → 地圖標出目前位置，**地點欄位的字不變**
 7. 存檔，回去編輯 → 地點是你打的字，定位的座標**沒有**被存進去
 8. 「清除」→ 欄位清空，目前位置的標記回來
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/expense/PlaceField.vue src/pages/ExpenseFormPage.vue
@@ -907,9 +907,6 @@ flutter_app/lib/ui/place_field.dart 早就抽出來了，只有網頁版沒抽�
 的 Vue 等價寫法。但內部只在 setup 時讀一次初始值、之後單向往外送 ——
 watch model 會成環：打字 emit、母元件更新、watch 改回輸入框、再 emit。
 只讀一次是安全的，因為母元件在 loading 還是 true 時就把地點設好了。
-
-順手把地圖從 180px 改成 120px。它的用途是「確認選對地方了」，不是拿來
-看的，120px 還看得到圖釘與周邊但少推 60px。
 
 「編輯時用這筆支出的座標當搜尋偏好」跟著搬進去：子元件從初始值自己推得
 出來，母元件不必知道有位置偏好這件事。
@@ -1357,7 +1354,7 @@ Expected: 三個都通過。測試數應該是 381 + 10 = 391。
 ```bash
 grep -n "queuedNotice" src/pages/ExpenseFormPage.vue          # 預期：無
 grep -n 'class="tabs' src/pages/ExpenseFormPage.vue           # 預期：無
-grep -n "180px" src/components/expense/PlaceField.vue         # 預期：無
+grep -n "120px" src/components/expense/PlaceField.vue         # 預期：無（維持 180px，見 spec §3.2）
 grep -c 'class="card stack"' src/pages/ExpenseFormPage.vue    # 預期：3
 wc -l src/pages/ExpenseFormPage.vue                           # 預期：明顯低於 1104
 ```
@@ -1430,7 +1427,7 @@ Expected: **「名字被改過之後，座標要丟掉」那個案例要紅。**
 | §二 2.1 sticky 不是 fixed | Task 5 §5.1 + Step 2 |
 | §二 2.2 刪除與取消留在捲動流 | Task 5 §5.0 + Step 1 |
 | §三 3.1 分攤方式換 `.seg` | Task 4 Step 4 |
-| §三 3.2 地圖 180 → 120 | Task 3 Step 1（元件 template） |
+| §三 3.2 地圖高度 | Task 3 Step 1 —— **實作後推翻，維持 180px**，spec 已更新 |
 | §三 3.3 匯率壓成兩行 | Task 4 Step 3 |
 | §三 3.4 刪 `queuedNotice`（含記下原意） | Task 2 |
 | §四 4.1 介面 | Task 3 §3.0 |
