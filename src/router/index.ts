@@ -136,7 +136,15 @@ router.beforeEach(async (to, from) => {
   const navIndex = navigationCount;
   navigationCount += 1;
 
-  const traceName = traceNameFor(to.path);
+  /*
+    query 變了但路徑沒變 —— 那是頁內切換（任務頁的頁籤），不是一次頁面載入。
+
+    不擋的話每切一次頁籤都會 startTrace 開一筆新的 trace，而元件沒有重新
+    掛載、onMounted 不會再跑，finishTrace 永遠不會被呼叫。除了讓 tracedCounts
+    灌水，更糟的是使用者在頁面還在載的時候切頁籤，正在進行的那一筆會被蓋掉。
+  */
+  const samePage = to.path === from.path;
+  const traceName = samePage ? null : traceNameFor(to.path);
   if (traceName) {
     startTrace(traceName);
     const seen = tracedCounts[traceName] ?? 0;
