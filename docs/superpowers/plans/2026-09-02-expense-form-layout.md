@@ -103,7 +103,7 @@ export function biasFromPlaces(places: (ExpensePlace | null)[]): LatLng | null;
   - `currentPlace(query: string, selected: ExpensePlace | null): ExpensePlace | null`
   - `shouldSearchPlace(query: string): boolean`
 
-- [ ] **Step 1: 寫會失敗的測試**
+- [x] **Step 1: 寫會失敗的測試**
 
 建立 `tests/placeSearch.test.ts`：
 
@@ -185,7 +185,7 @@ describe("shouldSearchPlace", () => {
 });
 ```
 
-- [ ] **Step 2: 跑測試確認會失敗**
+- [x] **Step 2: 跑測試確認會失敗**
 
 ```bash
 npm test -- placeSearch
@@ -193,7 +193,7 @@ npm test -- placeSearch
 
 Expected: FAIL，訊息是 `Failed to resolve import "@/utils/placeSearch"`。**如果它直接通過，代表測試沒被收進來，先解決那件事。**
 
-- [ ] **Step 3: 實作**
+- [x] **Step 3: 實作**
 
 建立 `src/utils/placeSearch.ts`：
 
@@ -232,7 +232,7 @@ export function shouldSearchPlace(query: string): boolean {
 }
 ```
 
-- [ ] **Step 4: 跑測試確認通過**
+- [x] **Step 4: 跑測試確認通過**
 
 ```bash
 npm test -- placeSearch
@@ -240,7 +240,7 @@ npm test -- placeSearch
 
 Expected: PASS，10 個案例全綠。
 
-- [ ] **Step 5: 全套測試與型別檢查**
+- [x] **Step 5: 全套測試與型別檢查**
 
 ```bash
 npm test
@@ -249,7 +249,7 @@ npm run check
 
 Expected: 兩者都通過。既有的 381 個案例不受影響（這一步只新增檔案）。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/utils/placeSearch.ts tests/placeSearch.test.ts
