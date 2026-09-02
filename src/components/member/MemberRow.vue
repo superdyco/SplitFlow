@@ -73,7 +73,7 @@ const showActions = computed(() => props.canManage && !isSelf.value && props.mem
 .member-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .body {
@@ -93,6 +93,6 @@ const showActions = computed(() => props.canManage && !isSelf.value && props.mem
   flex: none;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 6px;
+  gap: var(--space-2);
 }
 </style>

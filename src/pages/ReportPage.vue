@@ -300,7 +300,7 @@ onMounted(load);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   margin-top: 4px;
   text-align: center;
 }
@@ -308,7 +308,7 @@ onMounted(load);
 .page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
   max-width: 560px;
   margin: 0 auto;
   padding: 24px 16px 48px;
@@ -336,7 +336,7 @@ onMounted(load);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   /* .page 的 gap 是 16px，這裡再加 8px 讓主角與下一張卡拉開成 24px。 */
   margin-bottom: 8px;
   padding: 24px 18px;
@@ -354,7 +354,7 @@ onMounted(load);
 .entry {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 /*
@@ -413,13 +413,13 @@ onMounted(load);
 .line {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .day {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .day-head {
@@ -433,7 +433,7 @@ onMounted(load);
 .entries {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 2px 0 0;
   padding: 2px 0 2px 12px;
   border-left: 2px solid var(--color-line);

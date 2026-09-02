@@ -292,7 +292,7 @@ function copySettlement() {
 }
 
 .rows {
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .balance,
@@ -305,7 +305,7 @@ function copySettlement() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .balance:first-child,
@@ -314,7 +314,7 @@ function copySettlement() {
 }
 
 .transfer .spread {
-  gap: 10px;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
@@ -322,13 +322,13 @@ function copySettlement() {
   flex: none;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .who {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -360,7 +360,7 @@ function copySettlement() {
 .ends {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
 }
 

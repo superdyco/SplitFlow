@@ -969,13 +969,13 @@ onMounted(load);
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   min-height: 40px;
   padding: 0 14px;
   border: 1px solid var(--color-line);
@@ -992,13 +992,13 @@ onMounted(load);
 }
 
 .custom-list {
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .custom-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .custom-row .who {
@@ -1085,7 +1085,7 @@ onMounted(load);
 .suggestion {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-text);
   width: 100%;
   padding: 10px 12px;
   border: 0;

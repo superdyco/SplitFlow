@@ -136,7 +136,7 @@ const isArchived = computed(() => props.task.status === "archived");
   z-index: 1;
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: 10px;
 }
 
@@ -168,7 +168,7 @@ const isArchived = computed(() => props.task.status === "archived");
 
 .task-meta {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
   margin: 14px 0 8px;
 }
@@ -177,7 +177,7 @@ const isArchived = computed(() => props.task.status === "archived");
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   margin: 0 0 6px;
   padding-top: 8px;
   border-top: 1px solid var(--color-line);

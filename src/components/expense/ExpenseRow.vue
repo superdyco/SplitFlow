@@ -95,7 +95,7 @@ const missingRate = computed(
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .icon {

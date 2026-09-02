@@ -23,7 +23,7 @@ const emit = defineEmits<{ (e: "retry"): void }>();
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .retry {

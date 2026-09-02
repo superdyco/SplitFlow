@@ -61,7 +61,7 @@ const facts = computed(() => {
 
 <style scoped>
 .report-card {
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .name {
@@ -85,7 +85,7 @@ const facts = computed(() => {
   flex: none;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
+  gap: var(--space-text);
   text-align: right;
 }
 
@@ -95,6 +95,6 @@ const facts = computed(() => {
 }
 
 .actions {
-  gap: 8px;
+  gap: var(--space-2);
 }
 </style>

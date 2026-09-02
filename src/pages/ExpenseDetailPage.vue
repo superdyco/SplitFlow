@@ -250,7 +250,7 @@ onMounted(load);
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .row .label {

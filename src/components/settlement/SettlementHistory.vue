@@ -180,7 +180,7 @@ function copySnapshot(snapshot: SettlementSnapshot) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   padding: 4px 0;
   border: 0;
@@ -191,7 +191,7 @@ function copySnapshot(snapshot: SettlementSnapshot) {
 .entry-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-text);
   min-width: 0;
 }
 
@@ -209,14 +209,14 @@ function copySnapshot(snapshot: SettlementSnapshot) {
 }
 
 .rows {
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .line {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .receive {

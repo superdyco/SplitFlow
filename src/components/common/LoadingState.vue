@@ -19,7 +19,7 @@ defineProps<{
 .loading-card {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .spinner {

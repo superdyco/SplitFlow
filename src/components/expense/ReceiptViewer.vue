@@ -24,7 +24,7 @@ const emit = defineEmits<{ (e: "close"): void }>();
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: var(--space-4);
   padding: 16px;
   /* 收據常常是白底，深色背景才看得出邊界。 */
   background: rgba(0, 0, 0, 0.85);

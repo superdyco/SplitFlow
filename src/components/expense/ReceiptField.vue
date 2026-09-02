@@ -141,7 +141,7 @@ function onChange(event: Event) {
 .preview {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .thumb {
@@ -204,7 +204,7 @@ function onChange(event: Event) {
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .warn {

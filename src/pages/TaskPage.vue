@@ -781,7 +781,7 @@ onMounted(async () => {
 
 .listed {
   display: flex;
-  gap: 10px;
+  gap: var(--space-3);
   align-items: flex-start;
   line-height: 1.5;
 }
