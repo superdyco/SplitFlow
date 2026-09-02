@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { myTripCost, sumByCurrency } from "@/utils/myCost";
+import { myTripCost, sharesOf, sumByCurrency, totalsOf, type TripCost } from "@/utils/myCost";
 import type { Expense } from "@/types/expense";
 
 function expense(
@@ -99,5 +99,85 @@ describe("sumByCurrency", () => {
 
   it("金額為零的幣別不列出來", () => {
     expect(sumByCurrency([{ currency: "TWD", amount: 0 }])).toEqual([]);
+  });
+});
+
+function trip(name: string, currency: string, amount: number): TripCost {
+  return { taskId: `t_${name}`, name, currency, amount };
+}
+
+describe("totalsOf", () => {
+  it("只加總傳進來的，沒傳進來的不會變成零", () => {
+    // 讀失敗的旅程根本不該出現在輸入裡 —— 補一個 0 進去會讓總額
+    // 少一截而畫面看起來完全正常，那正是這次要避免的事。
+    const ok = [trip("東京", "TWD", 31480), trip("宜蘭", "TWD", 4260)];
+    expect(totalsOf(ok)).toEqual([{ currency: "TWD", amount: 35740 }]);
+  });
+
+  it("跨幣別分開列，金額大的在前", () => {
+    const ok = [trip("宜蘭", "TWD", 4260), trip("曼谷", "THB", 18900)];
+    expect(totalsOf(ok)).toEqual([
+      { currency: "THB", amount: 18900 },
+      { currency: "TWD", amount: 4260 }
+    ]);
+  });
+
+  it("沒有任何一趟就是空陣列，不是一個零", () => {
+    expect(totalsOf([])).toEqual([]);
+  });
+});
+
+describe("sharesOf", () => {
+  it("只算指定幣別，其他幣別不進分母", () => {
+    const ok = [trip("東京", "TWD", 75), trip("曼谷", "THB", 925), trip("宜蘭", "TWD", 25)];
+    const shares = sharesOf(ok, "TWD");
+    expect(shares.map(s => s.name)).toEqual(["東京", "宜蘭"]);
+    expect(shares[0].ratio).toBeCloseTo(0.75);
+  });
+
+  it("比例加起來是一", () => {
+    const ok = [trip("東京", "TWD", 31480), trip("大阪", "TWD", 12580), trip("宜蘭", "TWD", 4260)];
+    const sum = sharesOf(ok, "TWD").reduce((acc, s) => acc + s.ratio, 0);
+    expect(sum).toBeCloseTo(1);
+  });
+
+  it("金額大的排前面", () => {
+    const ok = [trip("宜蘭", "TWD", 4260), trip("東京", "TWD", 31480)];
+    expect(sharesOf(ok, "TWD").map(s => s.name)).toEqual(["東京", "宜蘭"]);
+  });
+
+  it("超過 max 趟時，多出來的併成一項其他，併完比例總和仍是一", () => {
+    const ok = [
+      trip("東京", "TWD", 50),
+      trip("大阪", "TWD", 30),
+      trip("宜蘭", "TWD", 10),
+      trip("花蓮", "TWD", 6),
+      trip("台南", "TWD", 4)
+    ];
+    const shares = sharesOf(ok, "TWD", 3);
+    expect(shares.map(s => s.name)).toEqual(["東京", "大阪", "宜蘭", "其他"]);
+    expect(shares[3].amount).toBe(10);
+    expect(shares.reduce((acc, s) => acc + s.ratio, 0)).toBeCloseTo(1);
+  });
+
+  it("剛好比 max 多一趟時全部列出，不會把一趟改名叫其他", () => {
+    // 併一項進「其他」等於把一個有名字的旅程改名，那比多列一行更糟。
+    const ok = [
+      trip("東京", "TWD", 50),
+      trip("大阪", "TWD", 30),
+      trip("宜蘭", "TWD", 15),
+      trip("花蓮", "TWD", 5)
+    ];
+    expect(sharesOf(ok, "TWD", 3).map(s => s.name)).toEqual(["東京", "大阪", "宜蘭", "花蓮"]);
+  });
+
+  it("該幣別總額為零時回空陣列，不會除以零", () => {
+    expect(sharesOf([trip("東京", "TWD", 0)], "TWD")).toEqual([]);
+    expect(sharesOf([], "TWD")).toEqual([]);
+  });
+
+  it("金額為零的旅程不佔一段長條", () => {
+    const ok = [trip("東京", "TWD", 100), trip("宜蘭", "TWD", 0)];
+    expect(sharesOf(ok, "TWD").map(s => s.name)).toEqual(["東京"]);
   });
 });
