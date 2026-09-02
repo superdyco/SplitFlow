@@ -366,7 +366,7 @@ function copySettlement() {
 }
 
 .arrow {
-  color: var(--color-soft);
+  color: var(--color-muted);
 }
 
 .draft {

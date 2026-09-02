@@ -227,7 +227,12 @@
 - [ ] **Step 4: 確認沒有殘留引用**
 
 ```bash
-grep -rn "shadow-card\|#a39a90" src/
+# 只找真正的使用。註解裡會提到舊值，那是刻意留著的說明，不該讓檢查誤報。
+grep -rnF "var(--shadow-card" src/
+grep -rnE ": *#a39a90" src/
+# 只找真正的使用。註解裡會提到舊值，那是刻意留著的說明，不該讓檢查誤報。
+grep -rnF "var(--shadow-card" src/
+grep -rnE ": *#a39a90" src/
 ```
 
 Expected: 沒有任何輸出。
@@ -300,8 +305,9 @@ Expected: 正好五筆，就是上面 Files 列的那五個。
   .tiny 是內文不是裝飾 —— 日期、成員數、支出筆數都印在這裡。
   所以用 --color-muted（4.9:1）而不是 --color-soft（3.4:1）。
 
-  --color-soft 永遠不放文字。它只給停用態、圖示、placeholder 這類
-  非文字的 UI 元件，那些的門檻是 3:1。
+  --color-soft 不放「讀得到的文字」。它給的是圖示、邊界、placeholder
+  這類非文字 UI 元件（門檻 3:1），以及停用中的控制項 —— WCAG 1.4.3
+  明文豁免停用元件的對比要求，那正是「這個現在按不了」該有的樣子。
 */
 .tiny {
   color: var(--color-muted);
@@ -1685,7 +1691,10 @@ Expected: 三者皆通過，含 `scripts/check-chunks.mjs`。
 - [ ] **Step 2: 殘留掃描**
 
 ```bash
-grep -rn "#a39a90\|shadow-card\|box-shadow: none" src/
+# 只找真正的使用。註解裡會提到舊值，那是刻意留著的說明，不該讓檢查誤報。
+grep -rnF "var(--shadow-card" src/
+grep -rnE ": *#a39a90" src/
+grep -rnF "box-shadow: none" src/
 grep -rn "gap: 6px\|gap: 10px" src/
 grep -rn "border-radius: \(8\|12\|16\|20\|22\|999\)px" src/
 grep -rn "color: var(--color-soft)" src/

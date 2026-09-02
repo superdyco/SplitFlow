@@ -201,7 +201,7 @@ function copySnapshot(snapshot: SettlementSnapshot) {
 
 .chevron {
   flex: none;
-  color: var(--color-soft);
+  color: var(--color-muted);
 }
 
 .detail {

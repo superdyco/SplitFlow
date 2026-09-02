@@ -114,7 +114,7 @@ const isArchived = computed(() => props.task.status === "archived");
 .task-card.archived .task-meta span:not(.archived-pill),
 .task-card.archived .role-pill {
   background: var(--color-line);
-  color: var(--color-soft);
+  color: var(--color-muted);
 }
 
 /* 連結只包標題，但 ::after 撐滿整張卡片，所以整張卡都可點。 */

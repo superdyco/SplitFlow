@@ -58,7 +58,7 @@ const label = computed(() => {
 }
 
 .chevron {
-  color: var(--color-soft);
+  color: var(--color-muted);
   flex: none;
 }
 
