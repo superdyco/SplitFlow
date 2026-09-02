@@ -1077,7 +1077,7 @@ onMounted(load);
   border: 1px solid var(--color-line);
   border-radius: 16px;
   background: var(--color-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-pop);
   max-height: 260px;
   overflow-y: auto;
 }
