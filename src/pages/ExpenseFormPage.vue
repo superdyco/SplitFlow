@@ -99,7 +99,6 @@ const involvedIds = ref<string[]>([]);
 const note = ref("");
 
 const rate = ref("1");
-const rateUpdatedAt = ref("");
 const rateLoading = ref(false);
 const rateError = ref<string | null>(null);
 
@@ -204,8 +203,9 @@ async function loadRate() {
   rateError.value = null;
   try {
     const quote = await getRate(currency.value, baseCurrency.value);
+    // quote.updatedAt 沒有人讀了：「參考匯率更新於…」那句隨著匯率區塊
+    // 壓成兩行一起刪掉，留一個沒人讀的 ref 比刪掉更難懂。
     rate.value = String(Number(quote.rate.toFixed(6)));
-    rateUpdatedAt.value = quote.updatedAt;
   } catch (err) {
     rateError.value = `${err instanceof Error ? err.message : String(err)}。請手動填寫匯率。`;
   } finally {
@@ -546,6 +546,30 @@ onMounted(load);
             </label>
           </div>
 
+          <div v-if="needsRate" class="field">
+            <span class="label">匯率（1 {{ currency }} = ? {{ baseCurrency }}）</span>
+            <div class="row">
+              <input v-model="rate" class="input grow" inputmode="decimal" placeholder="0" />
+              <button type="button" class="btn btn-sm" :disabled="rateLoading" @click="loadRate">
+                {{ rateLoading ? "查詢中..." : "重新查詢" }}
+              </button>
+            </div>
+            <!--
+              三塊壓成一行。格式錯誤與查詢失敗維持獨立顯示 —— 那是錯誤，該有重量；
+              三者互斥，所以最多只佔一行。代價是刪掉「記帳後就固定不再變動」與
+              「參考匯率更新於…可以自己改」兩句說明。
+            -->
+            <span v-if="rateFormatError" class="tiny warn">{{ rateFormatError }}</span>
+            <span v-else-if="rateError" class="tiny warn">{{ rateError }}</span>
+            <span v-else-if="baseAmount !== null" class="tiny">
+              ≈ {{ baseCurrency }} {{ formatAmount(baseAmount, baseCurrency) }}
+            </span>
+          </div>
+        </div>
+
+        <div class="card stack">
+          <h2 class="card-head">這趟的細節</h2>
+
           <div class="field">
             <div class="row">
               <label class="field grow">
@@ -560,22 +584,6 @@ onMounted(load);
             <span class="tiny">
               隔天才補記的話改成消費當天，結算與排序都看這個日期。
               時間只影響同一天的排序與顯示，不確定就清空。
-            </span>
-          </div>
-
-          <div v-if="needsRate" class="field">
-            <span class="label">匯率（1 {{ currency }} = ? {{ baseCurrency }}）</span>
-            <div class="row">
-              <input v-model="rate" class="input grow" inputmode="decimal" placeholder="0" />
-              <button type="button" class="btn btn-sm" :disabled="rateLoading" @click="loadRate">
-                {{ rateLoading ? "查詢中..." : "重新查詢" }}
-              </button>
-            </div>
-            <span v-if="rateFormatError" class="tiny warn">{{ rateFormatError }}</span>
-            <span v-else-if="rateError" class="tiny warn">{{ rateError }}</span>
-            <span v-else-if="rateUpdatedAt" class="tiny">參考匯率更新於 {{ rateUpdatedAt }}，可以自己改成實際成交匯率。</span>
-            <span v-if="baseAmount !== null" class="tiny">
-              換算後約 {{ baseCurrency }} {{ formatAmount(baseAmount, baseCurrency) }}，記帳後就固定不再變動。
             </span>
           </div>
 
@@ -608,6 +616,10 @@ onMounted(load);
               placeholder="例如：含小費、阿明先付現金、發票在小美那"
             ></textarea>
           </label>
+        </div>
+
+        <div class="card stack">
+          <h2 class="card-head">怎麼分</h2>
 
           <label class="field">
             <span class="label">誰先付</span>
@@ -620,9 +632,25 @@ onMounted(load);
 
           <div class="field">
             <span class="label">分攤方式</span>
-            <div class="tabs two">
-              <button class="tab" :class="{ active: splitMode === 'even' }" @click="setSplitMode('even')">均分</button>
-              <button class="tab" :class="{ active: splitMode === 'custom' }" @click="setSplitMode('custom')">
+            <!--
+              用 .seg 不用 .tabs：.tabs 是任務頁最上層的頁籤，墨黑實心，那是頁面
+              層級的重量。這裡只是表單裡的一個二選一，.seg 就是為次層級切換做的。
+            -->
+            <div class="seg">
+              <button
+                type="button"
+                class="seg-item"
+                :class="{ active: splitMode === 'even' }"
+                @click="setSplitMode('even')"
+              >
+                均分
+              </button>
+              <button
+                type="button"
+                class="seg-item"
+                :class="{ active: splitMode === 'custom' }"
+                @click="setSplitMode('custom')"
+              >
                 自訂金額
               </button>
             </div>
@@ -733,6 +761,18 @@ onMounted(load);
 </template>
 
 <style scoped>
+/*
+  卡片的小標。用 --text-card 而不是 --text-section：這是卡片標題不是頁面
+  區段，而 --text-card 正是為了「太大」與「跟內文一樣」之間那一格才加的。
+
+  卡 1 沒有小標，那是刻意的 —— 它是主角，不需要一個標題來宣告自己是主角。
+*/
+.card-head {
+  margin: 0;
+  font-size: var(--text-card);
+  font-weight: 800;
+}
+
 .grow {
   flex: 1;
   min-width: 0;

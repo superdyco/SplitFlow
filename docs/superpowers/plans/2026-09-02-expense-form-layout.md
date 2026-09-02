@@ -952,7 +952,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **不要改成依主題分的四張卡。** 那樣邏輯比較自明，但卡片的 padding 與間距是有成本的，總高度會比現在更長 —— 而縮短捲動距離正是這次的目標。
 
-- [ ] **Step 1: 卡 1 —— 現有那張卡收到金額為止**
+- [x] **Step 1: 卡 1 —— 現有那張卡收到金額為止**
 
 現在的 template 是一張 `<div class="card stack">` 包住全部。把它的結尾 `</div>` 移到「金額 ＋ 幣別」那一列之後。
 
@@ -960,7 +960,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **日期那一整塊往下搬**（它現在夾在金額與匯率之間）。
 
-- [ ] **Step 2: 開卡 2 與卡 3**
+- [x] **Step 2: 開卡 2 與卡 3**
 
 卡 1 的 `</div>` 之後接：
 
@@ -997,7 +997,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 > **卡 1 沒有小標，這是刻意的。** 它是主角，不需要一個標題來宣告自己是主角。
 
-- [ ] **Step 3: 匯率區塊壓成兩行**
+- [x] **Step 3: 匯率區塊壓成兩行**
 
 現在是輸入框 ＋ 換算後金額 ＋ 格式錯誤三個區塊。把換算後金額壓成輸入框下面一行灰字。
 
@@ -1031,7 +1031,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 > grep -n "rateUpdatedAt" src/pages/ExpenseFormPage.vue
 > ```
 
-- [ ] **Step 4: 「分攤方式」換成 `.seg`**
+- [x] **Step 4: 「分攤方式」換成 `.seg`**
 
 現在用的是任務頁最上層那個導覽元件（`.tabs.two`，選中態是墨黑實心）—— 那是頁面層級的視覺重量，用在表單裡的一個二選一上太搶。
 
@@ -1065,7 +1065,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 >
 > `.seg` 是 `display: inline-flex; flex: none`，所以它**不會撐滿整行**，跟原本 `.tabs.two` 佔滿一整列不一樣。那是預期的：分段控制本來就該只有內容那麼寬。
 
-- [ ] **Step 5: 驗證**
+- [x] **Step 5: 驗證**
 
 ```bash
 grep -n 'class="tabs' src/pages/ExpenseFormPage.vue
@@ -1079,7 +1079,7 @@ grep -c 'class="card stack"' src/pages/ExpenseFormPage.vue
 
 Expected: 3。
 
-- [ ] **Step 6: 型別檢查與 build**
+- [x] **Step 6: 型別檢查與 build**
 
 ```bash
 npm run check
@@ -1088,7 +1088,7 @@ npm run build
 
 Expected: 都通過。
 
-- [ ] **Step 7: 目視走一遍**
+- [x] **Step 7: 目視走一遍**
 
 `npm run dev`：
 
@@ -1098,7 +1098,7 @@ Expected: 都通過。
 - 「分攤方式」是白底選中的分段控制，不是墨黑實心
 - 卡 3 的順序是誰先付 → 分攤方式 → 分攤成員
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/pages/ExpenseFormPage.vue
