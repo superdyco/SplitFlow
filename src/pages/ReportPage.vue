@@ -327,7 +327,7 @@ onMounted(load);
   border: 0;
   background: none;
   padding: 0;
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
   font-size: 13px;
   font-weight: 700;
 }
@@ -480,6 +480,6 @@ onMounted(load);
 }
 
 .footer a {
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
 }
 </style>

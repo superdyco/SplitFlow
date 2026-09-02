@@ -334,7 +334,7 @@ onMounted(async () => {
   border: 0;
   background: none;
   padding: 0;
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
   font-size: 12px;
   font-weight: 700;
 }

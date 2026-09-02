@@ -988,7 +988,7 @@ onMounted(load);
 .chip.active {
   border-color: var(--color-primary);
   background: var(--color-primary-soft);
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
 }
 
 .custom-list {
@@ -1021,7 +1021,7 @@ onMounted(load);
   border: 0;
   background: none;
   padding: 0;
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
   font-size: 12px;
   font-weight: 700;
 }
@@ -1036,7 +1036,7 @@ onMounted(load);
   width: 52px;
   min-height: 52px;
   padding: 0;
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
 }
 
 /*

@@ -153,7 +153,7 @@ const isArchived = computed(() => props.task.status === "archived");
 
 .action:hover {
   border-color: var(--color-primary);
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
 }
 
 .action.danger:hover {
@@ -191,7 +191,7 @@ const isArchived = computed(() => props.task.status === "archived");
 .role-pill {
   border-radius: 999px;
   background: var(--color-primary-soft);
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
   padding: 6px 10px;
   font-size: 12px;
   font-weight: 700;

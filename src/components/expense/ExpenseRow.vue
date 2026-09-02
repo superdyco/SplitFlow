@@ -168,7 +168,7 @@ const missingRate = computed(
 
 .repeat:hover {
   border-color: var(--color-primary);
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
 }
 
 .amount {
