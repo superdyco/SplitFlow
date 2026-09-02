@@ -964,7 +964,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Files:** 可能修改 `flutter_app/lib/ui/theme.dart`、`flutter_app/lib/ui/expense_form_page.dart`
 
-- [ ] **Step 1: 自動檢查**
+- [x] **Step 1: 自動檢查**
 
 ```powershell
 $env:PATH = "C:\dev\flutter\bin;$env:PATH"
@@ -975,7 +975,7 @@ flutter test
 
 Expected: analyze **1 issue**（基線，不是 0）；test **391 passed**（380 + 11）。
 
-- [ ] **Step 2: 掃描**
+- [x] **Step 2: 掃描**
 
 ```bash
 cd flutter_app
@@ -985,7 +985,7 @@ grep -n "circular(12)\|circular(20)\|circular(16)" lib/ui/theme.dart  # 預期�
 grep -n "bottomNavigationBar" lib/ui/expense_form_page.dart  # 預期：1
 ```
 
-- [ ] **Step 3: 確認對比度測試會失敗於錯誤的顏色**
+- [x] **Step 3: 確認對比度測試會失敗於錯誤的顏色**
 
 驗收裡最容易造假的一項。把 `muted` 暫時改回 `Color(0xFF8A8078)`：
 
