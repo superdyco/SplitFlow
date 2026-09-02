@@ -65,7 +65,7 @@ const missingRate = computed(
     所以用 stretched link：連結本身只放在標題上，再用 ::after 覆蓋整張卡，
     「再記一筆」則疊在它上面。這樣兩個動作都能點，HTML 也是合法的。
   -->
-  <div class="card expense-row">
+  <div class="card flat expense-row">
     <span class="icon" :aria-label="meta.label">{{ meta.icon }}</span>
     <div class="body">
       <strong>
@@ -96,7 +96,6 @@ const missingRate = computed(
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: none;
 }
 
 .icon {

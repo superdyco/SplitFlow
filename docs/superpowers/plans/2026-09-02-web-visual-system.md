@@ -1694,7 +1694,7 @@ Expected: 三者皆通過，含 `scripts/check-chunks.mjs`。
 # 只找真正的使用。註解裡會提到舊值，那是刻意留著的說明，不該讓檢查誤報。
 grep -rnF "var(--shadow-card" src/
 grep -rnE ": *#a39a90" src/
-grep -rnF "box-shadow: none" src/
+grep -rnF "box-shadow: none;" src/
 grep -rn "gap: 6px\|gap: 10px" src/
 grep -rn "border-radius: \(8\|12\|16\|20\|22\|999\)px" src/
 grep -rn "color: var(--color-soft)" src/

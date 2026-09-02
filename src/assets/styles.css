@@ -174,12 +174,29 @@ a {
   border-radius: 50%;
 }
 
+/*
+  卡片有三種身分，不是一種卡片加上例外。
+
+  原本只有一個 .card 配一個大陰影，所以「這東西不該浮起來」只能寫
+  box-shadow: none 去取消 —— 有四個檔案這樣做。宣告身分比取消繼承好讀，
+  也讓「不浮起」變成一個正常的值。
+*/
 .card {
   background: var(--color-card);
   border: 1px solid var(--color-line);
-  border-radius: 20px;
-  padding: 18px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
   box-shadow: var(--shadow-rest);
+}
+
+/* 巢狀在別的卡裡、或本身是列表的一列。自己不該再浮一層。 */
+.card.flat {
+  box-shadow: var(--shadow-flat);
+}
+
+/* 真的浮在頁面之上的東西：對話框、選單。 */
+.card.raised {
+  box-shadow: var(--shadow-pop);
 }
 
 .stack {
@@ -317,6 +334,44 @@ a {
 
 .btn-danger {
   border-color: #f3d2ce;
+  color: var(--color-danger);
+}
+
+/*
+  卡片內的次要動作。原本這種按鈕做成 outline 藥丸，結果一張卡下緣
+  多一列灰色藥丸 —— 在一張已經有三顆標籤的卡片上，那是第四、第五個
+  搶注意力的東西。
+
+  拿掉外框改用純文字，靠位置（固定在右下角）與間距說明它可按。
+*/
+.btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  min-height: auto;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-muted);
+  font-size: var(--text-tiny);
+  font-weight: 700;
+  transition: color var(--dur-base) var(--ease);
+}
+
+.btn-quiet:hover:not(:disabled) {
+  color: var(--color-primary-dark);
+}
+
+/*
+  刪除鈕平時用低飽和的紅棕，hover 才轉正紅。
+
+  平時就用正紅的話，一排卡片上會有一整列紅字在對你喊 —— 而刪除是
+  一輩子按不到幾次的操作，不該長期佔用畫面上最強的顏色。
+*/
+.btn-quiet.danger {
+  color: #b8837c;
+}
+
+.btn-quiet.danger:hover:not(:disabled) {
   color: var(--color-danger);
 }
 

@@ -124,7 +124,7 @@ function copySettlement() {
 
 <template>
   <div class="stack">
-    <div v-if="settlement.unconverted.length" class="card warn-card stack">
+    <div v-if="settlement.unconverted.length" class="card flat warn-card stack">
       <strong>有 {{ settlement.unconverted.length }} 筆支出還沒有匯率</strong>
       <p class="tiny">
         這些支出是在匯率功能之前記的，沒有存換算金額，所以沒有算進下面的結算。
@@ -282,7 +282,6 @@ function copySettlement() {
 
 <style scoped>
 .warn-card {
-  box-shadow: none;
   border-color: #f3d2ce;
   background: #fff5f5;
 }

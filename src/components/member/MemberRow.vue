@@ -25,7 +25,7 @@ const showActions = computed(() => props.canManage && !isSelf.value && props.mem
 </script>
 
 <template>
-  <div class="card member-row">
+  <div class="card flat member-row">
     <span class="avatar">{{ member.nickname.charAt(0).toUpperCase() }}</span>
     <div class="body">
       <strong>{{ memberDisplayName(member) }}</strong>
@@ -74,7 +74,6 @@ const showActions = computed(() => props.canManage && !isSelf.value && props.mem
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: none;
 }
 
 .body {
