@@ -543,6 +543,10 @@ onMounted(async () => {
   gap: 5px;
 }
 
+/*
+  7px 的色塊，圓角綁的是這個尺寸本身而不是圓角尺度 —— 套 --radius-sm
+  會被 CSS 夾成 3.5px，形狀就變成幾乎是圓形，跟長條的方頭對不起來。
+*/
 .hero-leg em {
   width: 7px;
   height: 7px;
@@ -563,7 +567,7 @@ onMounted(async () => {
 }
 
 .skel {
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: linear-gradient(90deg, #efeae3 25%, #f7f3ee 50%, #efeae3 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;

@@ -1721,14 +1721,37 @@ Expected: 三者皆通過，含 `scripts/check-chunks.mjs`。
 grep -rnF "var(--shadow-card" src/
 grep -rnE ": *#a39a90" src/
 grep -rnF "box-shadow: none;" src/
-grep -rn "gap: 6px\|gap: 10px" src/
-grep -rn "border-radius: \(8\|12\|16\|20\|22\|999\)px" src/
-grep -rn "color: var(--color-soft)" src/
-# 找程式碼形式的 ) ?? 0，不是註解裡提到的那四個字。
-grep -nE "\)\s*\?\?\s*0" src/pages/TaskListPage.vue
+grep -rn "gap: 6px|gap: 10px;" src/
+grep -rnE "\)\s*\?\?\s*0" src/pages/TaskListPage.vue
+grep -rn "color: var(--color-primary);" src/ | grep -v "border|background|outline"
 ```
 
-Expected: 五個指令都沒有輸出。
+Expected: 六個指令都沒有輸出。
+
+接下來兩個檢查**有預期中的例外**，要逐筆確認而不是要求空輸出：
+
+```bash
+grep -rnE "border-radius: [0-9]+px" src/
+```
+
+Expected: 只有 `TaskListPage.vue` 的 `.hero-leg em`（`2px`）。那是 7px 色塊，
+圓角綁的是尺寸本身——套 `--radius-sm` 會被 CSS 夾成 3.5px 變成幾乎圓形，
+跟長條的方頭對不起來。上面應該有註解說明。
+
+```bash
+grep -rn -B 4 "color: var(--color-soft)" src/
+```
+
+Expected: 只有一處，而且選擇器是 `:disabled`（`.hero-action:disabled`）。
+WCAG 1.4.3 豁免停用元件的對比要求，這是規則允許的用法。**任何非 `:disabled`
+的命中都是違規。**
+
+```bash
+grep -rn "font-size: [0-9]" src/ --include=*.vue --include=*.css
+```
+
+Expected: 正好四筆，全部是有註解的例外——`AccessDenied`、`ExpenseRow`、
+`ExpenseDetailPage` 的 emoji 字符大小，以及 `ProfilePage` 的 monospace 除錯區塊。
 
 - [ ] **Step 3: 人工走查**
 
