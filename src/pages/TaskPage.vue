@@ -823,8 +823,4 @@ onMounted(async () => {
 .warn {
   color: var(--color-danger);
 }
-
-.tabs.two {
-  grid-template-columns: repeat(2, 1fr);
-}
 </style>

@@ -38,6 +38,17 @@
   --color-success-soft: #e6f6ef;
 
   /*
+    上一輪稽核硬寫顏色時只掃了 .vue，沒掃這個檔案本身，所以這六個漏網。
+    後三個還是上一輪自己加進去的。
+  */
+  --color-track: #f0ebe4; /* 頁籤與分段控制的底槽，比頁面底色再深一階 */
+  --color-danger-line: #f3d2ce;
+  --color-danger-soft: #fff5f5;
+  --color-danger-quiet: #b8837c; /* 平時的刪除鈕。正紅留給 hover。 */
+  --color-skeleton: #efeae3;
+  --color-skeleton-hi: #f7f3ee;
+
+  /*
     陰影四階。原本只有一個又大又軟的 --shadow-card，所有卡片一律套用，
     結果四個元件必須寫 box-shadow: none 把它關掉 —— 要靠取消來做層次，
     就是沒有層次的證據。現在「不浮起」是一個正常的值。
@@ -333,7 +344,7 @@ a {
 }
 
 .btn-danger {
-  border-color: #f3d2ce;
+  border-color: var(--color-danger-line);
   color: var(--color-danger);
 }
 
@@ -368,7 +379,7 @@ a {
   一輩子按不到幾次的操作，不該長期佔用畫面上最強的顏色。
 */
 .btn-quiet.danger {
-  color: #b8837c;
+  color: var(--color-danger-quiet);
 }
 
 .btn-quiet.danger:hover:not(:disabled) {
@@ -468,27 +479,77 @@ a {
   cursor: pointer;
 }
 
+/*
+  巢狀圓角：內層 = 外層 − padding。差一點點就會看到內外的弧線互相撞到。
+
+  這一組被機械替換弄壞過一次 —— 原本是 16/12/padding 4（16 − 4 = 12，精確
+  嵌套），收 token 時兩個都被塞進 --radius-md 變成 14/14。規則寫在這裡，
+  下次才不會再被一起收掉。
+*/
 .tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--space-2);
-  padding: 4px;
-  border-radius: var(--radius-md);
-  background: #f0ebe4;
+  padding: var(--space-1); /* 4 */
+  border-radius: var(--radius-md); /* 14 */
+  background: var(--color-track);
+}
+
+/* 兩個頁籤的變體。原本 TaskPage 與 ExpenseFormPage 各自寫了一份。 */
+.tabs.two {
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .tab {
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm); /* 14 − 4 = 10 ✓ */
   background: transparent;
   min-height: 38px;
   color: var(--color-muted);
   font-weight: 700;
+  transition:
+    background var(--dur-base) var(--ease),
+    color var(--dur-base) var(--ease);
 }
 
 .tab.active {
   background: var(--color-ink);
   color: #fff;
+}
+
+/*
+  次層級的切換（清單／地圖）。跟 .tabs 同一組 token、同一條巢狀規則，
+  但選中態是白底而不是 .tab.active 的墨黑底。
+
+  次層級不該跟頂層搶同一個視覺重量 —— 如果這裡也用墨黑，就只是把兩排
+  膠囊換成一排加一組膠囊，兩層相疊的問題沒有解掉。
+*/
+.seg {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--color-track);
+}
+
+.seg-item {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 6px 12px;
+  color: var(--color-muted);
+  font-size: var(--text-tiny);
+  font-weight: 700;
+  transition:
+    background var(--dur-base) var(--ease),
+    color var(--dur-base) var(--ease);
+}
+
+.seg-item.active {
+  background: var(--color-card);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-rest);
 }
 
 .empty {
@@ -499,8 +560,8 @@ a {
 }
 
 .error {
-  border: 1px solid #f3d2ce;
-  background: #fff5f5;
+  border: 1px solid var(--color-danger-line);
+  background: var(--color-danger-soft);
   color: var(--color-danger);
   border-radius: var(--radius-md);
   padding: 12px 14px;

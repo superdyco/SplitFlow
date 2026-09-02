@@ -962,10 +962,6 @@ onMounted(load);
   flex-wrap: wrap;
 }
 
-.tabs.two {
-  grid-template-columns: repeat(2, 1fr);
-}
-
 .chips {
   display: flex;
   flex-wrap: wrap;

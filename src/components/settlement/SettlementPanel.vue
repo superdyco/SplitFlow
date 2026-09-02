@@ -282,8 +282,8 @@ function copySettlement() {
 
 <style scoped>
 .warn-card {
-  border-color: #f3d2ce;
-  background: #fff5f5;
+  border-color: var(--color-danger-line);
+  background: var(--color-danger-soft);
 }
 
 .list {

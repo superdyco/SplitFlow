@@ -568,7 +568,12 @@ onMounted(async () => {
 
 .skel {
   border-radius: var(--radius-sm);
-  background: linear-gradient(90deg, #efeae3 25%, #f7f3ee 50%, #efeae3 75%);
+  background: linear-gradient(
+    90deg,
+    var(--color-skeleton) 25%,
+    var(--color-skeleton-hi) 50%,
+    var(--color-skeleton) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
