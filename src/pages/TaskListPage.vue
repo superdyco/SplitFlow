@@ -96,6 +96,34 @@ const totals = computed(() => totalsOf(okCosts.value));
   對一趟讀失敗的旅程來說，後者是在說「這趟你沒花錢」，那是假的。
 */
 const costById = computed(() => new Map(okCosts.value.map(item => [item.taskId, item.amount])));
+
+/** 每個幣別一塊，各自一條佔比條。跨幣別不合併 —— 混成一條等於在說 1 TWD = 1 THB。 */
+const blocks = computed(() =>
+  totals.value.map(item => ({
+    currency: item.currency,
+    amount: item.amount,
+    shares: sharesOf(okCosts.value, item.currency)
+  }))
+);
+
+const barColors = ["var(--color-primary-b1)", "var(--color-primary-b2)", "var(--color-primary-b3)"];
+function barColor(index: number) {
+  // 第四段以後（只可能是「其他」）用中性色，不再往下分明度。
+  return barColors[index] ?? "var(--color-line-strong)";
+}
+
+/*
+  少算了就要講，而且要講是哪一趟。只寫「部分失敗」的話，使用者無法
+  判斷這個數字能不能用。
+*/
+const failedNote = computed(() => {
+  const names = failedTasks.value.map(task => task.name);
+  if (!names.length) return null;
+  return `有 ${names.length} 趟旅程沒讀到（${names.join("、")}），這個數字少算了那幾趟。`;
+});
+
+/** 0 → 1 的動畫進度。Task 9 會讓它在按下計算時從 0 跑到 1。 */
+const countProgress = ref(1);
 function myCostOf(taskId: string) {
   return costById.value.get(taskId) ?? null;
 }
@@ -282,32 +310,57 @@ onMounted(async () => {
         <RouterLink to="/tasks/new" class="btn btn-primary" style="margin-top: 16px">建立分帳任務</RouterLink>
       </EmptyState>
 
-      <!-- 一個任務都沒有的人不該看到一顆算不出東西的按鈕。 -->
-      <template v-if="!loading && !error && costable.length">
-        <button
-          v-if="!costsLoaded"
-          class="btn btn-block"
-          :disabled="costsLoading"
-          @click="loadCosts"
-        >
-          {{ costsLoading ? "計算中..." : "計算我的花費" }}
-        </button>
+      <!--
+        一個任務都沒有的人不該看到一顆算不出東西的按鈕。
 
-        <div v-else class="spread totals-row">
-          <div class="totals">
-            <div v-for="item in totals" :key="item.currency" class="total">
-              <span class="tiny">{{ item.currency }}</span>
-              <strong class="figure">{{ formatAmount(item.amount, item.currency) }}</strong>
-            </div>
-            <p v-if="!totals.length" class="tiny">目前還沒有算得出金額的支出。</p>
-          </div>
-          <button class="link" :disabled="costsLoading" @click="loadCosts">
-            {{ costsLoading ? "計算中..." : "重新計算" }}
+        總花費是按需計算的，所以「還沒算」是每次進頁面的第一眼 ——
+        那一格不能是空白，要直接講為什麼要按。
+      -->
+      <div v-if="!loading && !error && costable.length" class="card hero">
+        <div class="hero-head">
+          <span class="hero-label">我的總花費</span>
+          <button class="btn-quiet hero-action" :disabled="costsLoading" @click="loadCosts">
+            {{ costsLoading ? "計算中…" : costsLoaded ? "重新計算" : "計算" }}
           </button>
         </div>
 
-        <p v-if="costsError" class="tiny warn">{{ costsError }}</p>
-      </template>
+        <p v-if="!costsLoaded && !costsLoading" class="hero-empty">
+          跨旅程加總要把每趟的支出全部載下來，點一下才算。
+        </p>
+
+        <!-- 骨架的形狀就是結果的形狀，數字進來時不跳版。 -->
+        <template v-else-if="costsLoading">
+          <div class="skel skel-fig"></div>
+          <div class="skel skel-bar"></div>
+          <div class="skel skel-leg"></div>
+        </template>
+
+        <template v-else>
+          <div v-for="(block, bi) in blocks" :key="block.currency" class="hero-block">
+            <p class="hero-fig">
+              <span class="hero-cur">{{ block.currency }}</span
+              >{{ formatAmount(Math.round(block.amount * countProgress), block.currency) }}
+            </p>
+            <div v-if="block.shares.length" class="hero-bar">
+              <i
+                v-for="(share, si) in block.shares"
+                :key="share.name"
+                :style="{ flexGrow: share.ratio * countProgress, background: barColor(si) }"
+              ></i>
+            </div>
+            <div v-if="block.shares.length" class="hero-leg">
+              <span v-for="(share, si) in block.shares" :key="share.name">
+                <em :style="{ background: barColor(si) }"></em>{{ share.name }}
+                {{ Math.round(share.ratio * 100) }}%
+              </span>
+            </div>
+            <p v-if="bi === 0 && failedNote" class="hero-warn">{{ failedNote }}</p>
+          </div>
+          <p v-if="!blocks.length" class="tiny">目前還沒有算得出金額的支出。</p>
+        </template>
+
+        <p v-if="costsError" class="hero-warn">{{ costsError }}</p>
+      </div>
 
       <div v-if="!loading && partitioned.active.length" class="stack">
         <TaskCard
@@ -354,46 +407,149 @@ onMounted(async () => {
 
 <style scoped>
 .intro {
-  margin: -4px 0 0;
+  margin: calc(var(--space-1) * -1) 0 0;
   line-height: 1.7;
 }
 
-.totals-row {
-  align-items: flex-end;
-}
-
-.totals {
+.hero-head {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
-.link {
-  flex: none;
-  border: 0;
-  background: none;
-  padding: 0;
-  color: var(--color-primary-dark);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.link:disabled {
+.hero-label {
+  font-size: var(--text-tiny);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--color-muted);
 }
 
-.total {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-text);
+/*
+  這張卡上唯一的橘色。它是這裡唯一可以按的東西。
+
+  hover 也要自己寫一次：全域的 .btn-quiet:hover 跟 scoped 的
+  .hero-action 特異性一樣，誰贏取決於打包順序 —— 不能賭。
+*/
+.hero-action {
+  color: var(--color-primary-dark);
 }
 
-.figure {
-  font-size: 22px;
+.hero-action:hover:not(:disabled) {
+  color: var(--color-primary-deep);
+}
+
+/* 停用態用 soft：WCAG 1.4.3 豁免停用元件的對比要求，讀起來就是按不了。 */
+.hero-action:disabled {
+  color: var(--color-soft);
+  cursor: not-allowed;
+}
+
+.hero-empty {
+  margin: 0;
+  color: var(--color-muted);
+  line-height: 1.6;
+}
+
+.hero-block + .hero-block {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+
+.hero-fig {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
-.warn {
+/* 幣別不分主次：totalsOf 已經照金額排序，順序本身就是層次。 */
+.hero-cur {
+  margin-right: 7px;
+  font-size: var(--text-body);
+  font-weight: 700;
+  color: var(--color-muted);
+  letter-spacing: 0;
+}
+
+.hero-bar {
+  display: flex;
+  gap: 2px;
+  height: 5px;
+  margin: var(--space-3) 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.hero-bar i {
+  display: block;
+  flex-basis: 0;
+}
+
+.hero-leg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--text-tiny);
+  color: var(--color-muted);
+}
+
+.hero-leg span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hero-leg em {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+
+/*
+  少算了就要在數字旁邊講，而且要講是哪一趟。印在卡片外面的話，
+  上面那個數字看起來仍然像是完整的。
+*/
+.hero-warn {
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+  font-size: var(--text-tiny);
+  line-height: 1.65;
   color: var(--color-danger);
+}
+
+.skel {
+  border-radius: 7px;
+  background: linear-gradient(90deg, #efeae3 25%, #f7f3ee 50%, #efeae3 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.skel-fig {
+  height: var(--text-display);
+  width: 62%;
+  margin-bottom: var(--space-3);
+}
+
+.skel-bar {
+  height: 5px;
+  margin-bottom: var(--space-2);
+}
+
+.skel-leg {
+  height: 11px;
+  width: 76%;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
 }
 </style>

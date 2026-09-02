@@ -1724,7 +1724,8 @@ grep -rnF "box-shadow: none;" src/
 grep -rn "gap: 6px\|gap: 10px" src/
 grep -rn "border-radius: \(8\|12\|16\|20\|22\|999\)px" src/
 grep -rn "color: var(--color-soft)" src/
-grep -n "?? 0" src/pages/TaskListPage.vue
+# 找程式碼形式的 ) ?? 0，不是註解裡提到的那四個字。
+grep -nE "\)\s*\?\?\s*0" src/pages/TaskListPage.vue
 ```
 
 Expected: 五個指令都沒有輸出。
