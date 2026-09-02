@@ -1018,6 +1018,31 @@ const totals = computed(() => totalsOf(okCosts.value));
     if (failed.length) traceDetail("failed", failed.length);
 ```
 
+- [ ] **Step 3.5: template 的兩處 `my-cost` 綁定也要改**
+
+（計畫原本漏了這一步，`vue-tsc` 會直接指出來。）兩處
+`:my-cost="costsLoaded ? costs.get(row.task.id) ?? 0 : null"` 是同一個
+`?? 0` 陷阱的第二現場：讀失敗的旅程會在卡片上顯示「TWD 0」，等於在說
+「這趟你沒花錢」。
+
+在 `totals` 底下加：
+
+```ts
+/*
+  卡片上的金額也走同一條規則：查不到就是 null，不是 0。
+
+  TaskCard 的 myCost 收到 null 時整行不顯示，收到 0 會顯示「TWD 0」——
+  對一趟讀失敗的旅程來說，後者是在說「這趟你沒花錢」，那是假的。
+*/
+const costById = computed(() => new Map(okCosts.value.map(item => [item.taskId, item.amount])));
+function myCostOf(taskId: string) {
+  return costById.value.get(taskId) ?? null;
+}
+```
+
+兩處綁定都改成 `:my-cost="myCostOf(row.task.id)"`。原本的 `costsLoaded ? ... : null`
+守衛可以拿掉：還沒計算時 `okCosts` 是空的，查不到就回 null，行為一樣。
+
 - [ ] **Step 4: `catch` 區塊只處理「整批都掛了」**
 
 `allSettled` 不會 reject，所以 `catch` 現在只會接到 `uid` 缺失之類的意外。保留它但簡化：

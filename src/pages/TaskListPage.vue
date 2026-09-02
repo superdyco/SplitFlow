@@ -14,7 +14,7 @@ import { listUserTasks, setTaskStatus } from "@/services/taskService";
 import { settleWrite } from "@/utils/offlineWrite";
 import { listTaskMembers } from "@/services/memberService";
 import { listExpenses } from "@/services/expenseService";
-import { myTripCost, sumByCurrency } from "@/utils/myCost";
+import { myTripCost, sharesOf, totalsOf, type TripCost } from "@/utils/myCost";
 import { partitionTasks } from "@/utils/taskStatus";
 import { taskRole } from "@/utils/taskRole";
 import { formatAmount } from "@/utils/currency";
@@ -64,7 +64,15 @@ async function load() {
  * 所以做成按需載入：不點就維持列表原本的速度，點了才付「任務數 × 支出數」
  * 這個讀取成本。
  */
-const costs = ref<Map<string, number>>(new Map());
+/*
+  算成功的與算失敗的分開存，而不是一個 Map 加上「查不到就當 0」。
+
+  「算不出來」跟「花了零元」是兩件事。用 ?? 0 補的話，讀失敗的那趟
+  會被當成零元算進總額與佔比 —— 數字少一截，分母錯掉，而畫面上看
+  起來完全正常。
+*/
+const okCosts = ref<TripCost[]>([]);
+const failedTasks = ref<Task[]>([]);
 const costsLoading = ref(false);
 const costsError = ref<string | null>(null);
 const costsLoaded = ref(false);
@@ -79,14 +87,18 @@ const partitioned = computed(() => partitionTasks(rows.value));
  */
 const costable = computed(() => [...partitioned.value.active, ...partitioned.value.archived]);
 
-const totals = computed(() =>
-  sumByCurrency(
-    costable.value.map(row => ({
-      currency: row.task.defaultCurrency,
-      amount: costs.value.get(row.task.id) ?? 0
-    }))
-  )
-);
+const totals = computed(() => totalsOf(okCosts.value));
+
+/*
+  卡片上的金額也走同一條規則：查不到就是 null，不是 0。
+
+  TaskCard 的 myCost 收到 null 時整行不顯示，收到 0 會顯示「TWD 0」——
+  對一趟讀失敗的旅程來說，後者是在說「這趟你沒花錢」，那是假的。
+*/
+const costById = computed(() => new Map(okCosts.value.map(item => [item.taskId, item.amount])));
+function myCostOf(taskId: string) {
+  return costById.value.get(taskId) ?? null;
+}
 
 async function loadCosts() {
   const uid = authStore.user?.uid;
@@ -104,7 +116,12 @@ async function loadCosts() {
   costsLoading.value = true;
   costsError.value = null;
   try {
-    const entries = await Promise.all(
+    /*
+      allSettled 而不是 all：原本任何一趟讀失敗就整個 reject，使用者按了
+      計算、等完「任務數 × 2 趟查詢」，然後什麼都拿不到，只有一行紅字。
+      算得出來的先給。
+    */
+    const settled = await Promise.allSettled(
       costable.value.map(async row => {
         // 成員也要載：餘數分給誰取決於加入順序，少了它數字會跟結算頁差幾分錢。
         const [expenses, members] = await Promise.all([
@@ -117,14 +134,36 @@ async function loadCosts() {
           uid,
           row.task.defaultCurrency
         );
-        return [row.task.id, cost] as const;
+        return {
+          taskId: row.task.id,
+          name: row.task.name,
+          currency: row.task.defaultCurrency,
+          amount: cost
+        } satisfies TripCost;
       })
     );
-    costs.value = new Map(entries);
-    costsLoaded.value = true;
+
+    const ok: TripCost[] = [];
+    const failed: Task[] = [];
+    settled.forEach((result, index) => {
+      if (result.status === "fulfilled") ok.push(result.value);
+      else failed.push(costable.value[index].task);
+    });
+
+    okCosts.value = ok;
+    failedTasks.value = failed;
+    /*
+      一趟都沒成功就不算「載好了」—— 那跟沒按過是一樣的狀態，給使用者
+      一顆可以重試的按鈕比給一張空卡片有用。
+    */
+    costsLoaded.value = ok.length > 0;
+
+    // 失敗的那幾筆要留在 trace 裡：逾時而失敗通常就是最慢的那幾筆，
+    // 濾掉它們會讓數字好看得不真實。
+    if (failed.length) traceDetail("failed", failed.length);
   } catch (err) {
+    // allSettled 不會 reject，走到這裡代表是預期外的錯誤。
     costsError.value = firebaseErrorMessage(err);
-    // 失敗的那一筆也要留：逾時而失敗通常就是最慢的那幾筆，濾掉它們會讓數字好看得不真實。
     traceDetail("failed", true);
   } finally {
     costsLoading.value = false;
@@ -276,7 +315,7 @@ onMounted(async () => {
           :key="row.task.id"
           :task="row.task"
           :role="row.role"
-          :my-cost="costsLoaded ? costs.get(row.task.id) ?? 0 : null"
+          :my-cost="myCostOf(row.task.id)"
           @archive="ask($event, 'archived')"
           @unarchive="ask($event, 'active')"
           @delete="ask($event, 'deleted')"
@@ -290,7 +329,7 @@ onMounted(async () => {
           :key="row.task.id"
           :task="row.task"
           :role="row.role"
-          :my-cost="costsLoaded ? costs.get(row.task.id) ?? 0 : null"
+          :my-cost="myCostOf(row.task.id)"
           @archive="ask($event, 'archived')"
           @unarchive="ask($event, 'active')"
           @delete="ask($event, 'deleted')"
