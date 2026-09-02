@@ -20,7 +20,9 @@ iOS Safari 的原生控制項修正，`styles.css` 的註解都寫得很清楚�
 - `styles.css` 的 token 重寫：顏色、字級、間距、圓角、陰影、動態
 - 元件規則：卡片三種身分、藥丸的使用時機、按鈕補第四階、文字顏色三階
 - `TaskCard` 去掉三顆橘藥丸、動作按鈕改 quiet、hover 浮起
-- `TaskListPage` 的「我的總花費」重做成 hero（四種狀態）
+- `TaskListPage` 的「我的總花費」重做成 hero（五種狀態，含部分失敗）
+- `loadCosts` 改用 `Promise.allSettled`，算得出來的先顯示，並記錄哪幾趟沒讀到
+- 把「哪些算進總計、佔比怎麼切」抽成 `utils` 的純函式並補測試
 - 全站元件對齊新 token
 - 互動回饋：hover／按下／浮起，以及主動觸發時的金額滾動與佔比條生長
 
@@ -28,11 +30,10 @@ iOS Safari 的原生控制項修正，`styles.css` 的註解都寫得很清楚�
 
 - **不動 `flutter_app/`。** `theme.dart` 是照抄 `styles.css` 的 `:root`，改完之後
   兩版顏色會不一致——這是已知且被接受的，之後單獨處理。
-- **不改任何資料形狀、查詢或商業邏輯。** 這次只碰樣式與樣式所需的 template 結構。
-- **不做 hero 的「部分失敗」狀態。** 那需要把 `TaskListPage.loadCosts` 的
-  `Promise.all` 換成 `Promise.allSettled` 並記錄失敗的任務，是功能改動。
-  現況是全有全無：任一趟失敗就整個 reject、`costsLoaded` 維持 false，退回
-  「計算我的花費」按鈕加一行紅字。**這個行為維持不變。**
+- **不改資料形狀與 Firestore 查詢。** `loadCosts` 的錯誤處理會改，但讀的東西、
+  讀的次數、寫進資料庫的內容都不變。
+- **不改 `myTripCost` 與 `settleExpenses`。** 金額怎麼算不在這次範圍內，
+  只改「算不出來的那幾趟怎麼呈現」。
 - **不做列表進場動畫與換頁轉場。** 進場動畫綁在 render 上會讓資料一更新就整排重跳；
   換頁轉場會讓每次導航感覺變慢。
 - **不做深色模式。** 另一個等級的工作，而且要先有這套 token 才做得起來。
@@ -200,7 +201,7 @@ hero 的佔比條需要在同一個色相裡分出三段，不引入新色相：
 ## 三、TaskListPage 的「我的總花費」
 
 現況是一顆 `.btn-block`「計算我的花費」，按了之後換成一排 `.totals` 數字加一顆
-「重新計算」文字鈕。改成一張 hero 卡，四種狀態：
+「重新計算」文字鈕。改成一張 hero 卡，五種狀態：
 
 ```
 ┌ 未計算（每次進頁面第一眼）──────────┐
@@ -245,9 +246,86 @@ hero 的佔比條需要在同一個色相裡分出三段，不引入新色相：
 - **多幣別的字級一樣大。** `sumByCurrency` 已經照金額排序，順序本身就是層次，
   不需要再用大小暗示一個並不存在的主從關係。
 
+```
+┌ 部分失敗 ───────────────────────────┐
+│ 我的總花費              重新計算    │
+│ TWD 35,740                          │
+│ ██████████████████░░░░              │
+│ ● 東京 88%  ● 宜蘭 12%              │
+│ ─────────────────────────────────── │
+│ 有 1 趟旅程沒讀到（大阪 2023），     │  ← --color-danger，在數字旁邊
+│ 這個數字少算了那一趟。               │
+└─────────────────────────────────────┘
+```
+
 佔比條用 §1.2.1 的三階明度，不引入新色相。超過三趟的部分併成「其他」。
 
-**失敗時的行為不變**：`costsError` 照現在的方式顯示，hero 退回未計算狀態。
+## 三之二、部分失敗：算得出來的先給
+
+現在 `TaskListPage.loadCosts` 用 `Promise.all`——任何一趟讀失敗就整個 reject，
+`costs` 完全沒填、`costsLoaded` 維持 false。使用者按了「計算」，等了一段
+「任務數 × 2 趟查詢」的時間，然後**什麼都沒拿到**，只有一行紅字。
+
+改成 `Promise.allSettled`：成功的進 Map，失敗的記下任務本身。
+
+### 3.2.1 失敗的旅程必須被排除，不能歸零
+
+`totals` 現在是：
+
+```ts
+costs.value.get(row.task.id) ?? 0
+```
+
+今天沒事，因為全有全無——Map 要嘛全滿要嘛是空的。但換成 `allSettled` 之後，
+**`?? 0` 會把讀失敗的那一趟當成「花了零元」算進總額與佔比**。總額少一截、
+佔比分母錯掉，而畫面上看起來完全正常。
+
+這是這次改動最容易寫錯的一行：狀態 5 要解決的正是「數字看起來完整但其實不是」，
+而同一段程式碼會製造出一模一樣的問題。**失敗的任務要從來源陣列裡濾掉，
+不是查 Map 時補 0。**
+
+### 3.2.2 抽成純函式才測得到
+
+沿用這個 repo 既有的規矩——規則放 `utils`，元件只負責畫。新增到
+`src/utils/myCost.ts`：
+
+```ts
+export interface TripCost {
+  taskId: string;
+  name: string;
+  currency: string;
+  amount: number;
+}
+
+/** 只把成功的算進總計。失敗的不是 0，是「不知道」。 */
+export function totalsOf(ok: TripCost[]): CurrencyAmount[];
+
+/**
+ * 某個幣別底下各趟的佔比。照金額排序，第 4 名以後併成「其他」。
+ * 全部為 0 時回空陣列 —— 一條分母是 0 的長條沒有意義。
+ */
+export function sharesOf(
+  ok: TripCost[],
+  currency: string,
+  max?: number
+): Array<{ name: string; amount: number; ratio: number }>;
+```
+
+`loadCosts` 的職責縮到「發查詢、分成功與失敗兩堆」，怎麼加總、怎麼切佔比
+全部走這兩個純函式。
+
+### 3.2.3 要補的測試
+
+新增 `tests/myCost.test.ts` 的案例（該檔已存在，測 `myTripCost` 與 `sumByCurrency`）：
+
+- `totalsOf` 只加總傳進來的項目——失敗的沒傳進來就不會被算到
+- `totalsOf` 跨幣別分開列，順序照金額由大到小（沿用 `sumByCurrency` 的既有保證）
+- `sharesOf` 的 ratio 加起來是 1
+- `sharesOf` 超過 max 趟時，第 max 名以後併成一項「其他」，且併完 ratio 總和仍是 1
+- `sharesOf` 在該幣別總額為 0 時回空陣列，不產生除以零
+- `sharesOf` 只算指定幣別，其他幣別的項目不影響分母
+
+**這些測試是這次改版唯一測得到的東西**，見 §七。
 
 ## 四、TaskCard
 
@@ -315,11 +393,32 @@ hero 的佔比條需要在同一個色相裡分出三段，不引入新色相：
 
 ## 七、驗收
 
-- `npm run check` 與 `npm run build` 通過（`check-chunks.mjs` 也要過）
-- `npm test` 通過——這次不碰邏輯，既有測試應全綠，任何一個變紅都代表改錯了
+### 7.1 先承認測試套件看不到這次改版
+
+現有 35 個測試沒有一個碰得到 UI：全部 import 自 `@/utils/`（28）、`@/types/`（15）、
+`@/services/`（2），沒有 `@vue/test-utils`、沒有 jsdom，沒有任何測試 import `.vue`。
+`vite.config.js` 的 `include` 只收 `tests/**/*.test.ts`。
+
+所以「`npm test` 全綠」對這次改版**是零資訊的條件**——它抓不到任何樣式錯誤。
+唯一真的被測到的，是 §3.2.3 新增的那幾個純函式案例。其餘全靠型別檢查、
+build 與人工走查，這點要說清楚，不要拿一條看起來很安全的假條件自我安慰。
+
+### 7.2 自動
+
+- `npm run check`（`vue-tsc --noEmit`）通過
+- `npm run build` 通過，含 `scripts/check-chunks.mjs` 的 chunk 循環相依檢查
+- `npm test` 通過，且**新增的 `totalsOf` / `sharesOf` 案例確實存在並會失敗於錯誤實作**
+  ——先確認測試會紅，再讓它綠
 - 全站搜不到 `#a39a90`
 - 全站搜不到 `box-shadow: none`
 - 全站搜不到 `gap: 6px` 與 `gap: 10px`；`2px` 只以 `--space-text` 出現在那四處
 - `--color-soft` 沒有出現在任何 `color:` 宣告上（只在 `background`、`border`、圖示）
-- 手動走一遍：任務列表、任務頁三個頁籤、支出表單、支出明細、報告頁、個人設定
+- `TaskListPage` 裡搜不到 `?? 0`（§3.2.1 那個陷阱）
+
+### 7.3 人工
+
+- 走一遍：任務列表、任務頁三個頁籤、支出表單、支出明細、報告頁、個人設定
+- hero 五種狀態逐一看過。**部分失敗這個狀態要刻意製造**——暫時讓某個
+  `listExpenses` 丟錯，確認總額真的少了那一趟、佔比分母跟著變、而且畫面
+  明講是哪一趟沒讀到
 - 開系統的「減少動態」再走一遍，確認沒有任何東西在動
