@@ -1152,7 +1152,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **捲動容器是 document。** `AppLayout` 的 `.page` 只有 `min-height: 100vh`，沒有 `overflow`，所以 `sticky` 的參考是 viewport —— 這正是我們要的。`.stack` 是 flex column，`sticky` 在 flex item 上是有效的。
 
-- [ ] **Step 1: template 收尾改寫**
+- [x] **Step 1: template 收尾改寫**
 
 現在是：
 
@@ -1212,7 +1212,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 > **順序變了：送出列現在是 `.stack` 的最後一個孩子**，刪除與取消排在它前面。這是 `sticky bottom` 能運作的前提 —— 它必須在正常流的最後，才會在「還沒捲到它」的時候被拉到 viewport 底部。
 
-- [ ] **Step 2: 樣式**
+- [x] **Step 2: 樣式**
 
 加進 `<style scoped>`：
 
@@ -1243,7 +1243,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 >
 > **`margin` 的負值要跟 `.page` 的 padding 一致（`--space-6`）。** 如果之後 `.page` 的 padding 改了，這裡會露餡 —— 但那是 `styles.css` 的事，這次不動它。
 
-- [ ] **Step 3: 底部留白**
+- [x] **Step 3: 底部留白**
 
 最後一個欄位會被固定列蓋住，頁面底部要補足夠的空白。
 
@@ -1267,7 +1267,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 >
 > **不要偷懶用 `.stack`。**
 
-- [ ] **Step 4: 記錄 `ReceiptField` 的文案過時**
+- [x] **Step 4: 記錄 `ReceiptField` 的文案過時**
 
 `ReceiptField.vue` 第 105 行左右有一句：
 
@@ -1288,7 +1288,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 -->
 ```
 
-- [ ] **Step 5: 型別檢查與 build**
+- [x] **Step 5: 型別檢查與 build**
 
 ```bash
 npm run check
@@ -1297,7 +1297,7 @@ npm run build
 
 Expected: 都通過。
 
-- [ ] **Step 6: 手動驗證（必須用手機或裝置模擬）**
+- [x] **Step 6: 手動驗證（必須用手機或裝置模擬）**
 
 `npm run dev`，用瀏覽器的裝置模擬（或真的手機）開一筆新支出：
 
@@ -1311,7 +1311,7 @@ Expected: 都通過。
 
 > 第 7 項如果沒有 iOS 裝置就跳過，但**要在 commit 訊息裡說沒驗過**。選 sticky 的整個理由就是那個情境，宣稱驗過而其實沒驗，比誠實說沒驗更糟。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/pages/ExpenseFormPage.vue

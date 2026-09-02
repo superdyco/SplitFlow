@@ -464,7 +464,7 @@ onMounted(load);
 
 <template>
   <AppLayout>
-    <div class="stack">
+    <div class="stack form-page">
       <LoadingState v-if="loading" title="讀取中" message="正在讀取任務與成員資料。" />
 
       <AccessDenied v-else-if="taskState.denied.value" />
@@ -589,6 +589,11 @@ onMounted(load);
 
           <PlaceField :task-id="taskId" v-model="place" />
 
+          <!--
+            ReceiptField 的提示寫「要按下面的『新增支出』」。送出鈕現在固定在
+            畫面底部而不是捲動流的下面 —— 那句話還算對（它就在下方），但措辭是
+            為了舊版面寫的。改它要看它的其他使用者，是獨立的一件事，不塞進這次。
+          -->
           <ReceiptField
             :preview-url="receiptState.previewUrl.value"
             :state="receiptState.state.value"
@@ -725,11 +730,14 @@ onMounted(load);
           </div>
         </div>
 
-        <ErrorState :message="error" />
+        <!--
+          刪除與取消留在捲動流裡，不進固定列。93be088 動的正是這個檔案：
+          手機上系統對話框的 OK 落在哪不是我們能決定的，而它傾向落在拇指下 ——
+          螢幕底部那一條就是拇指的定位點，不可逆的操作不該常駐在那裡。
 
-        <button class="btn btn-primary btn-block" :disabled="saving || !canSubmit" @click="submit">
-          {{ saving ? "儲存中..." : isEdit ? "儲存變更" : "新增支出" }}
-        </button>
+          附帶好處：刪除需要刻意捲下去才找得到，那正是它應得的摩擦。
+          取消也留著 —— 它是「放棄剛打的東西」，而返回鍵本來就能離開。
+        -->
         <button
           v-if="isEdit"
           class="btn btn-danger btn-block"
@@ -739,6 +747,24 @@ onMounted(load);
           {{ removing ? "刪除中..." : "刪除支出" }}
         </button>
         <button class="btn btn-block" @click="router.push(`/tasks/${taskId}`)">取消</button>
+
+        <!--
+          送出鈕固定在畫面底部，錯誤訊息跟著進去 —— 不然送出失敗時使用者停在
+          表單上方，訊息印在捲動流的底部，他會按了送出、什麼都沒發生、也不知道
+          為什麼。
+
+          用 sticky 不用 fixed：這一頁到處是文字輸入框，而 iOS Safari 的虛擬
+          鍵盤跳出來時 fixed 元素的行為不可靠 —— 可能被鍵盤蓋住、也可能浮在
+          鍵盤上方擋住正在打字的欄位。sticky 黏在捲動容器內，跟著內容走。
+
+          它必須是捲動流的最後一個元素，sticky bottom 才有東西可黏。
+        -->
+        <div class="submit-bar">
+          <ErrorState :message="error" />
+          <button class="btn btn-primary btn-block" :disabled="saving || !canSubmit" @click="submit">
+            {{ saving ? "儲存中..." : isEdit ? "儲存變更" : "新增支出" }}
+          </button>
+        </div>
       </template>
 
       <ReceiptViewer
@@ -761,6 +787,43 @@ onMounted(load);
 </template>
 
 <style scoped>
+/*
+  固定送出列。sticky 而不是 fixed 的理由見 template 的註解。
+
+  bottom 是負的 --space-6：AppLayout 的 .page 有 24px 的 padding，sticky
+  貼在 viewport 底部時那 24px 會露出頁面背景，看起來像卡在半空中。往下
+  拉滿讓它真的貼底，再用自己的 padding 把按鈕推回原位。左右的負 margin
+  同理 —— 兩個值都跟 .page 的 padding 綁在一起，改一邊就要改另一邊。
+
+  背景不能透明：下面的欄位會直接穿過去。
+
+  z-index 刻意比 PlaceField 的 .suggestions（5）低。建議清單是使用者正在
+  互動的東西，它蓋過送出列是對的；反過來的話，地點在卡 2 底部時清單會被
+  送出列切掉。
+*/
+.submit-bar {
+  position: sticky;
+  bottom: calc(var(--space-6) * -1);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 calc(var(--space-6) * -1);
+  padding: var(--space-3) var(--space-6) var(--space-6);
+  background: var(--color-bg);
+}
+
+/*
+  固定列會蓋住捲動流的最後一段，所以頁面底部要補足夠的空白 ——
+  不然「取消」按鈕永遠有一半藏在送出鈕下面。
+
+  用 .form-page 不用 .stack：scoped 的 .stack 會連三張 card stack 與
+  custom-list 一起命中，卡片內部也被加上 32px 的下方留白，那是錯的。
+*/
+.form-page {
+  padding-bottom: var(--space-8);
+}
+
 /*
   卡片的小標。用 --text-card 而不是 --text-section：這是卡片標題不是頁面
   區段，而 --text-card 正是為了「太大」與「跟內文一樣」之間那一格才加的。
