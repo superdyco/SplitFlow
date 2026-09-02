@@ -192,7 +192,7 @@ export function parseMapMode(raw: unknown, view: TaskView): boolean {
 npm test -- taskView
 ```
 
-Expected: PASS，10 個案例全綠。
+Expected: PASS，7 個案例全綠。
 
 - [ ] **Step 5: 型別檢查**
 
@@ -1392,7 +1392,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 npm run check && npm run build && npm test
 ```
 
-Expected: 三者皆通過。測試數應該比動工前多 19（Task 1 的 10 個 + Task 2 的 9 個）。
+Expected: 三者皆通過。測試數應該比動工前多 16（Task 1 的 7 個 + Task 2 的 9 個）。
 
 - [ ] **Step 2: 掃描**
 
