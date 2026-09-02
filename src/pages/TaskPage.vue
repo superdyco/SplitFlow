@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import { memberDisplayName } from "@/utils/memberName";
+import { parseMapMode, parseTaskView, type TaskView } from "@/utils/taskView";
+import SettlementSummary from "@/components/settlement/SettlementSummary.vue";
 import AccessDenied from "@/components/common/AccessDenied.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
@@ -46,14 +48,66 @@ import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import PromptDialog from "@/components/common/PromptDialog.vue";
 import { isInstalledApp } from "@/utils/platform";
 
-type Tab = "expenses" | "members" | "settlement";
+// 檢視狀態的型別現在來自 utils/taskView —— 解析規則跟型別住在一起。
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const uid = authStore.user!.uid;
 const taskId = computed(() => String(route.params.taskId || ""));
-const activeTab = ref<Tab>("expenses");
+/*
+  檢視狀態住在網址而不是本地 ref。原本重整一定跳回支出、沒辦法把「成員」
+  的連結傳給人、返回鍵在任何頁籤上都直接離開任務頁。
+*/
+const view = computed(() => parseTaskView(route.query.view));
+const mapMode = computed(() => parseMapMode(route.query.map, view.value));
+
+/**
+ * 摘要卡的「完整結算」連到這裡。RouterLink 預設是 push，正合適 ——
+ * 次頁就該用返回鍵回得來。
+ *
+ * 順手丟掉 map：地圖只屬於支出清單，帶到結算的網址上只是雜訊。
+ */
+const settlementTo = computed(() => {
+  const query: LocationQueryRaw = { ...route.query, view: "settlement" };
+  delete query.map;
+  return { query };
+});
+
+/** 結算次頁的返回目的地。保留 denied 之類的其他 query，只拿掉 view 與 map。 */
+const backQuery = computed(() => {
+  const query: LocationQueryRaw = { ...route.query };
+  delete query.view;
+  delete query.map;
+  return query;
+});
+
+/*
+  頁籤一律用 replace。
+
+  它是同層級切換，不是「去了別的地方」—— 用 push 的話，逛過三個頁籤之後
+  要按四次返回才離得開任務頁。replace 維持今天的返回語意（按返回離開任務
+  頁），只是多了可重整、可傳連結。
+
+  進出結算不走這裡：進去是摘要卡的 RouterLink（push），出來是次頁的返回列
+  （replace）。頁籤在結算次頁是隱藏的，所以這個函式永遠不會收到 settlement。
+*/
+function goView(next: TaskView) {
+  const query: LocationQueryRaw = { ...route.query };
+  // 換檢視就丟掉地圖模式 —— 它只屬於支出清單。
+  delete query.map;
+  // 預設值不寫進網址：分享出去的連結不該多一段沒有資訊的雜訊。
+  if (next === "expenses") delete query.view;
+  else query.view = next;
+  router.replace({ query });
+}
+
+function goMap(on: boolean) {
+  const query: LocationQueryRaw = { ...route.query };
+  if (on) query.map = "1";
+  else delete query.map;
+  router.replace({ query });
+}
 const copied = ref(false);
 const denied = computed(() => route.query.denied === "1");
 const actionError = ref<string | null>(null);
@@ -156,7 +210,6 @@ const loadError = computed(() => {
   return null;
 });
 
-const expenseView = ref<"list" | "map">("list");
 const mapAvailable = mapsEnabled();
 
 /** 只有帶座標的支出畫得上地圖，純文字地點與沒填地點的不算。 */
@@ -472,6 +525,20 @@ onMounted(async () => {
           </button>
         </div>
 
+        <!--
+          「我還要付誰多少」是這個 app 存在的理由，原本要切到第三個頁籤才看得到。
+
+          資料還沒到時整張卡不出現，不畫骨架 —— 頁面層級已經有 LoadingState，
+          再疊一個骨架等於同一件事說兩次。結算次頁不顯示它：完整面板已經涵蓋。
+        -->
+        <SettlementSummary
+          v-if="view !== 'settlement' && !expenseState.loading.value"
+          :settlement="settlement"
+          :uid="uid"
+          :member-names="memberNames"
+          :settlement-to="settlementTo"
+        />
+
         <p v-if="isArchived" class="card tiny archived-banner">
           這個任務已封存，目前唯讀。到「我的分帳」解除封存後才能繼續記帳。
         </p>
@@ -572,35 +639,44 @@ onMounted(async () => {
           </p>
         </section>
 
-        <div class="tabs">
-          <button class="tab" :class="{ active: activeTab === 'expenses' }" @click="activeTab = 'expenses'">支出</button>
-          <button class="tab" :class="{ active: activeTab === 'members' }" @click="activeTab = 'members'">成員</button>
-          <button class="tab" :class="{ active: activeTab === 'settlement' }" @click="activeTab = 'settlement'">結算</button>
+        <!-- 結算已經是次頁，不再是同層級的頁籤。 -->
+        <div v-if="view !== 'settlement'" class="tabs two">
+          <button class="tab" :class="{ active: view === 'expenses' }" @click="goView('expenses')">
+            支出
+          </button>
+          <button class="tab" :class="{ active: view === 'members' }" @click="goView('members')">
+            成員
+          </button>
         </div>
 
         <ErrorState :message="loadError" />
 
-        <section v-if="activeTab === 'expenses'" class="stack">
+        <section v-if="view === 'expenses'" class="stack">
           <LoadingState v-if="expenseState.loading.value" title="讀取支出中" message="正在讀取 Firestore 支出資料。" />
           <template v-else>
-            <RouterLink
-              v-if="!isArchived"
-              :to="`/tasks/${taskId}/expenses/new`"
-              class="btn btn-primary btn-block"
-            >
-              新增支出
-            </RouterLink>
-
-            <div v-if="mapAvailable && expenseMarkers.length" class="tabs two">
-              <button class="tab" :class="{ active: expenseView === 'list' }" @click="expenseView = 'list'">
-                清單
-              </button>
-              <button class="tab" :class="{ active: expenseView === 'map' }" @click="expenseView = 'map'">
-                地圖（{{ expenseMarkers.length }}）
-              </button>
+            <!--
+              「新增支出」與檢視切換同一列。原本檢視切換是第二排頁籤，跟上面
+              那排長得一模一樣，只能靠位置分辨哪一排是主層級。
+            -->
+            <div class="actbar">
+              <RouterLink
+                v-if="!isArchived"
+                :to="`/tasks/${taskId}/expenses/new`"
+                class="btn btn-primary grow-btn"
+              >
+                新增支出
+              </RouterLink>
+              <div v-if="mapAvailable && expenseMarkers.length" class="seg">
+                <button class="seg-item" :class="{ active: !mapMode }" @click="goMap(false)">
+                  清單
+                </button>
+                <button class="seg-item" :class="{ active: mapMode }" @click="goMap(true)">
+                  地圖 {{ expenseMarkers.length }}
+                </button>
+              </div>
             </div>
 
-            <template v-if="expenseView === 'map'">
+            <template v-if="mapMode">
               <PlaceMap :markers="expenseMarkers" height="360px" />
               <p class="tiny">
                 只顯示有座標的支出。從地點搜尋清單選出來的才會有座標，自己打字的沒有。
@@ -636,7 +712,7 @@ onMounted(async () => {
           </template>
         </section>
 
-        <section v-if="activeTab === 'members'" class="stack">
+        <section v-if="view === 'members'" class="stack">
           <LoadingState v-if="memberState.loading.value" title="讀取成員中" message="正在讀取 Firestore 成員資料。" />
           <template v-else>
             <p v-if="taskState.isAdmin.value" class="tiny">
@@ -689,7 +765,18 @@ onMounted(async () => {
           />
         </section>
 
-        <section v-if="activeTab === 'settlement'" class="stack">
+        <section v-if="view === 'settlement'" class="stack">
+          <!--
+            返回用 RouterLink 而不是 button：中鍵開新分頁、長按選單、「複製連結
+            網址」都會是瀏覽器原生行為。這一頁的「開啟」按鈕已經寫過同一個理由。
+
+            replace 是必要的：進來時是 push，歷史是「支出→結算」。返回列如果也
+            push，會變成「支出→結算→支出」，使用者按返回反而回到結算 —— 跟他
+            剛按下「回到支出」的意圖正好相反。
+          -->
+          <RouterLink :to="{ query: backQuery }" replace class="btn-quiet back">
+            ← 回到支出
+          </RouterLink>
           <LoadingState v-if="expenseState.loading.value" title="讀取支出中" message="結算會依最新支出重新計算。" />
           <EmptyState
             v-else-if="expenseState.isEmpty.value"
@@ -763,6 +850,23 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* 主要動作與檢視切換同一列 —— 原本檢視切換自成一排，跟頂層頁籤撞在一起。 */
+.actbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* 主要動作吃掉剩餘寬度，切換靠右且不被壓縮。 */
+.grow-btn {
+  flex: 1;
+}
+
+.back {
+  align-self: flex-start;
+  font-size: var(--text-body);
+}
+
 /* 標題本身就是按鈕，但看起來要跟原本的標題一模一樣。 */
 .title-reload {
   display: block;
