@@ -238,9 +238,10 @@ export function shouldSearchPlace(query: string): boolean;
 
 - `src/pages/ExpenseFormPage.vue` — 三張卡、固定送出列、`.seg`、匯率壓行、
   刪死碼、改用 `PlaceField`
-只有 `ExpenseFormPage.vue` 這一個檔案。固定送出列的樣式留在它的
-`<style scoped>` 裡，**不進 `styles.css`** —— 全專案只有這一頁有這種東西，
-提前共用化只會多一個沒有第二個使用者的類別。真的出現第二頁再說。
+
+**只有這一個檔案要改。** 固定送出列的樣式留在它的 `<style scoped>` 裡，
+**不進 `styles.css`** —— 全專案只有這一頁有固定送出列，提前共用化只會多一個
+沒有第二個使用者的類別。真的出現第二頁再說。
 
 ## 七、驗收
 
