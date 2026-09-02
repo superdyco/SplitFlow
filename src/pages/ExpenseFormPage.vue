@@ -824,18 +824,6 @@ onMounted(load);
   padding-bottom: var(--space-8);
 }
 
-/*
-  卡片的小標。用 --text-card 而不是 --text-section：這是卡片標題不是頁面
-  區段，而 --text-card 正是為了「太大」與「跟內文一樣」之間那一格才加的。
-
-  卡 1 沒有小標，那是刻意的 —— 它是主角，不需要一個標題來宣告自己是主角。
-*/
-.card-head {
-  margin: 0;
-  font-size: var(--text-card);
-  font-weight: 800;
-}
-
 .grow {
   flex: 1;
   min-width: 0;

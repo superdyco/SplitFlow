@@ -260,6 +260,22 @@ a {
   font-weight: 900;
 }
 
+/*
+  卡片內的小標，比 .section-title 輕一級。
+
+  用 --text-card 而不是 --text-section：那是卡片標題不是頁面區段，
+  而 --text-card 正是為了「太大」與「跟內文一樣」之間那一格才加的。
+
+  本來寫在 ExpenseFormPage 的 scoped 樣式裡，理由是「只有一頁有，
+  提前共用化只會多一個沒有第二個使用者的類別」。ProfilePage 是第二個，
+  所以照當初說好的搬上來。
+*/
+.card-head {
+  margin: 0;
+  font-size: var(--text-card);
+  font-weight: 800;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
