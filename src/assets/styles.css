@@ -150,7 +150,7 @@ a {
   align-items: center;
   justify-content: center;
   flex: none;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--color-primary);
   color: #fff;
   font-weight: 900;
@@ -164,7 +164,7 @@ a {
 .brand-logo {
   width: 38px;
   height: 38px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   object-fit: cover;
 }
 
@@ -381,7 +381,7 @@ a {
 
 .btn-sm {
   min-height: 36px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 0 12px;
   font-size: 13px;
 }
@@ -408,7 +408,7 @@ a {
   width: 100%;
   min-height: 52px;
   border: 1px solid var(--color-line);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-ink);
   padding: 0 14px;
@@ -473,13 +473,13 @@ a {
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   padding: 4px;
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   background: #f0ebe4;
 }
 
 .tab {
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: transparent;
   min-height: 38px;
   color: var(--color-muted);
@@ -493,7 +493,7 @@ a {
 
 .empty {
   border: 1px dashed var(--color-line-strong);
-  border-radius: 22px;
+  border-radius: var(--radius-xl);
   padding: 32px 18px;
   text-align: center;
 }
@@ -502,7 +502,7 @@ a {
   border: 1px solid #f3d2ce;
   background: #fff5f5;
   color: var(--color-danger);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   padding: 12px 14px;
   font-size: 13px;
   line-height: 1.6;

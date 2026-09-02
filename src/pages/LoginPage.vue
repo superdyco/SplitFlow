@@ -54,7 +54,7 @@ async function login(provider: SignInProvider) {
 .logo {
   width: 64px;
   height: 64px;
-  border-radius: 22px;
+  border-radius: var(--radius-xl);
   object-fit: cover;
 }
 </style>

@@ -298,7 +298,7 @@ async function exportData() {
   width: 100%;
   margin: 0;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--color-line);
   background: var(--color-surface);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

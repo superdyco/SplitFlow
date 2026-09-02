@@ -143,7 +143,7 @@ const isArchived = computed(() => props.task.status === "archived");
 .action {
   padding: 5px 12px;
   border: 1px solid var(--color-line-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   color: var(--color-muted);
   font-size: 12px;
@@ -189,7 +189,7 @@ const isArchived = computed(() => props.task.status === "archived");
 
 .task-meta span,
 .role-pill {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-primary-soft);
   color: var(--color-primary-dark);
   padding: 6px 10px;

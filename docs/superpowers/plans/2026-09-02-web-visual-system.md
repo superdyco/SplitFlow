@@ -671,7 +671,8 @@ grep -rn "gap: 6px\|gap: 10px" src/
 Expected: 沒有任何輸出。
 
 ```bash
-grep -rn "border-radius: \(8\|12\|16\|20\|22\|999\)px" src/
+# 50% 是圓形（頭像、spinner），不是圓角，本來就該留。
+grep -rnE "border-radius: [0-9]+px" src/
 ```
 
 Expected: 沒有任何輸出。

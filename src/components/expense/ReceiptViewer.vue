@@ -35,13 +35,13 @@ const emit = defineEmits<{ (e: "close"): void }>();
   /* 留空間給關閉鈕，也避免在 iOS 上被瀏覽器列切到。 */
   max-height: 80vh;
   object-fit: contain;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
 }
 
 .close {
   padding: 10px 24px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-surface);
   color: var(--color-text);
   font-weight: 700;

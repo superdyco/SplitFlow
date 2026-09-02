@@ -112,7 +112,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .map-wrap {
   position: relative;
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--color-line);
 }

@@ -371,7 +371,7 @@ function copySettlement() {
 .draft {
   margin-top: 10px;
   padding: 12px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
 }
 

@@ -163,7 +163,7 @@ function copySnapshot(snapshot: SettlementSnapshot) {
 <style scoped>
 .draft {
   padding: 12px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
 }
 

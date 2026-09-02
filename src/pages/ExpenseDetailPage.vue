@@ -233,7 +233,7 @@ onMounted(load);
   justify-content: center;
   width: 56px;
   height: 56px;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background: var(--color-primary-soft);
   font-size: 26px;
 }
@@ -268,7 +268,7 @@ onMounted(load);
 .receipt {
   padding: 0;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: none;
   cursor: pointer;
 }
@@ -276,6 +276,6 @@ onMounted(load);
 .receipt img {
   display: block;
   width: 100%;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
 }
 </style>

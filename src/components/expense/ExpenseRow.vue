@@ -105,7 +105,7 @@ const missingRate = computed(
   flex: none;
   width: 42px;
   height: 42px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--color-primary-soft);
   font-size: 20px;
 }
@@ -159,7 +159,7 @@ const missingRate = computed(
   margin-top: 6px;
   padding: 3px 10px;
   border: 1px solid var(--color-line-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   color: var(--color-muted);
   cursor: pointer;

@@ -372,7 +372,7 @@ onMounted(load);
   inset: 0;
   width: 100%;
   height: 100%;
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-line);
 }
 
