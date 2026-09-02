@@ -120,7 +120,7 @@ const TextStyle figureStyle;   // 金額用的等寬數字
 - Consumes: `AppColors`（`lib/ui/theme.dart`）
 - Produces: `contrastRatio(Color a, Color b)` — 測試檔內部的輔助函式，不匯出到 lib
 
-- [ ] **Step 1: 寫測試**
+- [x] **Step 1: 寫測試**
 
 建立 `flutter_app/test/theme_contrast_test.dart`：
 
@@ -231,7 +231,7 @@ void main() {
 > 不是 0..255 的 int**。上面的 `_luminance` 已經照新 API 寫。如果 analyze
 > 對這幾行有意見，看它要的是哪一種，**不要兩種混用**。
 
-- [ ] **Step 2: 跑測試，確認紅的是顏色不是編譯**
+- [x] **Step 2: 跑測試，確認紅的是顏色不是編譯**
 
 ```powershell
 $env:PATH = "C:\dev\flutter\bin;$env:PATH"
@@ -239,15 +239,25 @@ cd D:\project\SplitFlow\flutter_app
 flutter test test/theme_contrast_test.dart
 ```
 
-Expected: **「muted 對頁面底色」與「muted 對卡片白底」兩條失敗**，訊息類似
-`Expected: a value greater than or equal to <4.5> Actual: <3.4...>`。
+Expected: **四條失敗**（實測結果，2026-09-03）：
 
-其餘應該綠。**如果紅的是編譯錯誤，那是 `Color` API 的問題，先解決它 ——
+| 失敗的斷言 | 實際值 |
+|---|---|
+| muted 對頁面底色 | 3.39 |
+| muted 對卡片白底 | 3.86 |
+| soft 過得了 3:1 | 2.43 |
+| **danger 對頁面底色** | **4.10** |
+
+前三條 Step 3 改完就綠。**第四條是計畫沒料到的**：`danger` 對頁面底色
+過不了，而網頁版用同一個值。處理方式見 spec §4.1 —— 斷言改成只守白底，
+並把「錯誤文字只能放在白底上」寫成規則，那決定了 Task 4 的固定列背景。
+
+**如果紅的是編譯錯誤，那是 `Color` API 的問題，先解決它 ——
 那不是這一步要看的紅。**
 
 **這兩條紅就是這個計畫存在的理由。** 看到數字再往下走。
 
-- [ ] **Step 3: 灰階整條往下移一階**
+- [x] **Step 3: 灰階整條往下移一階**
 
 改 `lib/ui/theme.dart`（**這個檔案是 CRLF**）：
 
@@ -272,7 +282,7 @@ Expected: **「muted 對頁面底色」與「muted 對卡片白底」兩條失�
   static const soft = Color(0xFF8A8078); // 3.4:1。過得了非文字的 3:1，過不了文字的 4.5:1。
 ```
 
-- [ ] **Step 4: 跑測試確認全綠**
+- [x] **Step 4: 跑測試確認全綠**
 
 ```powershell
 flutter test test/theme_contrast_test.dart
@@ -280,7 +290,7 @@ flutter test test/theme_contrast_test.dart
 
 Expected: PASS，11 個案例全綠。
 
-- [ ] **Step 5: 全套測試與 analyze**
+- [x] **Step 5: 全套測試與 analyze**
 
 ```powershell
 flutter test
@@ -290,7 +300,7 @@ flutter analyze
 Expected: `flutter test` 是 380 + 11 = **391 passed**。
 `flutter analyze` 仍然是 **1 issue**（那個既有的 deprecated）。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add flutter_app/test/theme_contrast_test.dart flutter_app/lib/ui/theme.dart
@@ -791,11 +801,15 @@ under the thumb*）講的就是手機：系統對話框「OK 落在哪不是我�
 
         SafeArea 是必要的（iPhone 底部那條橫槓），背景色也是 ——
         預設透明的話下面的欄位會直接穿過去。
+
+        背景用 card（白）不用 bg：錯誤訊息印在這一列上，而 danger 對頁面
+        底色只有 4.10:1、對白底才有 4.66:1。這是 Task 1 的對比度測試逼出來
+        的結論，不是配色偏好。
       */
       bottomNavigationBar: task == null || blocked
           ? null
           : Container(
-              color: AppColors.bg,
+              color: AppColors.card,
               child: SafeArea(
                 minimum: const EdgeInsets.fromLTRB(
                     AppSpace.x4, AppSpace.x2, AppSpace.x4, AppSpace.x2),

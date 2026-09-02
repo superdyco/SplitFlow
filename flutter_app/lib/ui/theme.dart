@@ -12,8 +12,17 @@ abstract final class AppColors {
   static const surface = Color(0xFFFBFAF8);
   static const card = Color(0xFFFFFFFF);
   static const ink = Color(0xFF1A1613);
-  static const muted = Color(0xFF8A8078);
-  static const soft = Color(0xFFA39A90);
+  /*
+    灰階整條往下移一階，跟網頁版同一個做法。
+
+    舊的 muted (#8A8078) 對頁面底色只有 3.4:1，而 textTheme.bodySmall 正是
+    用它印日期、成員數與所有提示 —— 那是內文，不是裝飾，門檻是 4.5:1。
+
+    做法不是加新顏色，是把每一階都調深：舊的 soft 退役，舊的 muted 變成
+    新的 soft。階數與色相都不變，只是每一階都看得見。
+  */
+  static const muted = Color(0xFF6F665E); // 4.9:1 on bg。所有次要文字。
+  static const soft = Color(0xFF8A8078); // 3.4:1。過得了非文字的 3:1，過不了文字的 4.5:1。
   static const line = Color(0xFFEDE7E0);
   static const lineStrong = Color(0xFFE2DCD4);
   static const primary = Color(0xFFE8590C);
