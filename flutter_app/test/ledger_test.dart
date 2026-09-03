@@ -16,14 +16,21 @@ void main() {
     );
   }
 
-  testWidgets('位數不同的金額，左緣還是同一條線 —— 這就是「對齊成一欄」', (tester) async {
+  testWidgets('金額欄每一列一樣寬、起點一樣 —— 這就是「對齊成一欄」', (tester) async {
     /*
-      變數必須是**金額的位數**，不是標題長度。標題包在 Expanded 裡，
-      它多長都不會推到金額 —— 拿標題當變數的話，這條測試無論金額欄有沒有
-      固定寬度都會綠，也就是什麼都沒測到。
+      量的是**欄位**，不是欄位裡的字。這一條踩過兩個坑，都寫下來：
 
-      三位數對五位數才分得出來：沒有固定寬度時 '640' 比 '1,250' 窄，
-      它的左緣就會往右跑。
+      量文字的左緣沒有用。金額右對齊，所以「1,250」與「640」的左緣本來就
+      差一個字寬 —— 這條測試原本就是這樣寫的，它一度會過，只因為那時金額
+      是唯一的子項、剛好被撐滿整個盒子。後來欄位下面多了一行幣別，變成
+      Column（子項各自縮到內容寬度），左緣就再也對不齊了。畫面沒壞，
+      是測試量錯了東西 —— 而它從來沒被執行過，所以沒人發現。
+
+      量文字的右緣也沒有用。就算把 amountWidth 拿掉，那一欄還是會被
+      Expanded 擠到最右邊，右緣照樣對齊 —— 那條測試永遠是綠的。
+
+      固定寬度真正買到的是「標題與金額的分界每一列都在同一個 x」，
+      所以要量的就是那一欄的左緣與寬度。
     */
     await tester.pumpWidget(
       wrap(
@@ -36,10 +43,15 @@ void main() {
       ),
     );
 
-    final wide = tester.getTopLeft(find.text('1,250'));
-    final narrow = tester.getTopLeft(find.text('640'));
+    final slots = find.byKey(LedgerRow.amountKey);
+    expect(slots, findsNWidgets(2));
 
-    expect(narrow.dx, closeTo(wide.dx, 0.01));
+    final first = tester.getRect(slots.at(0));
+    final second = tester.getRect(slots.at(1));
+
+    expect(second.left, closeTo(first.left, 0.01));
+    expect(first.width, LedgerRow.amountWidth);
+    expect(second.width, LedgerRow.amountWidth);
   });
 
   testWidgets('金額用等寬數字', (tester) async {

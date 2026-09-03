@@ -99,6 +99,13 @@ class LedgerRow extends StatelessWidget {
   /// 金額欄的固定寬度。夠放到七位數（`999,999`）。
   static const amountWidth = 76.0;
 
+  /// 給測試抓金額欄用。
+  ///
+  /// 量文字的位置量不到這件事：金額右對齊，所以位數不同的兩個字串左緣本來
+  /// 就不一樣，而右緣就算沒有固定寬度也會對齊（它被 Expanded 擠到最右邊）。
+  /// 要驗的是**這一欄本身每列一樣寬、起點一樣**，所以要抓得到它。
+  static const amountKey = Key('ledger-amount');
+
   /// 有圖示時，分隔線該縮到的位置 —— 圖示的右緣。
   static const iconIndent = 44.0;
 
@@ -165,6 +172,7 @@ class LedgerRow extends StatelessWidget {
           ),
           if (amount != null)
             SizedBox(
+              key: amountKey,
               width: amountWidth,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
