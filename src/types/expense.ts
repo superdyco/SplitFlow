@@ -1,4 +1,5 @@
 import type { Timestamp } from "firebase/firestore";
+import type { ExpenseWeather } from "@/types/weather";
 
 export type ExpenseCategory = "food" | "transport" | "stay" | "ticket" | "shopping" | "other";
 
@@ -73,6 +74,11 @@ export interface Expense {
   splits: Record<string, number>;
   /** 選填，沒填就是 null。 */
   place: ExpensePlace | null;
+  /**
+   * 那天那個地點的天氣。**選填**：地點沒有座標、API 查不到、或離線記帳
+   * 還沒被觸發器補寫時都是 null。缺席是正常狀態，不是錯誤。
+   */
+  weather?: ExpenseWeather | null;
   /** 收據照片，選填。這個功能之前建立的舊資料是 null。 */
   receipt: ExpenseReceipt | null;
   /**
