@@ -14,6 +14,9 @@ import { useTaskMembers } from "@/composables/useTaskMembers";
 import { createExpense, deleteExpense, getExpense, updateExpense } from "@/services/expenseService";
 import { getRate } from "@/services/rateService";
 import PlaceField from "@/components/expense/PlaceField.vue";
+import WeatherChip from "@/components/expense/WeatherChip.vue";
+import { lookupWeather } from "@/services/weatherService";
+import type { ExpenseWeather } from "@/types/weather";
 import {
   CURRENCIES,
   allocate,
@@ -104,6 +107,49 @@ const rateError = ref<string | null>(null);
 
 /** 這筆支出的地點。搜尋、定位、地圖全在 PlaceField 裡，這裡只收結果。 */
 const place = ref<ExpensePlace | null>(null);
+
+const weather = ref<ExpenseWeather | null>(null);
+const weatherLoading = ref(false);
+
+/**
+ * 載入既有支出時，不要因為填入欄位就去重查天氣。
+ *
+ * 沒有這個守衛的話：編輯一筆舊支出 → 填入 place/date 觸發 watch → 那時如果
+ * 離線，查詢回 null → weather 被清空 → 只是改個備註，卻把它本來就有的天氣
+ * 洗掉了。使用者不會知道發生過這件事。
+ *
+ * watch 對同一個 tick 裡的多個變更只會觸發一次，所以一個旗標就夠。
+ */
+let skipWeatherLookup = false;
+
+/**
+ * 地點與日期都有了就查天氣。
+ *
+ * **改了任一個就重查，查不到就清空。** 停在那裡的舊天氣是「三月三號清邁的雨」
+ * 配上「三月五號曼谷的晚餐」，而畫面上看不出來 —— 跟未換算支出同一個立場：
+ * 寧可沒有，不要錯的。
+ *
+ * 先清空再查，所以查詢中畫面上不會是上一次的結果。
+ */
+watch([place, date, time], async () => {
+  if (skipWeatherLookup) {
+    skipWeatherLookup = false;
+    return;
+  }
+
+  // 先清空再查：**改了就重查，查不到就清空。** 停在那裡的舊天氣是
+  // 「三月三號清邁的雨」配上「三月五號曼谷的晚餐」，而畫面上看不出來 ——
+  // 跟未換算支出同一個立場：寧可沒有，不要錯的。
+  weather.value = null;
+  if (!place.value || place.value.lat === null || !date.value) return;
+
+  weatherLoading.value = true;
+  try {
+    weather.value = await lookupWeather(place.value, date.value, time.value);
+  } finally {
+    weatherLoading.value = false;
+  }
+});
 
 const baseCurrency = computed(() => taskState.task.value?.defaultCurrency || "TWD");
 const needsRate = computed(() => currency.value !== baseCurrency.value);
@@ -296,7 +342,10 @@ async function load() {
         amountToInput(value, expense.currency)
       ])
     );
+    // 這一批填入不該觸發重查，見 skipWeatherLookup 的說明。
+    skipWeatherLookup = true;
     place.value = expense.place;
+    weather.value = expense.weather ?? null;
     // 「編輯時用這筆支出的座標當搜尋偏好」搬進 PlaceField 了 ——
     // 它從初始值自己推得出來，母元件不必知道有位置偏好這件事。
     // 舊支出沒存日期，帶出 createdAt 換算的那天當預設，存回去就補上了。
@@ -375,6 +424,7 @@ async function submit() {
       splitMode: splitMode.value,
       splits,
       place: place.value,
+      weather: weather.value,
       // 先寫既有的值；新選的照片要等下面拿到 id 之後才處理。
       receipt: receiptState.receipt.value,
       note: note.value.trim(),
@@ -588,6 +638,12 @@ onMounted(load);
           </div>
 
           <PlaceField :task-id="taskId" v-model="place" />
+          <!--
+            天氣是加分不是必要：查不到就整段不出現，沒有錯誤訊息。
+            使用者正在記一筆帳，那才是他來這一頁的目的。
+          -->
+          <p v-if="weatherLoading" class="tiny">查天氣中...</p>
+          <p v-else-if="weather" class="tiny"><WeatherChip :weather="weather" /></p>
 
           <!--
             ReceiptField 的提示寫「要按下面的『新增支出』」。送出鈕現在固定在

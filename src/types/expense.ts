@@ -125,4 +125,9 @@ export interface ExpenseInput {
   note: string;
   date: string;
   time: string;
+  /**
+   * 表單預覽拿到的天氣。查不到就是 null —— 那時 `onExpenseWeather` 會在
+   * 文件建立後補寫，所以離線記的帳最後還是會有。
+   */
+  weather: ExpenseWeather | null;
 }
