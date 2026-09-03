@@ -57,6 +57,7 @@ Expense expenseFromMap(
     time: _nonEmpty(data['time']),
     createdAt: createdAt,
     place: _placeFrom(data['place']),
+    weather: weatherFrom(data['weather']),
     receipt: _receiptFrom(data['receipt']),
     createdBy: (data['createdBy'] as String?) ?? '',
     note: (data['note'] as String?) ?? '',
@@ -171,6 +172,29 @@ Payment paymentFromMap(String id, Map<String, dynamic> data) {
     // 認不得的狀態當成 pending —— 未確認的付款不影響餘額，
     // 猜錯的方向是「少扣」而不是「多扣」。
     status: data['status'] == 'confirmed' ? 'confirmed' : 'pending',
+  );
+}
+
+/// 天氣欄位。比照 _placeFrom：形狀不對就整個回 null，不丟例外。
+///
+/// 天氣是裝飾欄位，一筆支出不該因為它壞掉就整筆讀不出來。
+///
+/// 公開而不是私有，因為 report_mappers.dart 讀報告的時間軸時要用同一份。
+/// 兩份一樣的解析遲早會分岔，而分岔的症狀是同一個天氣在兩個畫面不一樣。
+Weather? weatherFrom(dynamic value) {
+  if (value is! Map) return null;
+
+  final code = (value['code'] as num?)?.toInt();
+  final high = (value['high'] as num?)?.toInt();
+  final low = (value['low'] as num?)?.toInt();
+  if (code == null || high == null || low == null) return null;
+
+  return Weather(
+    code: code,
+    high: high,
+    low: low,
+    // exact 沒有是正常的 —— 那代表這筆支出沒填時間。
+    exact: (value['exact'] as num?)?.toInt(),
   );
 }
 

@@ -13,6 +13,7 @@ import '../data/receipt_picker.dart';
 import '../data/receipt_repository.dart';
 import '../data/report_repository.dart';
 import '../data/task_repository.dart';
+import '../data/weather_repository.dart';
 import '../domain/favorites.dart';
 import '../domain/models.dart';
 import '../domain/report.dart';
@@ -32,6 +33,7 @@ final userRepositoryProvider = Provider((ref) => UserRepository());
 final taskRepositoryProvider = Provider((ref) => TaskRepository());
 final expenseRepositoryProvider = Provider((ref) => ExpenseRepository());
 final paymentRepositoryProvider = Provider((ref) => PaymentRepository());
+final weatherRepositoryProvider = Provider((ref) => WeatherRepository());
 final settlementRepositoryProvider =
     Provider((ref) => SettlementRepository());
 
