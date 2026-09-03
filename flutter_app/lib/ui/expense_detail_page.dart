@@ -11,7 +11,7 @@ import 'theme.dart';
 /// 唯讀的支出詳情。`src/pages/ExpenseDetailPage.vue` 的 Flutter 版。
 ///
 /// 為什麼需要它：編輯頁只讓「自己建的、自己先付的、或管理員」動得了，
-/// 其他人點進去只會在存檔時被規則擋下。而列表標了「📎」，點下去卻沒有
+/// 其他人點進去只會在存檔時被規則擋下。而列表標了迴紋針，點下去卻沒有
 /// 東西可看 —— 收據的用途就是對帳，看不到照片等於這個功能對半數的人不存在。
 ///
 /// **不重讀支出，直接接收列表已經有的那個物件。** 網頁版要依 id 重讀是因為
@@ -133,7 +133,19 @@ class ExpenseDetailPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const _SectionTitle('地點'),
-                  Text('📍 ${place.name}', style: text.bodyMedium),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.place_outlined,
+                        size: 16,
+                        color: AppColors.primaryDark,
+                      ),
+                      const SizedBox(width: AppSpace.x2),
+                      Flexible(
+                        child: Text(place.name, style: text.bodyMedium),
+                      ),
+                    ],
+                  ),
                   if (place.address != null && place.address!.isNotEmpty)
                     Text(place.address!, style: text.bodySmall),
                   if (place.lat != null && place.lng != null) ...[
