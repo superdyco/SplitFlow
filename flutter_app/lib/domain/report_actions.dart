@@ -3,6 +3,7 @@ import 'models.dart';
 import 'place_totals.dart';
 import 'report.dart';
 import 'report_timeline.dart';
+import 'task_status.dart';
 import 'trip_summary.dart';
 
 /// 產生一份旅費報告要算的東西，以及誰能做這件事。
@@ -11,13 +12,21 @@ import 'trip_summary.dart';
 /// 抽成純函式的理由跟 `canManageExpense` 一樣：**這裡決定什麼會被公開**。
 /// 少放一個欄位不會有人發現，多放一個就是外洩，所以要有測試把欄位清單釘住。
 
-/// 只有 owner 能產生與撤銷報告。
+/// 只有 owner 能對**已封存**的任務產生與撤銷報告。
 ///
-/// 公開別人的消費資料只有他能決定 —— admin 也不行，rules 那邊寫的是同一條。
-/// **刻意不看封存狀態**：報告本來就是旅程結束後才產生的，而封存的任務仍要
-/// 能重新產生與撤銷。
+/// 兩個條件，理由不同：
+///
+/// - **owner**：公開別人的消費資料只有他能決定 —— admin 也不行，rules 那邊
+///   寫的是同一條。
+/// - **已封存**：旅費參考的前提是數字定案。旅程進行到一半分享出去，別人拿到
+///   的是不完整的預算，反而誤導。想更新就解除封存、改完再封存、重新產生。
+///
+/// rules 裡那句「不加 `taskIsActive`」不是這一條的反例，是它的補集：規則要放行
+/// 的正是**封存**的任務（`taskIsActive` 會擋掉它們），而不是放行未封存的。
+/// 後端因此擋不住未封存的任務 —— 這個函式是唯一的閘門。
 bool canShareReport({required Task task, required String uid}) {
-  return uid.isNotEmpty && task.ownerId == uid;
+  if (uid.isEmpty || task.ownerId != uid) return false;
+  return taskStatusFrom(task.status) == TaskStatus.archived;
 }
 
 /// 把任務與支出算成一份報告。
