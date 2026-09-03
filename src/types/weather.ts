@@ -43,3 +43,44 @@ export function weatherKind(code: number): WeatherKind {
   if (code >= 95 && code <= 99) return "thunder";
   return "overcast";
 }
+
+/**
+ * 每一組的中文名。
+ *
+ * 加這個是因為 14px 的圖示分不出「雷雨」與「毛毛雨」—— 在小尺寸下，
+ * 兩個字比任何圖示都好認。圖示負責一眼掃到，文字負責講清楚。
+ */
+export const WEATHER_LABELS: Record<WeatherKind, string> = {
+  clear: "晴",
+  cloudy: "多雲",
+  overcast: "陰",
+  fog: "霧",
+  drizzle: "毛毛雨",
+  rain: "雨",
+  snow: "雪",
+  thunder: "雷雨"
+};
+
+/**
+ * 圖示的顏色。**只有三種，不是八種。**
+ *
+ * 顏色講「哪一類」，形狀與文字講「哪一個」。八種顏色會讓一個小圖示變成
+ * 調色盤，而且藍色系彼此根本分不出來 —— 分辨毛毛雨與大雨本來就該靠文字。
+ *
+ * 藍色是這個 app 唯一的非暖色，刻意只加這一個：天氣是少數「藍色代表水」
+ * 比品牌一致性更有用的地方，但那不是把調色盤打開的理由。
+ */
+export function weatherColor(kind: WeatherKind): string {
+  switch (kind) {
+    case "clear":
+      return "var(--color-primary)";
+    case "thunder":
+      return "var(--color-primary-dark)";
+    case "drizzle":
+    case "rain":
+    case "snow":
+      return "var(--color-weather-wet)";
+    default:
+      return "var(--color-muted)";
+  }
+}

@@ -637,13 +637,19 @@ onMounted(load);
             </span>
           </div>
 
-          <PlaceField :task-id="taskId" v-model="place" />
           <!--
-            天氣是加分不是必要：查不到就整段不出現，沒有錯誤訊息。
-            使用者正在記一筆帳，那才是他來這一頁的目的。
+            天氣掛在地點欄位的那一列，跟定位鍵並排 —— 它是「剛選完地點」
+            這個動作的回饋，擺在別的地方就看不出是同一件事的兩半。
+
+            查不到就整格不出現，沒有錯誤訊息：使用者正在記一筆帳，
+            那才是他來這一頁的目的。
           -->
-          <p v-if="weatherLoading" class="tiny">查天氣中...</p>
-          <p v-else-if="weather" class="tiny"><WeatherChip :weather="weather" /></p>
+          <PlaceField :task-id="taskId" v-model="place">
+            <template #trailing>
+              <span v-if="weatherLoading" class="weather-wait tiny">查天氣</span>
+              <WeatherChip v-else-if="weather" :weather="weather" variant="chip" show-label />
+            </template>
+          </PlaceField>
 
           <!--
             ReceiptField 的提示寫「要按下面的『新增支出』」。送出鈕現在固定在
@@ -1013,5 +1019,20 @@ onMounted(load);
 
 .warn {
   color: var(--color-danger);
+}
+
+/*
+  讀取中的佔位。跟天氣那一格同高同框 —— 不然查到的瞬間整列會抖一下，
+  而那一列裡還有使用者正在打字的輸入框。
+*/
+.weather-wait {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
 }
 </style>

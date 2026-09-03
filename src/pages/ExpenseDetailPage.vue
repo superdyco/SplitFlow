@@ -189,7 +189,7 @@ onMounted(load);
           <span>📍 {{ expense.place.name }}</span>
           <span v-if="expense.place.address" class="tiny">{{ expense.place.address }}</span>
           <!-- 天氣跟地點、地圖放同一區：它是關於這個地點那天的事。 -->
-          <span v-if="expense.weather" class="tiny"><WeatherChip :weather="expense.weather" /></span>
+          <span v-if="expense.weather" class="tiny"><WeatherChip :weather="expense.weather" show-label /></span>
           <PlaceMap v-if="mapAvailable && placeMarkers.length" :markers="placeMarkers" height="180px" />
         </div>
 

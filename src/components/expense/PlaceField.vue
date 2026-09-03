@@ -187,6 +187,12 @@ function clearPlace() {
           @input="onPlaceInput(($event.target as HTMLInputElement).value)"
         />
         <!--
+          給母元件掛東西的位置。用 slot 而不是收一個 weather prop：
+          這一格管的是「地點是什麼」，不該認識天氣 —— 天氣只是剛好
+          屬於這個地點，而且母元件才知道它查到了沒。
+        -->
+        <slot name="trailing" />
+        <!--
           只有一個圖示，所以 aria-label 是它唯一的名字，不能省。
           title 讓滑鼠停著也看得到說明。
         -->

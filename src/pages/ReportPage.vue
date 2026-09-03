@@ -271,7 +271,7 @@ onMounted(load);
                 舊報告沒有這個欄位，所以一定要 v-if 而不是假設它存在 ——
                 這次改動之前產生的報告要照樣打得開。
               -->
-              <WeatherChip v-if="day.weather" :weather="day.weather" />
+              <WeatherChip v-if="day.weather" :weather="day.weather" show-label />
             </span>
             <span class="amount">{{ formatAmount(day.total, report.currency) }}</span>
           </div>
