@@ -84,3 +84,20 @@ export async function listUserTasks(uid: string): Promise<Task[]> {
 export function setTaskStatus(taskId: string, status: TaskStatus): Promise<void> {
   return updateDoc(doc(db, "tasks", taskId), { status, updatedAt: serverTimestamp() });
 }
+
+/**
+ * 改任務名稱。
+ *
+ * 規則那邊不用改：`updatesTaskAsAdmin` 沒有 hasOnly，管理員本來就動得了
+ * 這個欄位 —— 少的只是介面。
+ *
+ * **已經發出去的邀請連結會繼續顯示舊名字。** 邀請文件在建立時抄了一份
+ * taskName，而規則寫著 `allow update, delete: if false` —— 那是刻意鎖死的。
+ * 為了一個名字把邀請變成可寫不划算，而且加入之後看到的就是新名字了。
+ */
+export function renameTask(taskId: string, name: string): Promise<void> {
+  return updateDoc(doc(db, "tasks", taskId), {
+    name: name.trim(),
+    updatedAt: serverTimestamp()
+  });
+}

@@ -29,6 +29,7 @@ import { reportTrace } from "@/services/perfService";
 import { finishTrace, markPhase } from "@/utils/perfTrace";
 import { useExpenses } from "@/composables/useExpenses";
 import { usePayments } from "@/composables/usePayments";
+import { renameTask } from "@/services/taskService";
 import { useTask } from "@/composables/useTask";
 import { useTaskMembers } from "@/composables/useTaskMembers";
 import { useTripReport } from "@/composables/useTripReport";
@@ -390,6 +391,34 @@ async function addVirtualMember() {
  * 存 uid 而不是布林值：成員列上每一列都能開這個對話框，它得知道改的是誰，
  * 而且要拿現在的名字當預填值。
  */
+const renamingTask = ref(false);
+const renamingTaskBusy = ref(false);
+
+/**
+ * 改任務名稱。
+ *
+ * 錯誤處理跟 runMemberAction 一樣，但沒有走它 —— 那支要一個 targetUid
+ * 來標示哪一列在忙，而這裡忙的是整個對話框。
+ */
+async function submitTaskRename(next: string) {
+  const name = next.trim();
+  // 對話框的 maxlength 擋得住打字，擋不住貼上 —— 截字是最後一道。
+  const trimmed = name.slice(0, 40);
+  if (!trimmed) return;
+
+  renamingTaskBusy.value = true;
+  actionError.value = null;
+  try {
+    await renameTask(taskId.value, trimmed);
+    await taskState.load();
+    renamingTask.value = false;
+  } catch (err) {
+    actionError.value = firebaseErrorMessage(err);
+  } finally {
+    renamingTaskBusy.value = false;
+  }
+}
+
 const renaming = ref<string | null>(null);
 
 const renamingMember = computed(() =>
@@ -524,9 +553,31 @@ onMounted(async () => {
               本來就是很多 App 的習慣，而這裡的版面已經夠擠了。
               用 button 而不是在 h1 上掛 @click：鍵盤 Tab 到得了、Enter 按得下去。
             -->
-            <button class="title-reload" :disabled="reloading" @click="reload">
-              <h1 class="title">{{ taskState.task.value.name }}</h1>
-            </button>
+            <div class="title-row">
+              <button class="title-reload" :disabled="reloading" @click="reload">
+                <h1 class="title">{{ taskState.task.value.name }}</h1>
+              </button>
+              <!--
+                只有一個圖示，所以 aria-label 是它唯一的名字，不能省。
+                條件跟這一頁其他寫入一樣是 canWrite（管理員且沒封存）——
+                改名不需要另一套權限，規則那邊也是同一條。
+              -->
+              <button
+                v-if="canWrite"
+                type="button"
+                class="btn-quiet rename"
+                aria-label="修改任務名稱"
+                title="修改任務名稱"
+                @click="renamingTask = true"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+                     stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                     stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+                </svg>
+              </button>
+            </div>
             <p class="tiny">
               {{ taskState.task.value.defaultCurrency }} ·
               {{ taskState.task.value.memberCount }} 位成員 ·
@@ -845,6 +896,20 @@ onMounted(async () => {
       </template>
 
       <PromptDialog
+        :open="renamingTask"
+        title="改成什麼名字？"
+        message="只是換個顯示的名字，帳目與成員都不受影響。已經發出去的邀請連結仍然會顯示舊名字。"
+        label="任務名稱"
+        confirm-label="改名"
+        :initial="taskState.task.value?.name ?? ''"
+        placeholder="例如：京都・大阪 五天四夜"
+        :maxlength="40"
+        :busy="renamingTaskBusy"
+        @confirm="submitTaskRename"
+        @cancel="renamingTask = false"
+      />
+
+      <PromptDialog
         :open="renaming !== null"
         title="改成什麼名字？"
         message="這個名字只在這個任務裡用，支出與結算上的顯示都會跟著換。"
@@ -922,6 +987,24 @@ onMounted(async () => {
 }
 
 /* 標題本身就是按鈕，但看起來要跟原本的標題一模一樣。 */
+/* 標題與鉛筆同一列，鉛筆貼著標題 —— 它改的是標題，不是這一頁。 */
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rename {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1);
+  color: var(--color-muted);
+}
+
+.rename:hover {
+  color: var(--color-primary-dark);
+}
+
 .title-reload {
   display: block;
   margin: 0;
