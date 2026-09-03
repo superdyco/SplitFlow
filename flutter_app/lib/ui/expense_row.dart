@@ -77,24 +77,37 @@ class ExpenseRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          '$_shown · $paidBy 付 · $splitLabel',
+                          style: text.bodySmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       // 有收據要看得出來，不然只能一筆一筆點進去找。
-                      '$_shown · $paidBy 付 · $splitLabel'
-                      '${expense.receipt == null ? '' : ' · 📎'}',
-                      style: text.bodySmall),
+                      if (expense.receipt != null) ...[
+                        const SizedBox(width: AppSpace.x1),
+                        const Icon(
+                          Icons.attach_file,
+                          size: 13,
+                          color: AppColors.muted,
+                        ),
+                      ],
+                    ],
+                  ),
                   // 地點與備註在列表就要看得到。要點進去才看得到的話，
                   // 對帳時每一筆都得點一次 —— 那兩個欄位就等於白填。
                   // 各自截成一行：它們是掃過去用的線索，不是內文。
+                  //
+                  // 圖示而不是 emoji：跟分類同一個理由，emoji 在不同 ROM 上
+                  // 長得不一樣，而且吃不到 muted 這個顏色。
                   if (place != null)
-                    Text('📍 ${place.name}',
-                        style: text.bodySmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                    _Clue(icon: Icons.place_outlined, label: place.name),
                   if (expense.note.isNotEmpty)
-                    Text('📝 ${expense.note}',
-                        style: text.bodySmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                    _Clue(icon: Icons.notes, label: expense.note),
                   if (onRepeat != null) ...[
                     const SizedBox(height: 6),
                     // 巢狀按鈕自己會吃掉點擊，不用像網頁版那樣擋冒泡。
@@ -104,29 +117,73 @@ class ExpenseRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${expense.currency} '
-                  '${formatAmount(expense.amount, expense.currency)}',
-                  style: text.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+            // 固定欄寬，不是讓它自己撐 —— 名稱長的那幾列會把金額往右推，
+            // 一整欄看下來就是歪的。
+            SizedBox(
+              width: 84,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    formatAmount(expense.amount, expense.currency),
+                    textAlign: TextAlign.right,
+                    style: figure(size: 15, weight: FontWeight.w600),
                   ),
-                ),
-                if (converted != null)
-                  Text('≈ $baseCurrency $converted', style: text.bodySmall),
-                // 缺匯率的要講出來 —— 它沒被算進任何一個總額，
-                // 不講的話使用者只會看到數字對不上而不知道為什麼。
-                if (missingRate)
-                  Text('未換算',
-                      style: text.bodySmall?.copyWith(color: AppColors.danger)),
-              ],
+                  // 幣別小一級：一整欄的「THB 1,250」同字級的話，每一列都要
+                  // 先跳過三個字母才讀得到數字。
+                  Text(
+                    expense.currency,
+                    textAlign: TextAlign.right,
+                    style: text.bodySmall,
+                  ),
+                  if (converted != null)
+                    Text(
+                      '≈ $baseCurrency $converted',
+                      textAlign: TextAlign.right,
+                      style: text.bodySmall,
+                    ),
+                  // 缺匯率的要講出來 —— 它沒被算進任何一個總額，
+                  // 不講的話使用者只會看到數字對不上而不知道為什麼。
+                  if (missingRate)
+                    Text(
+                      '未換算',
+                      textAlign: TextAlign.right,
+                      style: text.bodySmall?.copyWith(color: AppColors.danger),
+                    ),
+                ],
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 列表上的一條線索：地點或備註。圖示加一行截斷的文字。
+class _Clue extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _Clue({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return Row(
+      children: [
+        Icon(icon, size: 13, color: AppColors.muted),
+        const SizedBox(width: AppSpace.x1),
+        Flexible(
+          child: Text(
+            label,
+            style: text.bodySmall,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

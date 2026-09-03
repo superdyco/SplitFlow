@@ -87,7 +87,7 @@ class ReportCard extends StatelessWidget {
     return Card(
       child: InkWell(
         onTap: onOpen,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -114,17 +114,21 @@ class ReportCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(currency, style: text.bodySmall),
-                      Text(
-                        formatAmount(total, currency),
-                        style: text.titleMedium?.copyWith(
-                          fontFeatures: const [FontFeature.tabularFigures()],
+                  // 固定欄寬：探索頁是一長串報告，金額不對齊就沒辦法一眼
+                  // 比出哪一趟貴。
+                  SizedBox(
+                    width: 84,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(currency, style: text.bodySmall),
+                        Text(
+                          formatAmount(total, currency),
+                          textAlign: TextAlign.right,
+                          style: figure(size: 17, weight: FontWeight.w700),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
