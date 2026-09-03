@@ -12,12 +12,22 @@ export interface ExpenseCategoryMeta {
   icon: string;
 }
 
+/*
+  三個 icon 後面跟著一個看不見的 U+FE0F（變體選擇符），不要手滑刪掉。
+
+  U+1F37D（餐飲）、U+1F39F（門票）、U+1F6CD（購物）在 Unicode 裡的預設是
+  **文字呈現**而不是 emoji 呈現，所以系統會把它們畫成單色字符 —— 一排六個
+  分類裡就那三個是灰黑的。另外三個預設就是彩色，所以不需要這個字元。
+
+  加上 U+FE0F 才是強制彩色的標準做法。用別的 emoji 換掉它們也可以，
+  但那是為了繞過一個有正解的問題而改掉使用者已經認得的圖示。
+*/
 export const EXPENSE_CATEGORIES: ExpenseCategoryMeta[] = [
-  { value: "food", label: "餐飲", icon: "🍽" },
+  { value: "food", label: "餐飲", icon: "🍽️" },
   { value: "transport", label: "交通", icon: "🚗" },
   { value: "stay", label: "住宿", icon: "🏨" },
-  { value: "ticket", label: "門票", icon: "🎟" },
-  { value: "shopping", label: "購物", icon: "🛍" },
+  { value: "ticket", label: "門票", icon: "🎟️" },
+  { value: "shopping", label: "購物", icon: "🛍️" },
   { value: "other", label: "其他", icon: "📦" }
 ];
 
