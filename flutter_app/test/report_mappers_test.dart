@@ -101,7 +101,18 @@ void main() {
       final day = (map['timeline'] as List).single as Map<String, dynamic>;
       final entry = (day['entries'] as List).single as Map<String, dynamic>;
 
-      expect(day.keys.toList()..sort(), ['date', 'day', 'entries', 'total']);
+      /*
+        這兩條釘的是「哪些欄位會被寫進任何人拿到連結都讀得到的文件」，
+        所以改它要有理由，不是配合實作。
+
+        weather 是後來加的，而它通過那道檢查：地點名稱與日期本來就已經在
+        這份文件裡了，「那個地點那天下不下雨」是公開事實，不多洩漏任何東西。
+
+        entry 那條**沒有變**：天氣掛在「天」不掛在「筆」。同一天三筆支出
+        印三次一樣的天氣是噪音，公開文件也小一點。
+      */
+      expect(day.keys.toList()..sort(),
+          ['date', 'day', 'entries', 'total', 'weather']);
       expect(entry.keys.toList()..sort(),
           ['amount', 'category', 'place', 'time']);
     });

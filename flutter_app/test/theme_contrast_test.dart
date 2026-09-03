@@ -150,20 +150,23 @@ void main() {
     });
   });
 
-  group('不准的組合', () {
+  group('橘色的字配橘色的淺底', () {
     /*
-      primaryDark 印在 primarySoft 上只有 4.17:1。
+      這一組是最容易不小心做出來的組合：橘字配橘底，看起來非常合理。
+      三個橘色的實際數字是
 
-      這一條跟「soft 過不了 4.5」一樣是刻意寫的：兩個顏色各自都合法，
-      湊在一起才不合法，而那正是最容易不小心做出來的組合 ——
-      橘色的字配橘色的淺底，看起來非常合理。
+        primary      3.21  ✗
+        primaryDark  4.64  ✓
+        primaryDeep  6.55  ✓
 
-      報告頁的每人平均本來就是這個組合，改成白底才過。
+      **這幾個數字曾經被手算錯過**：primaryDark 一度被寫成 4.17，於是有一條
+      測試斷言它「不准用」，而報告頁的每人平均為此從 primarySoft 改成白底。
+      CI 跑起來才發現真值是 4.64。手算對比度不可靠，要算就用程式算。
     */
-    test('primaryDark 不能印在 primarySoft 上', () {
+    test('primaryDark 印在 primarySoft 上過得了 AA', () {
       expect(
         contrastRatio(AppColors.primaryDark, AppColors.primarySoft),
-        lessThan(4.5),
+        greaterThanOrEqualTo(4.5),
       );
     });
 

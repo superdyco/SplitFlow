@@ -225,15 +225,15 @@ class _Body extends StatelessWidget {
         /*
           每人平均是這一頁唯一的主角，所以字最大、而且是這一頁唯一有顏色的字。
 
-          底色從 primarySoft 換回白：primaryDark 印在 primarySoft 上只有
-          4.17:1，過不了 4.5。要嘛字不上色、要嘛底是白的，選後者 ——
-          這一頁需要一個主張，而顏色是它最便宜的表達方式。
-          theme_contrast_test 裡有一條把這個組合釘死成「不准」。
+          底色留著 primarySoft。它一度被改成白的，理由是「primaryDark 印在
+          primarySoft 上只有 4.17:1」—— 那個數字是手算錯的，真值是 4.64，
+          過得了 AA。淺橘底本來就是在說「這一格是主角」，沒有理由拿掉。
 
           字級走 figure() 而不是 text.headlineMedium：這個 app 的 textTheme
           根本沒有定義 headlineMedium，那一行一直在吃 Material 的預設值。
         */
         Card(
+          color: AppColors.primarySoft,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
             child: Column(
