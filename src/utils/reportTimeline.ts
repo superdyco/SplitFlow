@@ -12,6 +12,7 @@
  * 純函式，不 import firebase 也不 import vue。
  */
 import type { Expense, ExpenseCategory } from "@/types/expense";
+import type { ExpenseWeather } from "@/types/weather";
 import { baseAmountOf } from "@/utils/settlement";
 import { compareExpenses, expenseDate, expenseTime } from "@/utils/expenseDate";
 import { daysBetween } from "@/utils/tripSummary";
@@ -33,6 +34,20 @@ export interface ReportDay {
   day: number;
   /** 當天小計。 */
   total: number;
+  /**
+   * 當天的天氣，取**當天第一筆有天氣的支出**。整天都沒有就是 null。
+   *
+   * 掛在「天」不掛在「筆」：同一天三筆支出印三次一樣的天氣是噪音，
+   * 而且公開文件也小一點。
+   *
+   * 一天跨兩個城市時會顯示第一個 —— 這是已知且接受的不精確。替代方案
+   * （取眾數、列出全部）都讓規則沒辦法一句話講完，而報告是給不在場的人
+   * 看的，那個精度沒有意義。
+   *
+   * 天氣通過「只放公開得起的欄位」那道檢查：地點名稱與日期本來就已經在
+   * 這份文件裡了，那個地點那天下不下雨是公開事實。
+   */
+  weather: ExpenseWeather | null;
   entries: ReportEntry[];
 }
 
@@ -80,11 +95,14 @@ export function reportTimeline(
 
     let group = days.get(date);
     if (!group) {
-      group = { date, day: 0, total: 0, entries: [] };
+      group = { date, day: 0, total: 0, weather: null, entries: [] };
       days.set(date, group);
     }
 
     group.total += amount;
+    // 第一筆有天氣的說了算。「第一筆」的順序來自上面那個 ordered
+    // （由舊到新），不是呼叫端傳進來的順序。
+    if (group.weather === null && expense.weather) group.weather = expense.weather;
     group.entries.push({
       time: expenseTime(expense),
       category: expense.category,

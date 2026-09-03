@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WeatherChip from "@/components/expense/WeatherChip.vue";
 /**
  * 公開的旅費報告。**任何人都能開，不需要帳號。**
  *
@@ -264,7 +265,14 @@ onMounted(load);
         <strong class="section-title">每天怎麼過的</strong>
         <div v-for="day in timeline" :key="day.date" class="day">
           <div class="line">
-            <span class="name day-head">Day {{ day.day }} · {{ dayLabel(day.date) }}</span>
+            <span class="name day-head">
+              Day {{ day.day }} · {{ dayLabel(day.date) }}
+              <!--
+                舊報告沒有這個欄位，所以一定要 v-if 而不是假設它存在 ——
+                這次改動之前產生的報告要照樣打得開。
+              -->
+              <WeatherChip v-if="day.weather" :weather="day.weather" />
+            </span>
             <span class="amount">{{ formatAmount(day.total, report.currency) }}</span>
           </div>
           <ol class="entries">
