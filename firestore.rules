@@ -266,7 +266,8 @@ service cloud.firestore {
             && validReceipt()
             && validNote()
             && validDate()
-            && validTime();
+            && validTime()
+            && validWeather();
         }
 
         // 地點是選填。有填的話至少要有名稱，座標可以是 null（沒用 Google 搜尋時）。
@@ -289,6 +290,39 @@ service cloud.firestore {
         // 收據是選填。有的話兩個欄位都可以是 null（待上傳時 path 是 null，
         // 傳完之後 localId 是 null），但型別不能亂。
         // 用 .get() 是因為這個功能之前建立的舊支出沒有這個欄位。
+        /*
+          天氣是選填的裝飾欄位。client 寫得了它 —— 那是表單預覽拿到的值，
+          存檔時一起送上去。偽造天氣的風險可以忽略；反過來禁止 client 寫的話，
+          編輯支出時前端送回整份文件就會把它洗掉，那更容易發生也更難察覺。
+
+          exact 那組括號不能省：`A && B || C` 解析成 `(A && B) || C`，
+          少了括號只要 exact 合法，前面所有檢查就全部被短路，驗證形同虛設。
+        */
+        function validWeather() {
+          let weather = request.resource.data.get("weather", null);
+          return weather == null
+            || (
+              weather is map
+              && weather.code is int
+              && weather.code >= 0
+              && weather.code <= 99
+              && weather.high is int
+              && weather.high >= -90
+              && weather.high <= 60
+              && weather.low is int
+              && weather.low >= -90
+              && weather.low <= 60
+              && (
+                weather.get("exact", null) == null
+                || (
+                  weather.exact is int
+                  && weather.exact >= -90
+                  && weather.exact <= 60
+                )
+              )
+            );
+        }
+
         function validReceipt() {
           let receipt = request.resource.data.get("receipt", null);
           return receipt == null
