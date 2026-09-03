@@ -25,6 +25,17 @@ describe("visiblePlaces", () => {
     expect(result.hiddenCount).toBe(3);
   });
 
+  // 報告頁的「還有 N 個地點」按下去就是拿 Infinity 再算一次。
+  it("上限放寬時全部顯示，hiddenCount 歸零", () => {
+    const many = Array.from({ length: 11 }, (_, index) =>
+      place({ name: `地點${index}`, total: 1000 - index })
+    );
+    const result = visiblePlaces(many, Infinity);
+
+    expect(result.rows).toHaveLength(11);
+    expect(result.hiddenCount).toBe(0);
+  });
+
   it("沒有超過上限時 hiddenCount 是 0", () => {
     expect(visiblePlaces([place()]).hiddenCount).toBe(0);
   });

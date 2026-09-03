@@ -13,7 +13,7 @@ import type { TripReport } from "@/types/report";
 import { getPublicReport } from "@/services/reportService";
 import { categoryMeta } from "@/types/expense";
 import { formatAmount } from "@/utils/currency";
-import { visiblePlaces } from "@/utils/reportPlaces";
+import { PLACE_LIMIT, visiblePlaces } from "@/utils/reportPlaces";
 import { reportMapUrl } from "@/services/reportMap";
 import ReportBar from "@/components/report/ReportBar.vue";
 import { addFavorite, isFavorited, removeFavorite } from "@/services/favoriteService";
@@ -58,7 +58,18 @@ const dateRange = computed(() => {
   return `${value.startDate} – ${value.endDate}`;
 });
 
-const places = computed(() => visiblePlaces(report.value?.places ?? []));
+/**
+ * 地點超過上限時先收起來，但要展得開 —— 之前只印一行「還有 N 個地點」，
+ * 那行沒有出口，看的人只知道有東西被藏起來、卻永遠看不到是哪幾個。
+ */
+const placesExpanded = ref(false);
+
+const places = computed(() =>
+  visiblePlaces(report.value?.places ?? [], placesExpanded.value ? Infinity : PLACE_LIMIT)
+);
+
+/** 展開後 hiddenCount 會變 0，所以收合鍵要看原始筆數，不能看 hiddenCount。 */
+const placesTruncatable = computed(() => (report.value?.places?.length ?? 0) > PLACE_LIMIT);
 
 const timeline = computed(() => report.value?.timeline ?? []);
 
@@ -208,10 +219,27 @@ onMounted(load);
         <strong class="figure">
           {{ report.currency }} {{ formatAmount(report.perPerson, report.currency) }}
         </strong>
-        <p class="tiny">
-          總花費 {{ report.currency }} {{ formatAmount(report.total, report.currency) }} ·
-          {{ report.expenseCount }} 筆 · {{ report.places.length }} 個地點
-        </p>
+        <!--
+          三個獨立的量，本來是用「·」串成一句話 —— 那要讀的人自己斷句，
+          而且三個數字混在同一行的視覺重量裡，等於沒有一個看得清楚。
+          排成三格、白底浮在淺橘卡上，分隔靠色塊邊界而不是一條細線。
+        -->
+        <dl class="stats">
+          <div class="stat">
+            <dt class="tiny">總花費</dt>
+            <dd class="stat-value">
+              {{ report.currency }} {{ formatAmount(report.total, report.currency) }}
+            </dd>
+          </div>
+          <div class="stat">
+            <dt class="tiny">筆數</dt>
+            <dd class="stat-value">{{ report.expenseCount }}</dd>
+          </div>
+          <div class="stat">
+            <dt class="tiny">地點</dt>
+            <dd class="stat-value">{{ report.places.length }}</dd>
+          </div>
+        </dl>
       </section>
 
       <section v-if="report.categories.length" class="card stack">
@@ -254,7 +282,14 @@ onMounted(load);
           </div>
           <ReportBar v-if="row.bar !== null" :value="row.bar" soft />
         </div>
-        <p v-if="places.hiddenCount" class="tiny">還有 {{ places.hiddenCount }} 個地點</p>
+        <button
+          v-if="placesTruncatable"
+          type="button"
+          class="more"
+          @click="placesExpanded = !placesExpanded"
+        >
+          {{ placesExpanded ? "收合" : `還有 ${places.hiddenCount} 個地點` }}
+        </button>
       </section>
 
       <!--
@@ -284,9 +319,13 @@ onMounted(load);
               <!-- 這份報告有時間才留這一欄；沒記時間的那幾筆用破折號佔位，
                    時間欄才不會忽寬忽窄。 -->
               <span v-if="showTimes" class="tiny time">{{ entry.time || "—" }}</span>
+              <!--
+                名稱優先。`entry.place` 是這個改動之前產生的報告才有的欄位 ——
+                那些報告沒有名稱，退回顯示地點比顯示分類具體。兩個都沒有才用分類。
+              -->
               <span class="name">
                 {{ categoryMeta(entry.category).icon }}
-                {{ entry.place || categoryMeta(entry.category).label }}
+                {{ entry.name || entry.place || categoryMeta(entry.category).label }}
               </span>
               <span class="amount">{{ formatAmount(entry.amount, report.currency) }}</span>
             </li>
@@ -357,6 +396,44 @@ onMounted(load);
   font-size: var(--text-hero);
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
+}
+
+.stats {
+  display: grid;
+  /*
+    金額那格要寬一點。三格等寬的話「TWD 41,559,480.00」會折成兩行，
+    而一個數字斷成兩行讀不出來是多少。
+  */
+  grid-template-columns: 1.7fr 1fr 1fr;
+  width: 100%;
+  margin: var(--space-2) 0 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-text);
+  padding: var(--space-3) var(--space-2);
+  text-align: center;
+}
+
+/* 分隔線在格與格之間，所以掛在第二格起的左邊。 */
+.stat + .stat {
+  border-left: 1px solid var(--color-line);
+}
+
+.stat-value {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  /*
+    位數多的時候寧可縮小也不要折行。下限 11px 是還讀得出數字的底線，
+    上限就是內文尺寸 —— 這一格不是主角，不該比主角搶眼。
+  */
+  font-size: clamp(11px, 3.4vw, var(--text-body));
+  white-space: nowrap;
 }
 
 .entry {
@@ -485,6 +562,19 @@ onMounted(load);
 
 .count {
   flex: none;
+}
+
+/*
+  長得像 .tiny 的一行字，但它是按鈕 —— 靠左、不撐滿，理由同 .back。
+*/
+.more {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-primary-dark);
+  font-size: var(--text-tiny);
+  font-weight: 700;
 }
 
 .footer a {

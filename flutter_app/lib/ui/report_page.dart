@@ -187,7 +187,6 @@ class _Body extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final places = visiblePlaces(report.places);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -240,12 +239,18 @@ class _Body extends StatelessWidget {
               children: [
                 Text('每人平均', style: text.bodySmall),
                 const SizedBox(height: 4),
-                Text(
-                  '${report.currency} '
-                  '${formatAmount(report.perPerson, report.currency)}',
-                  style: figure(size: 38, color: AppColors.primaryDark),
+                // 位數多的時候寧可縮小也不要溢位 —— 38pt 放得下
+                // 「TWD 8,311,896.00」，但再多兩位就會撞到卡片邊。
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    '${report.currency} '
+                    '${formatAmount(report.perPerson, report.currency)}',
+                    maxLines: 1,
+                    style: figure(size: 38, color: AppColors.primaryDark),
+                  ),
                 ),
-                const SizedBox(height: AppSpace.x3),
+                const SizedBox(height: AppSpace.x4),
                 // 三個數字排成一列格子，而不是用「·」串成一句話：
                 // 它們是三個獨立的量，串起來讀的人要自己斷句。
                 _StatRow(
@@ -255,6 +260,9 @@ class _Body extends StatelessWidget {
                     '${report.expenseCount}',
                     '${report.places.length}',
                   ],
+                  // 金額那欄要寬一點。三欄等寬的話「41,559,480.00」會被擠到
+                  // 換行，而一個數字斷成兩行看起來就是壞掉的。
+                  flex: const [2, 1, 1],
                 ),
               ],
             ),
@@ -284,23 +292,9 @@ class _Body extends StatelessWidget {
           _ReportMap(taskId: taskId, reportId: reportId),
         ],
 
-        if (places.rows.isNotEmpty) ...[
+        if (report.places.isNotEmpty) ...[
           const SizedBox(height: 12),
-          _Section(
-            title: '去過的地方',
-            children: [
-              for (final row in places.rows)
-                _BarRow(
-                  label: row.place.name,
-                  note: '${row.place.expenseCount} 筆',
-                  amount: formatAmount(row.place.total, report.currency),
-                  bar: row.bar,
-                  soft: true,
-                ),
-              if (places.hiddenCount > 0)
-                Text('還有 ${places.hiddenCount} 個地點', style: text.bodySmall),
-            ],
-          ),
+          PlacesSection(places: report.places, currency: report.currency),
         ],
 
         // 時間軸放在最後：前面幾區回答「花了多少、花在哪」，
@@ -436,9 +430,11 @@ class _Timeline extends StatelessWidget {
                   const SizedBox(width: AppSpace.x2),
                   Expanded(
                     child: Text(
-                      // 沒有支出名稱可放（報告裡刻意沒有），
-                      // 所以沒地點時退回顯示分類。
-                      entry.place ?? categoryMeta(entry.category).label,
+                      // 名稱優先。place 是這個改動之前產生的報告才有的欄位 ——
+                      // 那些報告沒有名稱，退回顯示地點比顯示分類具體。
+                      entry.name.isNotEmpty
+                          ? entry.name
+                          : entry.place ?? categoryMeta(entry.category).label,
                       style: text.bodySmall,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -452,6 +448,57 @@ class _Timeline extends StatelessWidget {
               ),
             ),
         ],
+      ],
+    );
+  }
+}
+
+/// 「去過的地方」。超過上限先收起來，但要展得開 —— 只印一行
+/// 「還有 N 個地點」的話那行沒有出口，看的人只知道有東西被藏起來、
+/// 卻永遠看不到是哪幾個。
+///
+/// 不是私有的，因為「按下去會不會真的展開」有標準答案，該有測試釘著。
+class PlacesSection extends StatefulWidget {
+  final List<PlaceTotal> places;
+  final String currency;
+
+  const PlacesSection({super.key, required this.places, required this.currency});
+
+  @override
+  State<PlacesSection> createState() => _PlacesSectionState();
+}
+
+class _PlacesSectionState extends State<PlacesSection> {
+  bool expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = visiblePlaces(
+      widget.places,
+      limit: expanded ? widget.places.length : placeLimit,
+    );
+    // 展開後 hiddenCount 會變 0，所以收合鍵要看原始筆數。
+    final truncatable = widget.places.length > placeLimit;
+
+    return _Section(
+      title: '去過的地方',
+      children: [
+        for (final row in visible.rows)
+          _BarRow(
+            label: row.place.name,
+            note: '${row.place.expenseCount} 筆',
+            amount: formatAmount(row.place.total, widget.currency),
+            bar: row.bar,
+            soft: true,
+          ),
+        if (truncatable)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () => setState(() => expanded = !expanded),
+              child: Text(expanded ? '收合' : '還有 ${visible.hiddenCount} 個地點'),
+            ),
+          ),
       ],
     );
   }
@@ -488,15 +535,25 @@ class _StatRow extends StatelessWidget {
   final List<String> labels;
   final List<String> values;
 
-  const _StatRow({required this.labels, required this.values});
+  /// 每一欄的寬度比例，預設等寬。長度要跟 labels 一樣。
+  final List<int>? flex;
+
+  const _StatRow({required this.labels, required this.values, this.flex});
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
 
+    /*
+      白底的一條，浮在淺橘的主角卡上。
+
+      本來是「透明底 + 一圈細框 + 細分隔線」，那在淺橘上幾乎看不見 ——
+      三個數字讀起來就是黏成一塊。改成整條換底色：分隔靠的是色塊邊界，
+      不是一條 1px 的線，那個在任何螢幕上都看得見。
+    */
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.rowLine),
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: IntrinsicHeight(
@@ -508,22 +565,36 @@ class _StatRow extends StatelessWidget {
                 const VerticalDivider(
                   width: 1,
                   thickness: 1,
-                  color: AppColors.rowLine,
+                  // 白底上要看得見的線，比列表用的 rowLine 再深一階。
+                  color: AppColors.lineStrong,
+                  indent: AppSpace.x2,
+                  endIndent: AppSpace.x2,
                 ),
               Expanded(
+                flex: flex?[i] ?? 1,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpace.x3,
-                    vertical: 9,
+                    horizontal: AppSpace.x2,
+                    vertical: AppSpace.x3,
                   ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    // 置中，跟上面的主角數字同一條中軸。靠左的話三欄的字
+                    // 各自從不同的地方開始，那才是「擠成一塊」的來源。
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(labels[i], style: text.bodySmall),
-                      Text(
-                        values[i],
-                        style: figure(size: 14, weight: FontWeight.w600),
+                      const SizedBox(height: 2),
+                      // 放不下就整個縮小，不換行。數字斷成兩行讀不出來是多少。
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          values[i],
+                          maxLines: 1,
+                          softWrap: false,
+                          style: figure(size: 15, weight: FontWeight.w600),
+                        ),
                       ),
                     ],
                   ),
@@ -595,11 +666,21 @@ class _BarRow extends StatelessWidget {
               ),
               const SizedBox(width: AppSpace.x2),
               SizedBox(
-                width: 62,
-                child: Text(
-                  amount,
-                  textAlign: TextAlign.right,
-                  style: figure(size: 14, weight: FontWeight.w600),
+                // 62 太窄：六位數以上就折行，而「38,519,0 / 00.00」根本
+                // 讀不出來是多少。加寬到放得下百萬級的金額，名稱那欄仍有
+                // 兩百多 px 可用。
+                width: 96,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  // 縮小之後仍然貼齊右緣，整欄才還是一條直線。
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    amount,
+                    maxLines: 1,
+                    softWrap: false,
+                    textAlign: TextAlign.right,
+                    style: figure(size: 14, weight: FontWeight.w600),
+                  ),
                 ),
               ),
             ],
