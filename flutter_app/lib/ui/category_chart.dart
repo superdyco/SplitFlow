@@ -72,7 +72,13 @@ class _Row extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Text('${meta.icon} ${meta.label}', style: text.bodyMedium),
+              child: Row(
+                children: [
+                  Icon(meta.icon, size: 16, color: AppColors.primaryDark),
+                  const SizedBox(width: AppSpace.x2),
+                  Text(meta.label, style: text.bodyMedium),
+                ],
+              ),
             ),
             Text(
               formatAmount(row.total, currency),

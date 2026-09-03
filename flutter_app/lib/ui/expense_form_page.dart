@@ -509,7 +509,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           children: [
                             for (final meta in expenseCategories)
                               ChoiceChip(
-                                label: Text('${meta.icon} ${meta.label}'),
+                                avatar: Icon(meta.icon, size: 16),
+                                label: Text(meta.label),
                                 selected: _category == meta.value,
                                 onSelected: (_) =>
                                     setState(() => _category = meta.value),

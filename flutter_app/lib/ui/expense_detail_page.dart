@@ -69,7 +69,7 @@ class ExpenseDetailPage extends StatelessWidget {
           _Card(
             child: Column(
               children: [
-                Text(meta.icon, style: const TextStyle(fontSize: 30)),
+                Icon(meta.icon, size: 30, color: AppColors.primaryDark),
                 const SizedBox(height: 8),
                 Text(
                   expense.title,

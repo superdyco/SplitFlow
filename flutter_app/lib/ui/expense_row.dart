@@ -7,15 +7,6 @@ import 'theme.dart';
 
 /// 支出列表的一列。`src/components/expense/ExpenseRow.vue` 的 Flutter 版。
 
-const Map<ExpenseCategory, String> _icons = {
-  ExpenseCategory.food: '🍽',
-  ExpenseCategory.transport: '🚗',
-  ExpenseCategory.stay: '🏨',
-  ExpenseCategory.ticket: '🎟',
-  ExpenseCategory.shopping: '🛍',
-  ExpenseCategory.other: '📦',
-};
-
 class ExpenseRow extends StatelessWidget {
   final Expense expense;
   final Map<String, String> memberNames;
@@ -68,8 +59,11 @@ class ExpenseRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_icons[expense.category] ?? '📦',
-                style: const TextStyle(fontSize: 20)),
+            Icon(
+              categoryMeta(expense.category).icon,
+              size: 18,
+              color: AppColors.primaryDark,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

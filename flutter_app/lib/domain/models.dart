@@ -6,23 +6,35 @@
 
 library;
 
+import 'package:flutter/material.dart';
+
 enum ExpenseCategory { food, transport, stay, ticket, shopping, other }
 
 /// 分類的顯示資料。順序就是選單的順序，也是金額相同時的次要排序依據。
+///
+/// icon 是 IconData 而不是 emoji 字串：emoji 在不同 Android 版本與廠商 ROM
+/// 上長得不一樣，控制不了，而且上不了色 —— 跟「圖示用 primaryDark」這條
+/// 規則直接衝突。Material Icons 已經在 bundle 裡，不增加 APK 大小。
+///
+/// 網頁版還是 emoji。圖示不像顏色那樣是身分，兩邊不一致可以接受。
 class CategoryMeta {
   final ExpenseCategory value;
   final String label;
-  final String icon;
+  final IconData icon;
   const CategoryMeta(this.value, this.label, this.icon);
 }
 
 const List<CategoryMeta> expenseCategories = [
-  CategoryMeta(ExpenseCategory.food, '餐飲', '🍽'),
-  CategoryMeta(ExpenseCategory.transport, '交通', '🚗'),
-  CategoryMeta(ExpenseCategory.stay, '住宿', '🏨'),
-  CategoryMeta(ExpenseCategory.ticket, '門票', '🎟'),
-  CategoryMeta(ExpenseCategory.shopping, '購物', '🛍'),
-  CategoryMeta(ExpenseCategory.other, '其他', '📦'),
+  CategoryMeta(ExpenseCategory.food, '餐飲', Icons.restaurant_outlined),
+  CategoryMeta(ExpenseCategory.transport, '交通', Icons.directions_car_outlined),
+  CategoryMeta(ExpenseCategory.stay, '住宿', Icons.bed_outlined),
+  CategoryMeta(
+    ExpenseCategory.ticket,
+    '門票',
+    Icons.confirmation_number_outlined,
+  ),
+  CategoryMeta(ExpenseCategory.shopping, '購物', Icons.shopping_bag_outlined),
+  CategoryMeta(ExpenseCategory.other, '其他', Icons.inventory_2_outlined),
 ];
 
 const ExpenseCategory defaultCategory = ExpenseCategory.food;

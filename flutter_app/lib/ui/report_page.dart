@@ -258,8 +258,8 @@ class _Body extends StatelessWidget {
             children: [
               for (final item in report.categories)
                 _BarRow(
-                  label: '${categoryMeta(item.category).icon} '
-                      '${categoryMeta(item.category).label}',
+                  icon: categoryMeta(item.category).icon,
+                  label: categoryMeta(item.category).label,
                   note: '${item.share.round()}%',
                   amount: formatAmount(item.total, report.currency),
                   bar: item.share / 100,
@@ -413,12 +413,17 @@ class _Timeline extends StatelessWidget {
                         style: text.bodySmall,
                       ),
                     ),
+                  Icon(
+                    categoryMeta(entry.category).icon,
+                    size: 16,
+                    color: AppColors.primaryDark,
+                  ),
+                  const SizedBox(width: AppSpace.x2),
                   Expanded(
                     child: Text(
-                      '${categoryMeta(entry.category).icon} '
                       // 沒有支出名稱可放（報告裡刻意沒有），
                       // 所以沒地點時退回顯示分類。
-                      '${entry.place ?? categoryMeta(entry.category).label}',
+                      entry.place ?? categoryMeta(entry.category).label,
                       style: text.bodySmall,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -463,6 +468,8 @@ class _Section extends StatelessWidget {
 
 /// 一列：名稱、筆數或百分比、金額，底下一條長條。
 class _BarRow extends StatelessWidget {
+  /// null 就不畫圖示。地點那一組沒有分類可放，分類那一組有。
+  final IconData? icon;
   final String label;
   final String note;
   final String amount;
@@ -472,6 +479,7 @@ class _BarRow extends StatelessWidget {
   final bool soft;
 
   const _BarRow({
+    this.icon,
     required this.label,
     required this.note,
     required this.amount,
@@ -490,6 +498,10 @@ class _BarRow extends StatelessWidget {
         children: [
           Row(
             children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: AppColors.primaryDark),
+                const SizedBox(width: AppSpace.x2),
+              ],
               Expanded(
                 child: Text(
                   label,
