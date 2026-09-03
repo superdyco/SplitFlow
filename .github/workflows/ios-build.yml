@@ -46,8 +46,16 @@ jobs:
       - name: Analyze Dart code
         run: dart analyze
 
+      # flutter test 而不是 dart test。
+      #
+      # dart test 跑不動任何 import 到 Flutter SDK 的測試 —— 它沒有 dart:ui，
+      # 載入階段就會失敗（不是斷言失敗，是整個檔案讀不進來）。這個專案的測試
+      # 一直到最近都是純 Dart，所以 dart test 一直夠用；現在有兩個不是：
+      # theme_contrast_test 要 Color，ledger_test 是 widget test。
+      #
+      # flutter test 兩種都跑得動，純 Dart 的那些也照樣跑。
       - name: Run tests
-        run: dart test --reporter compact
+        run: flutter test --reporter compact
 
       - name: Install iOS dependencies
         working-directory: flutter_app/ios
