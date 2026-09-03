@@ -10,6 +10,7 @@ import '../domain/report.dart';
 import '../state/providers.dart';
 import 'report_card.dart';
 import 'theme.dart';
+import 'weather_chip.dart';
 
 /// 一份公開的旅費報告。`src/pages/ReportPage.vue` 的 Flutter 版。
 ///
@@ -401,6 +402,11 @@ class _Timeline extends StatelessWidget {
                         text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
+                // 舊報告沒有這個欄位，一定要判斷而不是假設它存在。
+                if (day.weather != null) ...[
+                  WeatherChip(weather: day.weather!, size: 11),
+                  const SizedBox(width: AppSpace.x3),
+                ],
                 Text(
                   formatAmount(day.total, report.currency),
                   style: text.bodyMedium,

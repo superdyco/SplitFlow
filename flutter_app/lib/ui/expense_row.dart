@@ -4,6 +4,7 @@ import '../domain/currency.dart';
 import '../domain/expense_date.dart';
 import '../domain/models.dart';
 import 'theme.dart';
+import 'weather_chip.dart';
 
 /// 支出列表的一列。`src/components/expense/ExpenseRow.vue` 的 Flutter 版。
 
@@ -104,8 +105,24 @@ class ExpenseRow extends StatelessWidget {
                   //
                   // 圖示而不是 emoji：跟分類同一個理由，emoji 在不同 ROM 上
                   // 長得不一樣，而且吃不到 muted 這個顏色。
+                  // 天氣接在地點那條線索後面，不另開一欄：列上已經有分類
+                  // 圖示，再並排一個天氣圖示是兩個圖示搶注意力 —— 而天氣
+                  // 本來就屬於地點。
                   if (place != null)
-                    _Clue(icon: Icons.place_outlined, label: place.name),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: _Clue(
+                            icon: Icons.place_outlined,
+                            label: place.name,
+                          ),
+                        ),
+                        if (expense.weather != null) ...[
+                          const SizedBox(width: AppSpace.x2),
+                          WeatherChip(weather: expense.weather!, size: 11),
+                        ],
+                      ],
+                    ),
                   if (expense.note.isNotEmpty)
                     _Clue(icon: Icons.notes, label: expense.note),
                   if (onRepeat != null) ...[

@@ -7,6 +7,7 @@ import '../domain/place_bias.dart' as domain;
 import 'place_map.dart';
 import 'remote_receipt.dart';
 import 'theme.dart';
+import 'weather_chip.dart';
 
 /// 唯讀的支出詳情。`src/pages/ExpenseDetailPage.vue` 的 Flutter 版。
 ///
@@ -148,6 +149,11 @@ class ExpenseDetailPage extends StatelessWidget {
                   ),
                   if (place.address != null && place.address!.isNotEmpty)
                     Text(place.address!, style: text.bodySmall),
+                  // 天氣跟地點、地圖同一區：它是關於這個地點那天的事。
+                  if (expense.weather != null) ...[
+                    const SizedBox(height: AppSpace.x2),
+                    WeatherChip(weather: expense.weather!),
+                  ],
                   if (place.lat != null && place.lng != null) ...[
                     const SizedBox(height: 8),
                     PlaceMap.enabled
