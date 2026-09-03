@@ -143,9 +143,15 @@ VisiblePlaces visiblePlaces(List<PlaceTotal> places, {int limit = placeLimit}) {
 
 /// 有座標的地點才畫得上靜態地圖。純文字輸入的地點沒有經緯度。
 ///
-/// 上限 20：標記太多會讓網址超過長度上限，取金額最大的前幾個就夠表達
-/// 「去了哪一帶」。
-List<PlaceTotal> mappablePlaces(List<PlaceTotal> places, {int limit = 20}) {
+/// 上限直接由網址長度推出來，跟 `src/services/staticMap.ts` 同一套算法：
+/// Static Maps 的網址上限 16384 字元，留 1384 給其餘參數，一個標記最長
+/// 24 字元（`|-123.456789,-123.456789`），扣掉 `color:0xe8590c|` 那個開頭。
+///
+/// 本來寫死 20，那是保守過頭 —— 二十幾個地點的旅程並不罕見，而超過的地點
+/// 會安靜地從地圖上消失，看的人不會知道少了什麼。
+const int maxMarkers = (16384 - 1384 - 32) ~/ 24;
+
+List<PlaceTotal> mappablePlaces(List<PlaceTotal> places, {int limit = maxMarkers}) {
   return places
       .where((place) => place.lat != null && place.lng != null)
       .take(limit)

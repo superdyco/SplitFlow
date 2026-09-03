@@ -214,5 +214,31 @@ void main() {
 
       expect(mappablePlaces(places).map((p) => p.name), ['有座標']);
     });
+
+    // 二十幾個地點的旅程很正常，那些不該從地圖上消失。
+    test('一般規模的旅程一個標記都不截', () {
+      final places = [
+        for (var i = 0; i < 60; i++)
+          PlaceTotal(
+            name: '地點$i',
+            placeId: null,
+            lat: 1,
+            lng: 2,
+            total: 100,
+            expenseCount: 1,
+          ),
+      ];
+
+      expect(mappablePlaces(places), hasLength(60));
+    });
+
+    // 上限的意義就是「網址塞得下」，所以直接量網址。
+    test('塞到上限時網址仍在 Static Maps 的 16384 字元限制內', () {
+      final markers = [
+        for (var i = 0; i < maxMarkers; i++) '-123.456789,-123.456789',
+      ].join('|');
+
+      expect('markers=color:0xe8590c|$markers'.length, lessThan(16384 - 1384));
+    });
   });
 }

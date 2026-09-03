@@ -16,8 +16,24 @@ import type { PlaceTotal } from "@/utils/placeTotals";
 
 const STATIC_MAP_URL = "https://maps.googleapis.com/maps/api/staticmap";
 const LANGUAGE = "zh-TW";
-/** 標記太多會讓 URL 超過長度上限，取金額最大的前幾個就夠表達「去了哪一帶」。 */
-const MAX_MARKERS = 20;
+/**
+ * 標記上限直接由 URL 長度推出來，不是憑感覺定的數字。
+ *
+ * Static Maps 的網址上限是 16384 字元，一個標記最長 24 字元
+ * （`|-123.456789,-123.456789`）。留 1384 給網址其餘部分（金鑰最長，其他都是固定的），
+ * 剩下的除一除就是這裡的上限。
+ *
+ * 本來寫死 20，那是保守過頭 —— 二十幾個地點的旅程並不罕見，而超過的地點
+ * 會安靜地從地圖上消失，看的人不會知道少了什麼。真正會先撞到的是
+ * `MAX_MAP_BYTES`（那個有警告訊息），不是這裡。
+ */
+const MARKER_URL_BUDGET = 16384 - 1384;
+const MARKER_MAX_CHARS = 24;
+/** `markers=` 那個參數的固定開頭（`color:0xe8590c|`），不是每個標記都有一份。 */
+const MARKER_PREFIX_CHARS = 32;
+export const MAX_MARKERS = Math.floor(
+  (MARKER_URL_BUDGET - MARKER_PREFIX_CHARS) / MARKER_MAX_CHARS
+);
 /** 搭配 scale=2，實際輸出是 1280x800，在高解析度螢幕上才不會糊。 */
 const SIZE = "640x400";
 /** Google 的錯誤訊息是一整段文字，截短才塞得進一行提示。 */
