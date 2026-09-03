@@ -1,3 +1,5 @@
+import 'package:splitflow/domain/models.dart';
+import 'package:splitflow/domain/place_bias.dart';
 import 'package:splitflow/domain/place_search.dart';
 import 'package:test/test.dart';
 
@@ -200,6 +202,59 @@ void main() {
         placeErrorHint('地點服務回應 500', status: 500),
         '地點服務回應 500',
       );
+    });
+  });
+
+  group('currentPlace 與定位抓到的座標', () {
+    const here = LatLng(22.6119, 120.2999);
+
+    test('只打名字時帶上定位的座標', () {
+      // 使用者按了定位、然後自己打了名字。座標仍然成立 ——
+      // 他描述的就是他站的地方。
+      final place = currentPlace('路邊攤', null, here);
+
+      expect(place?.name, '路邊攤');
+      expect(place?.lat, 22.6119);
+      expect(place?.lng, 120.2999);
+    });
+
+    test('改掉建議的名字之後，座標換成定位的，不是留著建議的', () {
+      /*
+        這是兩種座標的分界。
+
+        從建議選來的座標是一句斷言：「這是那家店」。改了名字那句話就不
+        成立，所以原本的規則是丟掉它 —— 那條沒有變。
+
+        定位的座標是另一句話：「我在這」。改名字不會讓它變假。
+      */
+      const picked = ExpensePlace(
+        name: '星巴克',
+        address: '某某路',
+        lat: 25.03,
+        lng: 121.56,
+        placeId: 'abc',
+      );
+
+      final place = currentPlace('麥當勞', picked, here);
+
+      expect(place?.lat, 22.6119);
+      expect(place?.placeId, isNull);
+    });
+
+    test('選了建議就用建議的，定位的座標讓位', () {
+      // 選了店就是問那家店，比問你站的地方準。
+      const picked = ExpensePlace(name: '一蘭', lat: 35.6, lng: 139.7);
+
+      expect(currentPlace('一蘭', picked, here)?.lat, 35.6);
+    });
+
+    test('沒定位過就跟以前一樣，只有名字', () {
+      expect(currentPlace('路邊攤', null)?.lat, isNull);
+    });
+
+    test('欄位清空就是 null，定位過也一樣', () {
+      // 清空代表「這筆沒有地點」。定位過不該讓它變成有地點。
+      expect(currentPlace('', null, here), isNull);
     });
   });
 }
