@@ -73,9 +73,10 @@ export const WEATHER_LABELS: Record<WeatherKind, string> = {
 export function weatherColor(kind: WeatherKind): string {
   switch (kind) {
     case "clear":
-      return "var(--color-primary)";
     case "thunder":
-      return "var(--color-primary-dark)";
+      // 太陽與閃電都是黃的。品牌橘拿來畫太陽讀起來是「橘色的太陽」，
+      // 不是「晴天」—— 這是這個功能少數不該讓品牌色說話的地方。
+      return "var(--color-weather-sun)";
     case "drizzle":
     case "rain":
     case "snow":

@@ -54,7 +54,8 @@ const iconSize = computed(() => (props.variant === "chip" ? 22 : 14));
       aria-hidden="true"
     >
       <template v-if="kind === 'clear'">
-        <circle cx="12" cy="12" r="4" />
+        <!-- 實心圓盤：細線在這個亮度下會消失，色塊不會。 -->
+        <circle cx="12" cy="12" r="4.2" fill="currentColor" stroke="none" />
         <path
           d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
         />
@@ -85,7 +86,8 @@ const iconSize = computed(() => (props.variant === "chip" ? 22 : 14));
       </template>
       <template v-else>
         <path d="M16 12H7a4 4 0 0 1 0-8 5 5 0 0 1 9.6 1.3A3.4 3.4 0 0 1 16 12z" />
-        <path d="M13 15l-3 4h4l-3 5" />
+        <!-- 閃電是閉合路徑才填得起來，跟太陽同一個理由。 -->
+        <path d="M13 13l-4 6h3l-1 5 5-7h-3l1.4-4z" fill="currentColor" stroke="none" />
       </template>
     </svg>
     <span v-if="showLabel" class="name">{{ label }}</span>
