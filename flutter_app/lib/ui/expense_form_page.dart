@@ -17,6 +17,7 @@ import '../state/providers.dart';
 import 'place_field.dart';
 import 'receipt_field.dart';
 import 'theme.dart';
+import 'weather_chip.dart';
 
 /// 新增／編輯支出。`src/pages/ExpenseFormPage.vue` 的 Flutter 版。
 ///
@@ -74,6 +75,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   String _currency = 'TWD';
   String _date = todayInput();
   String _time = nowTimeInput();
+
+  Weather? _weather;
+  bool _weatherLoading = false;
   String _paidBy = '';
   SplitMode _splitMode = SplitMode.even;
 
@@ -120,6 +124,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       _date = existing.date ?? expenseDate(existing);
       _time = existing.time ?? '';
       _place = existing.place;
+      /*
+        沿用已存的天氣，**不重查**。
+
+        重查的話：離線編輯 → 查回 null → 存檔把原本正確的天氣洗掉，
+        而使用者只是改個備註，畫面上完全看不出來發生過這件事。
+        網頁版踩過這個坑。
+      */
+      _weather = existing.weather;
       // 備註一定要回填。存檔時一律寫入 note 欄位，這裡不填就等於
       // 每編輯一次就把原本的備註洗掉一次。
       _note.text = existing.note;
@@ -139,11 +151,42 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       _paidBy = repeat.paidBy;
       _splitMode = repeat.splitMode;
       _place = repeat.place;
+      // 「再記一筆」不帶日期，所以是今天 —— 天氣要照今天重查，不能沿用
+      // 來源那筆的。initState 不能 await，交給第一幀之後。
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshWeather());
       // 只帶「分攤給誰」，**不帶各人的金額**。自訂金額是跟著來源那筆的
       // 總額算出來的，而新的一筆總額還沒填 —— 預填進去只會讓驗證對著
       // 使用者根本沒打過的數字喊「合計對不上」。
       _splitWith.addAll(repeat.splits.keys);
     }
+  }
+
+  /// 地點與日期都有了就查天氣。
+  ///
+  /// **只在使用者改動地點、日期或時間時呼叫，載入既有支出時不呼叫。**
+  /// 載入時呼叫的話，離線編輯會查回 null 把原本正確的天氣清掉 ——
+  /// 而使用者只是改個備註，畫面上完全看不出來發生過這件事。
+  Future<void> _refreshWeather() async {
+    // 先清空：改了就重查，查不到就沒有。停在那裡的舊天氣是「三月三號
+    // 清邁的雨」配上「三月五號曼谷的晚餐」，跟未換算支出同一個立場 ——
+    // 寧可沒有，不要錯的。
+    final canLookup = _place?.lat != null && _date.isNotEmpty;
+    setState(() {
+      _weather = null;
+      _weatherLoading = canLookup;
+    });
+    if (!canLookup) return;
+
+    final found = await ref.read(weatherRepositoryProvider).lookup(
+          place: _place,
+          date: _date,
+          time: _time,
+        );
+    if (!mounted) return;
+    setState(() {
+      _weather = found;
+      _weatherLoading = false;
+    });
   }
 
   @override
@@ -292,6 +335,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 'lat': place.lat,
                 'lng': place.lng,
                 'placeId': place.placeId,
+              },
+        // 查不到就是 null —— 那時 onExpenseWeather 觸發器會在文件建立後
+        // 補寫，所以離線記的帳最後還是會有天氣。
+        'weather': _weather == null
+            ? null
+            : {
+                'code': _weather!.code,
+                'high': _weather!.high,
+                'low': _weather!.low,
+                'exact': _weather!.exact,
               },
         'note': _note.text.trim(),
         'date': _date.isEmpty ? todayInput() : _date,
@@ -660,6 +713,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                   );
                                   if (picked != null) {
                                     setState(() => _date = toDateInput(picked));
+                                    _refreshWeather();
                                   }
                                 },
                                 child: Text(_date.isEmpty ? '選日期' : _date),
@@ -677,6 +731,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                     setState(() => _time =
                                         '${picked.hour.toString().padLeft(2, '0')}:'
                                             '${picked.minute.toString().padLeft(2, '0')}');
+                                    _refreshWeather();
                                   }
                                 },
                                 child: Text(_time.isEmpty ? '沒記時間' : _time),
@@ -686,7 +741,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               IconButton(
                                 tooltip: '清除時間',
                                 icon: const Icon(Icons.close, size: 18),
-                                onPressed: () => setState(() => _time = ''),
+                                onPressed: () {
+                                  setState(() => _time = '');
+                                  _refreshWeather();
+                                },
                               ),
                           ],
                         ),
@@ -700,9 +758,28 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           taskId: widget.taskId,
                           initial: widget.existing?.place,
                           // 這一格自己管輸入，父層只要知道最後算出來是什麼。
-                          onChanged: (value) => _place = value,
+                          onChanged: (value) {
+                            _place = value;
+                            _refreshWeather();
+                          },
                         ),
                       ),
+                      // 天氣是加分不是必要：查不到就整段不出現，沒有錯誤
+                      // 訊息。使用者正在記一筆帳，那才是他來這一頁的目的。
+                      if (_weatherLoading)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: AppSpace.x4,
+                          ),
+                          child: Text('查天氣中...', style: text.bodySmall),
+                        )
+                      else if (_weather != null)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: AppSpace.x4,
+                          ),
+                          child: WeatherChip(weather: _weather!),
+                        ),
                       _Field(
                         label: '收據（選填）',
                         hint: _isEdit ? null : '按下儲存時才會上傳，傳完才算數',
