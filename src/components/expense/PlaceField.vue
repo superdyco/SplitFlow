@@ -20,6 +20,15 @@ import PlaceMap, { type MapMarker } from "@/components/map/PlaceMap.vue";
 const props = defineProps<{ taskId: string }>();
 const place = defineModel<ExpensePlace | null>({ required: true });
 
+/**
+ * 定位抓到的座標。**不是地點** —— 它不會被存進支出。
+ *
+ * 往外發是因為母元件可能想拿它做別的事（例如查天氣）：天氣問的是
+ * 「那天那裡是什麼樣子」，而「我人在這」正好回答得了，即使使用者
+ * 根本不想記是哪一家店。
+ */
+const emit = defineEmits<{ locate: [LatLng] }>();
+
 /*
   初始值只讀一次，之後單向往外送 —— 跟 Flutter 版（lib/ui/place_field.dart）
   的 initial + onChanged 是同一個約定。不 watch model：使用者打字會 emit，
@@ -154,6 +163,7 @@ async function useCurrentLocation() {
     const here = await getCurrentLatLng();
     myLocation.value = here;
     placeBias.value = here;
+    emit("locate", here);
   } catch (err) {
     placeError.value = err instanceof Error ? err.message : String(err);
   } finally {

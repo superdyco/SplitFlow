@@ -74,11 +74,15 @@ const missingRate = computed(
       </strong>
       <p class="tiny">{{ shownDate }} · {{ meta.label }} · {{ paidByName }} 先付 · {{ splitLabel }}</p>
       <!--
-        天氣掛在地點這一行，不另開一欄。列上已經有分類圖示，再並排一個
-        天氣圖示是兩個圖示搶注意力 —— 而天氣本來就屬於地點，貼著它最自然。
+        天氣跟地點同一行，不另開一欄：列上已經有分類圖示，再並排一個天氣
+        圖示是兩個圖示搶注意力 —— 而天氣本來就屬於地點，貼著它最自然。
+
+        但**沒有地點也要顯示天氣**。用「定位」而不選店是合理的記法：
+        想記那天在下大雨，不見得想記是哪一家店。包在 place 的條件裡的話，
+        那種支出的天氣就查到了卻永遠看不到。
       -->
-      <p v-if="expense.place" class="tiny place">
-        📍 {{ expense.place.name }}
+      <p v-if="expense.place || expense.weather" class="tiny place">
+        <template v-if="expense.place">📍 {{ expense.place.name }}</template>
         <WeatherChip v-if="expense.weather" :weather="expense.weather" />
       </p>
       <!-- 只標示有沒有，不放縮圖：一天十筆就是十個網路請求，漫遊網路下會很難看。 -->

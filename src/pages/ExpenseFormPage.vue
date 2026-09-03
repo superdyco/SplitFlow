@@ -16,6 +16,7 @@ import { getRate } from "@/services/rateService";
 import PlaceField from "@/components/expense/PlaceField.vue";
 import WeatherChip from "@/components/expense/WeatherChip.vue";
 import { lookupWeather } from "@/services/weatherService";
+import type { WeatherAt } from "@/services/weatherService";
 import type { ExpenseWeather } from "@/types/weather";
 import {
   CURRENCIES,
@@ -112,6 +113,27 @@ const weather = ref<ExpenseWeather | null>(null);
 const weatherLoading = ref(false);
 
 /**
+ * 按「定位」抓到的座標。**不會存進支出** —— 它只用來查天氣。
+ *
+ * 不選地點只按定位是合理的用法：想記「那天在下大雨」，不見得想記是
+ * 哪一家店。少了這個，那種記法就完全查不到天氣。
+ */
+const locatedAt = ref<WeatherAt | null>(null);
+
+/**
+ * 查天氣用哪個座標：選好的地點優先，沒有就用定位抓到的。
+ *
+ * 地點優先是因為它更精確 —— 選了店就是問那家店，不是問你站的地方。
+ */
+const weatherAt = computed<WeatherAt | null>(() => {
+  const picked = place.value;
+  if (picked && picked.lat !== null && picked.lng !== null) {
+    return { lat: picked.lat, lng: picked.lng };
+  }
+  return locatedAt.value;
+});
+
+/**
  * 載入既有支出時，不要因為填入欄位就去重查天氣。
  *
  * 沒有這個守衛的話：編輯一筆舊支出 → 填入 place/date 觸發 watch → 那時如果
@@ -131,7 +153,7 @@ let skipWeatherLookup = false;
  *
  * 先清空再查，所以查詢中畫面上不會是上一次的結果。
  */
-watch([place, date, time], async () => {
+watch([weatherAt, date, time], async () => {
   if (skipWeatherLookup) {
     skipWeatherLookup = false;
     return;
@@ -141,11 +163,11 @@ watch([place, date, time], async () => {
   // 「三月三號清邁的雨」配上「三月五號曼谷的晚餐」，而畫面上看不出來 ——
   // 跟未換算支出同一個立場：寧可沒有，不要錯的。
   weather.value = null;
-  if (!place.value || place.value.lat === null || !date.value) return;
+  if (!weatherAt.value || !date.value) return;
 
   weatherLoading.value = true;
   try {
-    weather.value = await lookupWeather(place.value, date.value, time.value);
+    weather.value = await lookupWeather(weatherAt.value, date.value, time.value);
   } finally {
     weatherLoading.value = false;
   }
@@ -644,7 +666,7 @@ onMounted(load);
             查不到就整格不出現，沒有錯誤訊息：使用者正在記一筆帳，
             那才是他來這一頁的目的。
           -->
-          <PlaceField :task-id="taskId" v-model="place">
+          <PlaceField :task-id="taskId" v-model="place" @locate="locatedAt = $event">
             <template #trailing>
               <span v-if="weatherLoading" class="weather-wait tiny">查天氣</span>
               <WeatherChip v-else-if="weather" :weather="weather" variant="chip" show-label />

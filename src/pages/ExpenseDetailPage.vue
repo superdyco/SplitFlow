@@ -184,11 +184,16 @@ onMounted(load);
           </div>
         </div>
 
-        <div v-if="expense.place" class="card stack">
-          <strong class="section-title">地點</strong>
-          <span>📍 {{ expense.place.name }}</span>
-          <span v-if="expense.place.address" class="tiny">{{ expense.place.address }}</span>
-          <!-- 天氣跟地點、地圖放同一區：它是關於這個地點那天的事。 -->
+        <!--
+          沒有地點但有天氣也要出現：用「定位」而不選店是合理的記法。
+          標題也跟著改，不然一張寫著「地點」卻只有天氣的卡片很怪。
+        -->
+        <div v-if="expense.place || expense.weather" class="card stack">
+          <strong class="section-title">{{ expense.place ? "地點" : "天氣" }}</strong>
+          <template v-if="expense.place">
+            <span>📍 {{ expense.place.name }}</span>
+            <span v-if="expense.place.address" class="tiny">{{ expense.place.address }}</span>
+          </template>
           <span v-if="expense.weather" class="tiny"><WeatherChip :weather="expense.weather" show-label /></span>
           <PlaceMap v-if="mapAvailable && placeMarkers.length" :markers="placeMarkers" height="180px" />
         </div>
