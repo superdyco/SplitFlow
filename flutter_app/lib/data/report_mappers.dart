@@ -4,6 +4,7 @@ import '../domain/models.dart';
 import '../domain/place_totals.dart';
 import '../domain/report.dart';
 import '../domain/report_timeline.dart';
+import 'mappers.dart';
 
 /// 報告與收藏的 Firestore 文件 ↔ 領域模型。
 /// `src/services/reportService.ts` 的 `toReport` 與寫入那一段的 Dart 版。
@@ -90,6 +91,8 @@ List<ReportDay> _timeline(dynamic value) {
           date: (item['date'] as String?) ?? '',
           day: (item['day'] as num?)?.toInt() ?? 0,
           total: (item['total'] as num?)?.toInt() ?? 0,
+          // 這個功能之前產生的報告沒有這個欄位，weatherFrom 會回 null。
+          weather: weatherFrom(item['weather']),
           entries: _entries(item['entries']),
         ),
   ];
@@ -167,6 +170,16 @@ Map<String, dynamic> reportToMap(TripReport report) {
           'date': day.date,
           'day': day.day,
           'total': day.total,
+          // 手機產生的報告也要有天氣，不然同一個功能會產出兩種文件形狀 ——
+          // 而使用者看不出來自己拿到的是哪一種。
+          'weather': day.weather == null
+              ? null
+              : {
+                  'code': day.weather!.code,
+                  'high': day.weather!.high,
+                  'low': day.weather!.low,
+                  'exact': day.weather!.exact,
+                },
           'entries': [
             for (final entry in day.entries)
               {
