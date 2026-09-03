@@ -74,18 +74,41 @@ function validWeather() {
 
 ### 兩個 endpoint
 
-| 情況 | endpoint |
-|---|---|
-| 日期夠近 | `api.open-meteo.com/v1/forecast`，帶 `start_date` / `end_date` |
-| 更早 | `archive-api.open-meteo.com/v1/archive` |
+**已經實際打過 API 確認**（2026-09-03，曼谷座標）。兩個 endpoint 的涵蓋範圍是：
 
-**不能一律用 archive**：它的資料有幾天延遲，昨天的支出查不到。**也不能一律用 forecast**：它只能往回一段有限的天數。所以「這個日期該用哪個」是一個純函式，而且是要有測試的那種 —— 邊界搞錯的症狀是「某些支出就是沒有天氣」，而那看起來跟 API 掛掉一模一樣。
+| endpoint | 涵蓋範圍 | 怎麼知道的 |
+|---|---|---|
+| `archive-api.open-meteo.com/v1/archive` | **1940-01-01 到今天** | 超出範圍時它自己回報：`out of allowed range from 1940-01-01 to 2026-09-03` |
+| `api.open-meteo.com/v1/forecast` | **往回 93 天、往前 15 天** | 同上：`allowed range from 2026-06-02 to 2026-09-18` |
 
-> **實作第一步要先確認這兩個數字**：forecast 能往回幾天、archive 落後幾天。
-> 我沒辦法在寫規格的環境裡打 API，而這兩個值是憑印象的（forecast 大約 92 天、
-> archive 延遲數天）。**兩個都要去 Open-Meteo 的文件確認並寫進註解**，因為
-> 邊界值寫錯的症狀是「有些支出就是沒天氣」，不會有任何錯誤訊息告訴你為什麼。
-> 這也是 §9 說「要真的打一次 API 看回應」的一部分。
+所以分流規則是一句話：**日期是今天或未來用 forecast，過去用 archive。**
+
+**這跟直覺相反，值得寫下來為什麼**：archive 聽起來像是「舊資料」，但它其實**連今天都有真值**（查 2026-09-03 回傳 `weather_code: 61, max: 33.5, min: 25.6`），而且往回到 1940 年 —— 所以 forecast 那個 93 天的界線根本用不到，過去的日期一律走 archive 就好。
+
+會用 forecast 只有兩個理由，都跟未來有關：
+
+- **archive 拒絕未來日期**（明天就回 400）。使用者可以把日期填成未來。
+- **今天用 forecast 拿到的是完整的一天**。archive 給的是「到目前為止」—— 早上八點記帳會拿到「今天最高 27°」，而那天其實會到 33°。今天是最常見的支出日期，值得為它多一個分支。
+
+兩個 endpoint 的參數與回應形狀完全一樣，所以差別只在網址。
+
+### 實際的參數與回應形狀（已驗證）
+
+參數名是 **snake_case**：`weather_code`、`temperature_2m_max`、`temperature_2m_min`、`temperature_2m`。（舊文件裡的 `weathercode` 不要用。）
+
+```json
+{
+  "timezone": "Asia/Bangkok",
+  "daily":  { "time": ["2026-08-20"], "weather_code": [95],
+              "temperature_2m_max": [29.6], "temperature_2m_min": [25.0] },
+  "hourly": { "time": ["2026-08-20T00:00", "2026-08-20T01:00", ...],
+              "temperature_2m": [26.1, 26.4, ...], "weather_code": [3, 3, ...] }
+}
+```
+
+`hourly.time` 是**當地時間、沒有時區位移後綴**，所以直接拿支出的 `HH:MM` 去比對就對得上。archive 與 forecast 都支援 `hourly`。
+
+**錯誤回應是 HTTP 400 加 JSON body**：`{"error": true, "reason": "..."}`。解析時要先看 `error` 欄位，不能只看 HTTP 狀態就丟例外 —— `reason` 是唯一講得出「為什麼這筆沒有天氣」的東西，值得記進日誌。
 
 ### `timezone=auto` 是正確性需求不是選項
 
@@ -171,13 +194,15 @@ WMO 的 28 個代碼收成 **8 個圖示**：晴、多雲、陰、霧、毛毛�
 
 `functions/src/weather.ts` 全部是純函式，用既有的 vitest：
 
-- 日期新舊決定 forecast 還是 archive —— 含 92 天邊界
+- 日期新舊決定 forecast 還是 archive —— 今天、明天、昨天三個邊界
 - URL 組裝，特別是 `timezone=auto`
 - 回應解析：有時間取那小時、沒時間取當日高低、欄位缺漏時回 null 而不是丟例外
 - WMO 代碼 → 8 個圖示分組，含未知代碼的退路
 - 報告「當天第一筆有天氣」的挑選規則（`reportTimeline.ts`，用 `src/` 的 vitest）
 
-**測不到的**：四個畫面長什麼樣、冷啟動的實際延遲、Open-Meteo 真實回應的形狀。最後一項要在實作時**真的打一次 API 看回應**，不能照著記憶寫解析。
+**測不到的**：四個畫面長什麼樣、冷啟動的實際延遲。
+
+Open-Meteo 的真實回應形狀本來也在這一列，但**寫規格時已經實際打過了**（見 §3），所以解析是照著真實回應寫的，不是照記憶。那一輪也順手推翻了原本的分流方向 —— 這就是為什麼「先打一次再寫」值得。
 
 ## 10. 會動到的檔案
 
