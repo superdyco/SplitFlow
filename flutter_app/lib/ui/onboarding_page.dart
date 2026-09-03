@@ -108,7 +108,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                       child: Text(
                         initial,
                         style: const TextStyle(
-                          color: AppColors.primary,
+                          // primaryDeep：這是文字印在 primarySoft 上，
+                          // primary 只有 3.2:1、primaryDark 4.17，都不夠。
+                          // 跟 members_tab 的頭像是同一個修正。
+                          color: AppColors.primaryDeep,
                           fontWeight: FontWeight.w700,
                         ),
                       ),

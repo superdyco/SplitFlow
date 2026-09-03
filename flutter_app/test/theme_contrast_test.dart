@@ -144,6 +144,24 @@ void main() {
       );
     });
 
+    test('primary 更不能印在 primarySoft 上', () {
+      expect(
+        contrastRatio(AppColors.primary, AppColors.primarySoft),
+        lessThan(4.5),
+      );
+    });
+
+    /*
+      橘色淺底上唯一過得了的橘色。頭像的字母就是這個組合 ——
+      members_tab 與 onboarding_page 各有一個。
+    */
+    test('primaryDeep 印在 primarySoft 上過得了 AA', () {
+      expect(
+        contrastRatio(AppColors.primaryDeep, AppColors.primarySoft),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+
     test('primaryDark 印在白底上才過得了 AA', () {
       expect(
         contrastRatio(AppColors.primaryDark, AppColors.card),
