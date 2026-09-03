@@ -127,6 +127,31 @@ void main() {
     });
   });
 
+  group('不准的組合', () {
+    /*
+      primaryDark 印在 primarySoft 上只有 4.17:1。
+
+      這一條跟「soft 過不了 4.5」一樣是刻意寫的：兩個顏色各自都合法，
+      湊在一起才不合法，而那正是最容易不小心做出來的組合 ——
+      橘色的字配橘色的淺底，看起來非常合理。
+
+      報告頁的每人平均本來就是這個組合，改成白底才過。
+    */
+    test('primaryDark 不能印在 primarySoft 上', () {
+      expect(
+        contrastRatio(AppColors.primaryDark, AppColors.primarySoft),
+        lessThan(4.5),
+      );
+    });
+
+    test('primaryDark 印在白底上才過得了 AA', () {
+      expect(
+        contrastRatio(AppColors.primaryDark, AppColors.card),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+  });
+
   group('非文字顏色', () {
     test('soft 過得了 3:1 —— 它畫的是分隔與圖示，不是字', () {
       expect(
