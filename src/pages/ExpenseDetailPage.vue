@@ -160,7 +160,11 @@ onMounted(load);
         <div class="card stack">
           <div class="row">
             <span class="tiny label">分類</span>
-            <span>{{ meta.label }}</span>
+            <!--
+              帶上圖示。這一列本來只有純文字，是整頁唯一沒有顏色的東西 ——
+              而分類在列表與這一頁的抬頭都是有顏色的方塊，只有這裡是黑字。
+            -->
+            <span class="cat">{{ meta.icon }} {{ meta.label }}</span>
           </div>
           <div class="row">
             <span class="tiny label">日期</span>
@@ -286,5 +290,12 @@ onMounted(load);
   display: block;
   width: 100%;
   border-radius: var(--radius-md);
+}
+
+/* 圖示與文字之間留一格，不然 emoji 會黏著字。 */
+.cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 </style>
