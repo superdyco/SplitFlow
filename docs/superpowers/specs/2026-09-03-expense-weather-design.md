@@ -1,7 +1,11 @@
 # 支出天氣 Design
 
 **日期：** 2026-09-03
-**範圍：** `src/`（網頁版）、`functions/`、`firestore.rules`。`flutter_app/` 這一輪不做。
+**範圍：** `src/`（網頁版）、`functions/`、`firestore.rules`、`flutter_app/`（手機版）。
+
+> **範圍變更（同日）**：原本寫「Flutter 這一輪不做」。改成做，理由見 §11 ——
+> 報告的序列化是雙向的，Flutter 也會產生報告，不做的話**從手機產生的報告
+> 沒有天氣、從網頁產生的有**，同一個功能兩種文件形狀。
 
 ## 1. 這是什麼
 
@@ -182,7 +186,8 @@ WMO 的 28 個代碼收成 **8 個圖示**：晴、多雲、陰、霧、毛毛�
 ## 8. 不做的事
 
 - **不回填舊支出。** 舊的就是沒有天氣，跟「自己打字的地點沒有座標」是同一種缺席。零風險、零額外工作。
-- **不做 Flutter。** callable 是共用的，手機版之後接同一個，不用重寫查詢邏輯。
+- ~~**不做 Flutter。**~~ 見 §11。callable 共用這個決定仍然成立 ——
+  Flutter 呼叫同一個雲端函式，**不重寫任何 Open-Meteo 的邏輯**。
 - **推播不掛天氣。** `expenseNotification()` 只吃 taskName / author / expenseTitle / amount / currency，`message.ts` 完全不動。
 - **不做華氏。**
 - **不改任何金額計算、結算、分攤。**
@@ -230,3 +235,45 @@ Open-Meteo 的真實回應形狀本來也在這一列，但**寫規格時已經�
 | `src/composables/useTripReport.ts` | 產生報告時帶上天氣 |
 
 **不動**：`functions/src/message.ts`、任何金額或結算相關的檔案、`flutter_app/`。
+
+## 11. 手機版
+
+### 為什麼不能留到下一輪
+
+`data/report_mappers.dart` 的時間軸序列化是**雙向**的：Flutter 讀報告，也產生報告。
+
+Flutter 不做的話，**從手機按「產生報告」出來的文件沒有天氣，從網頁按的有**。同一個功能產出兩種形狀的公開文件，而使用者完全看不出來差別在哪 —— 他只會覺得「有時候有天氣有時候沒有」。
+
+### 不重寫的東西
+
+**Open-Meteo 的邏輯一行都不搬到 Dart。** endpoint 分流、URL 組裝、回應解析、`timezone=auto`、錯誤處理，全部留在 `functions/src/weather.ts`。Flutter 呼叫同一個 `lookupWeather` callable，拿到的是算好的結果。
+
+這正是 §4 那個決定的回報：如果當初讓前端自己查，現在就要用 Dart 再寫一次，而兩份實作分岔的症狀是「同一筆支出在手機和網頁顯示不同天氣」。
+
+`cloud_functions` 套件已經在依賴裡（`deleteAccount` 用的），region 一樣是 `asia-east1`。
+
+### 要寫的東西
+
+| 檔案 | 變更 |
+|---|---|
+| `domain/models.dart` | 加 `Weather` 值物件，`Expense` 加選填 `weather` |
+| `domain/weather.dart`（新） | `WeatherKind` 與 `weatherKind(code)`。**照抄網頁版的分組與那 8 條測試** |
+| `data/mappers.dart` | `_weatherFrom` —— 比照既有的 `_placeFrom` |
+| `data/report_mappers.dart` | `ReportDay` 的**讀與寫都要**加 weather |
+| `domain/report_timeline.dart` | `ReportDay` 加 weather 與「當天第一筆」的挑選規則 |
+| `data/weather_repository.dart`（新） | 呼叫 callable。查不到回 null |
+| `ui/weather_chip.dart`（新） | 圖示＋溫度 |
+| `ui/expense_form_page.dart` | 地點與日期都有了就查；**存檔的 map 要帶上** |
+| `ui/expense_row.dart` | 掛在地點那條線索行 |
+| `ui/expense_detail_page.dart` | 地點區 |
+| `ui/report_page.dart` | 時間軸的日表頭 |
+
+### 跟網頁版一樣要小心的兩件事
+
+1. **編輯路徑不能洗掉天氣。** 網頁版踩過這個坑：載入舊支出時填入地點會觸發重查，那時如果離線就把原本正確的天氣清成 null，存檔後就沒了 —— 而使用者只是改個備註。Flutter 的表單是 `setState` 不是 watcher，但同一個陷阱要一起想過。
+
+2. **存檔的 map 要帶 `weather`。** `expense_form_page.dart` 的 `input` 是**手寫的欄位清單**，漏掉就是靜默不存 —— 沒有任何型別檢查會抓到。
+
+### 圖示用 Material Icons
+
+網頁版畫 inline SVG 是因為它沒有圖示庫。Flutter 有 Material Icons，而且這一輪剛把分類圖示從 emoji 換成 `IconData` —— 天氣照同一套，不畫 SVG。
