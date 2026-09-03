@@ -108,7 +108,7 @@ class TaskCard extends StatelessWidget {
                       Text(
                         '${task.defaultCurrency} '
                         '${formatAmount(myCost!, task.defaultCurrency)}',
-                        style: figureStyle.copyWith(fontSize: 16),
+                        style: figure(size: 16),
                       ),
                     ],
                   ),

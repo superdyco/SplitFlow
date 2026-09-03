@@ -51,6 +51,28 @@ void main() {
     });
   });
 
+  group('rowHead —— 列表表頭條', () {
+    /*
+      表頭條上面印的是 13px 的區段標題，那是內文不是裝飾，門檻 4.5:1。
+
+      #FAF8F5 幾乎是白的，這兩條預期會過。還是要寫：預期會過跟算過是兩件事，
+      而下一個人改這個顏色的時候，需要有東西攔住他。
+    */
+    test('ink 印在 rowHead 上過得了 AA', () {
+      expect(
+        contrastRatio(AppColors.ink, AppColors.rowHead),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+
+    test('muted 印在 rowHead 上過得了 AA', () {
+      expect(
+        contrastRatio(AppColors.muted, AppColors.rowHead),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+  });
+
   group('文字顏色要過 4.5:1', () {
     test('muted 對頁面底色 —— 它是 bodySmall 的預設，那是內文不是裝飾', () {
       // 日期、成員數、每人金額、所有提示都印在這個顏色上。

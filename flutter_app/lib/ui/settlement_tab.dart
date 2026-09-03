@@ -210,7 +210,7 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
                     Text(
                       '${result.currency} '
                       '${formatAmount(result.total, result.currency)}',
-                      style: figureStyle,
+                      style: figure(),
                     ),
                     const SizedBox(height: 4),
                     Text(

@@ -368,7 +368,7 @@ class _CostSection extends StatelessWidget {
                     Text(item.currency, style: text.bodySmall),
                     Text(
                       formatAmount(item.amount, item.currency),
-                      style: figureStyle,
+                      style: figure(),
                     ),
                   ],
                 ),

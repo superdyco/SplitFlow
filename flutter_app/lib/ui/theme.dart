@@ -51,6 +51,16 @@ abstract final class AppColors {
   static const track = Color(0xFFF0EBE4);
 
   /*
+    列表的兩個新顏色。卡片不再一張張浮起來之後，「這是兩件事」就只剩
+    這兩個東西在講：頂上的一條底色，跟中間的一條線。
+
+    rowLine 比 line (#EDE7E0) 深一點點是刻意的 —— 它現在要承擔原本陰影
+    在做的分隔工作，用一樣淺的話列表會糊成一片。
+  */
+  static const rowHead = Color(0xFFFAF8F5); // 列表表頭條。比 card 深、比 bg 淺。
+  static const rowLine = Color(0xFFECE6DE); // 列表內的分隔線。
+
+  /*
     danger 現在有 45 個使用者，全部是同一個正紅 —— 邊框、底、文字、按鈕
     前景都是它。網頁版已經拆成四階。
 
@@ -78,10 +88,17 @@ abstract final class AppColors {
 /// 圓角四階加一個藥丸。全 app 原本有 4/10/12/16/20/22 六種，
 /// 其中最常用的 12 與按鈕的 16 都不在網頁版的階梯上。
 abstract final class AppRadius {
-  static const sm = 10.0;
-  static const md = 14.0;
-  static const lg = 18.0;
-  static const xl = 22.0;
+  /*
+    這一輪整條往下移一階：18px 的卡片圓角在密度提高之後會顯得鬆垮，
+    而圓角本身不是這個方向要表達的東西。
+
+    **只改值，不改名，不改使用點。** 四階仍是四階，不會生出沒人用的常數。
+    cardTheme 已經走 AppRadius.lg，所以全 app 的卡片圓角就是這一行在管。
+  */
+  static const sm = 6.0; // chip、分段控制的內層、小標籤
+  static const md = 8.0; // 按鈕、輸入框
+  static const lg = 10.0; // 卡片
+  static const xl = 14.0; // 對話框、bottom sheet
   static const pill = 999.0;
 }
 
@@ -156,10 +173,15 @@ ThemeData buildAppTheme() {
       ),
     ),
 
-    // 網頁版的 .btn 是 48px 高、--radius-md 圓角。
+    /*
+      44px 而不是 48：44 是 iOS 的建議下限，也過得了 WCAG 2.5.8 的 24×24。
+      48 在密度提高之後顯得笨重。
+
+      網頁版還是 48 —— 這一輪只動手機版，兩邊會不一致直到網頁版跟上。
+    */
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: const Size(0, 48),
+        minimumSize: const Size(0, 44),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
         ),
@@ -169,7 +191,7 @@ ThemeData buildAppTheme() {
 
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size(0, 48),
+        minimumSize: const Size(0, 44),
         foregroundColor: AppColors.ink,
         side: const BorderSide(color: AppColors.line),
         shape: RoundedRectangleBorder(
@@ -215,13 +237,22 @@ ThemeData buildAppTheme() {
   );
 }
 
-/// 金額用等寬數字。
+/// 金額的字型。**畫面上每一個金額都要走這裡。**
 ///
-/// 不加的話一欄金額右對齊會因為數字寬度不同而抖動 —— 網頁版靠
-/// `font-variant-numeric: tabular-nums`，Flutter 的等價寫法是這個。
-const TextStyle figureStyle = TextStyle(
-  fontSize: 22,
-  fontWeight: FontWeight.w700,
-  color: AppColors.ink,
-  fontFeatures: [FontFeature.tabularFigures()],
-);
+/// 等寬數字讓一欄金額右對齊時位數對得齊 —— 比例字型的 1 比 6 窄，
+/// 一整欄下來小數點會是歪的，而「對齊」是這一輪整個方向的核心。
+///
+/// 做成函式而不是常數，是因為原本那個 22px 的常數只有三個地方用得上，
+/// 其餘尺寸的金額就全都沒有等寬數字了 —— 一個尺寸的常數等於一條沒人守得住的規則。
+TextStyle figure({
+  double size = 22,
+  FontWeight weight = FontWeight.w700,
+  Color color = AppColors.ink,
+}) {
+  return TextStyle(
+    fontSize: size,
+    fontWeight: weight,
+    color: color,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
+}
