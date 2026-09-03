@@ -778,7 +778,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           padding: const EdgeInsets.only(
                             bottom: AppSpace.x4,
                           ),
-                          child: WeatherChip(weather: _weather!),
+                          child: WeatherChip(
+                            weather: _weather!,
+                            variant: WeatherChipVariant.chip,
+                            showLabel: true,
+                          ),
                         ),
                       _Field(
                         label: '收據（選填）',

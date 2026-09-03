@@ -404,7 +404,7 @@ class _Timeline extends StatelessWidget {
                 ),
                 // 舊報告沒有這個欄位，一定要判斷而不是假設它存在。
                 if (day.weather != null) ...[
-                  WeatherChip(weather: day.weather!, size: 11),
+                  WeatherChip(weather: day.weather!, showLabel: true),
                   const SizedBox(width: AppSpace.x3),
                 ],
                 Text(

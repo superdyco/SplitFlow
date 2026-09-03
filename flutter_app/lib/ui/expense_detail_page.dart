@@ -127,34 +127,43 @@ class ExpenseDetailPage extends StatelessWidget {
             ),
           ),
 
-          if (place != null) ...[
+          // 沒有地點但有天氣也要出現：用「定位」而不選店是合理的記法。
+          // 標題跟著改，不然一張寫著「地點」卻只有天氣的卡片很怪。
+          if (place != null || expense.weather != null) ...[
             const SizedBox(height: 12),
             _Card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _SectionTitle('地點'),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.place_outlined,
-                        size: 16,
-                        color: AppColors.primaryDark,
-                      ),
-                      const SizedBox(width: AppSpace.x2),
-                      Flexible(
-                        child: Text(place.name, style: text.bodyMedium),
-                      ),
-                    ],
-                  ),
-                  if (place.address != null && place.address!.isNotEmpty)
-                    Text(place.address!, style: text.bodySmall),
+                  _SectionTitle(place != null ? '地點' : '天氣'),
+                  if (place != null) ...[
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.place_outlined,
+                          size: 16,
+                          color: AppColors.primaryDark,
+                        ),
+                        const SizedBox(width: AppSpace.x2),
+                        Flexible(
+                          child: Text(place.name, style: text.bodyMedium),
+                        ),
+                      ],
+                    ),
+                    if (place.address != null && place.address!.isNotEmpty)
+                      Text(place.address!, style: text.bodySmall),
+                  ],
                   // 天氣跟地點、地圖同一區：它是關於這個地點那天的事。
                   if (expense.weather != null) ...[
                     const SizedBox(height: AppSpace.x2),
-                    WeatherChip(weather: expense.weather!),
+                    WeatherChip(
+                      weather: expense.weather!,
+                      showLabel: true,
+                    ),
                   ],
-                  if (place.lat != null && place.lng != null) ...[
+                  if (place != null &&
+                      place.lat != null &&
+                      place.lng != null) ...[
                     const SizedBox(height: 8),
                     PlaceMap.enabled
                         ? PlaceMap.single(

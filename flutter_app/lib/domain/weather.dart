@@ -26,3 +26,21 @@ WeatherKind weatherKind(int code) {
   if (code >= 95 && code <= 99) return WeatherKind.thunder;
   return WeatherKind.overcast;
 }
+
+/// 每一組的中文名。
+///
+/// 加這個是因為小尺寸的圖示分不出「雷雨」與「毛毛雨」—— 兩個字比任何圖示
+/// 都好認。圖示負責一眼掃到，文字負責講清楚。
+///
+/// 顏色不放這裡：那需要 import material，而這個檔案是純 Dart，
+/// 測試才跑得動 package:test。顏色在 ui/weather_chip.dart。
+const Map<WeatherKind, String> weatherLabels = {
+  WeatherKind.clear: '晴',
+  WeatherKind.cloudy: '多雲',
+  WeatherKind.overcast: '陰',
+  WeatherKind.fog: '霧',
+  WeatherKind.drizzle: '毛毛雨',
+  WeatherKind.rain: '雨',
+  WeatherKind.snow: '雪',
+  WeatherKind.thunder: '雷雨',
+};

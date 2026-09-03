@@ -108,18 +108,24 @@ class ExpenseRow extends StatelessWidget {
                   // 天氣接在地點那條線索後面，不另開一欄：列上已經有分類
                   // 圖示，再並排一個天氣圖示是兩個圖示搶注意力 —— 而天氣
                   // 本來就屬於地點。
-                  if (place != null)
+                  //
+                  // **沒有地點也要顯示天氣**：用「定位」而不選店是合理的
+                  // 記法。包在 place 的條件裡的話，那種支出的天氣就查到了
+                  // 卻永遠看不到。
+                  if (place != null || expense.weather != null)
                     Row(
                       children: [
-                        Flexible(
-                          child: _Clue(
-                            icon: Icons.place_outlined,
-                            label: place.name,
+                        if (place != null)
+                          Flexible(
+                            child: _Clue(
+                              icon: Icons.place_outlined,
+                              label: place.name,
+                            ),
                           ),
-                        ),
                         if (expense.weather != null) ...[
-                          const SizedBox(width: AppSpace.x2),
-                          WeatherChip(weather: expense.weather!, size: 11),
+                          if (place != null)
+                            const SizedBox(width: AppSpace.x2),
+                          WeatherChip(weather: expense.weather!),
                         ],
                       ],
                     ),

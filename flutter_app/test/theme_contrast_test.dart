@@ -127,6 +127,29 @@ void main() {
     });
   });
 
+  group('天氣圖示的兩個顏色', () {
+    test('weatherWet 過得了圖形的 3:1', () {
+      expect(
+        contrastRatio(AppColors.weatherWet, AppColors.card),
+        greaterThanOrEqualTo(3),
+      );
+    });
+
+    /*
+      這一條**斷言它過不了**，跟「soft 過不了 4.5」是同一種寫法。
+
+      任何看起來像陽光的黃都太亮，這是物理限制不是選色失敗。它站得住是
+      因為兩件事：圖示旁邊一律有文字（意義不靠它獨自承擔），而且太陽與
+      閃電是實心圖示（會消失的是細線，不是色塊）。
+
+      寫成測試是為了讓下一個人知道這是**算過之後決定的**，不是漏掉了。
+      哪天有人想拿它去印文字，這條會擋住。
+    */
+    test('weatherSun 過不了 3:1 —— 這是刻意的，所以它只用在實心圖示上', () {
+      expect(contrastRatio(AppColors.weatherSun, AppColors.card), lessThan(3));
+    });
+  });
+
   group('不准的組合', () {
     /*
       primaryDark 印在 primarySoft 上只有 4.17:1。

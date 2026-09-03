@@ -61,6 +61,22 @@ abstract final class AppColors {
   static const rowLine = Color(0xFFECE6DE); // 列表內的分隔線。
 
   /*
+    天氣圖示的兩個顏色。跟網頁版的 --color-weather-sun / --color-weather-wet
+    是同一組值 —— 同一筆支出在兩邊要長一樣。
+
+    八種天氣只有三種顏色：這兩個加上 muted（雲、霧）。顏色講「哪一類」，
+    形狀與名稱講「哪一個」；八種顏色會讓一個小圖示變成調色盤，而且藍色系
+    彼此根本分不出來。
+
+    weatherSun 對白底只有 2.3:1，過不了圖形的 3:1 —— 而那是物理限制：
+    任何看起來像陽光的黃都太亮。兩件事讓它站得住：圖示旁邊一律有文字，
+    所以意義不靠它獨自承擔；而且太陽與閃電用**實心**圖示，真正會消失的是
+    細線，不是色塊。沒有任何**文字**用這兩個顏色。
+  */
+  static const weatherSun = Color(0xFFE0A020);
+  static const weatherWet = Color(0xFF3D7FA6); // 4.4:1 on 白底。
+
+  /*
     danger 現在有 45 個使用者，全部是同一個正紅 —— 邊框、底、文字、按鈕
     前景都是它。網頁版已經拆成四階。
 
