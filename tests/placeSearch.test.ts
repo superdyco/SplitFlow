@@ -57,6 +57,69 @@ describe("currentPlace", () => {
   });
 });
 
+describe("currentPlace 與定位抓到的座標", () => {
+  const here = { lat: 22.6119, lng: 120.2999 };
+
+  it("只打名字時帶上定位的座標", () => {
+    // 使用者按了定位、然後自己打了名字。座標仍然成立 ——
+    // 他描述的就是他站的地方。
+    const place = currentPlace("路邊攤", null, here);
+
+    expect(place).toEqual({
+      name: "路邊攤",
+      address: null,
+      lat: 22.6119,
+      lng: 120.2999,
+      placeId: null
+    });
+  });
+
+  it("改掉建議的名字之後，座標換成定位的，不是留著建議的", () => {
+    /*
+      這是兩種座標的分界。
+
+      從建議選來的座標是一句斷言：「這是那家店」。改了名字那句話就不成立，
+      所以原本的規則是丟掉它 —— 那條沒有變。
+
+      定位的座標是另一句話：「我在這」。改名字不會讓它變假。
+    */
+    const picked = {
+      name: "星巴克",
+      address: "某某路",
+      lat: 25.03,
+      lng: 121.56,
+      placeId: "abc"
+    };
+
+    const place = currentPlace("麥當勞", picked, here);
+
+    expect(place?.lat).toBe(22.6119);
+    expect(place?.placeId).toBeNull();
+  });
+
+  it("選了建議就用建議的，定位的座標讓位", () => {
+    // 選了店就是問那家店，比問你站的地方準。
+    const picked = {
+      name: "一蘭",
+      address: null,
+      lat: 35.6,
+      lng: 139.7,
+      placeId: "x"
+    };
+
+    expect(currentPlace("一蘭", picked, here)?.lat).toBe(35.6);
+  });
+
+  it("沒定位過就跟以前一樣，只有名字", () => {
+    expect(currentPlace("路邊攤", null, null)?.lat).toBeNull();
+  });
+
+  it("欄位清空就是 null，定位過也一樣", () => {
+    // 清空代表「這筆沒有地點」。定位過不該讓它變成有地點。
+    expect(currentPlace("", null, here)).toBeNull();
+  });
+});
+
 describe("shouldSearchPlace", () => {
   it("兩個字以上才查", () => {
     expect(shouldSearchPlace("拉麵")).toBe(true);

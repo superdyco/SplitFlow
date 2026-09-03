@@ -46,7 +46,15 @@ const locating = ref(false);
 const placeError = ref<string | null>(null);
 const placeSearchable = placesEnabled();
 
-/** 按下定位鍵抓到的座標。只用來在地圖上標出「你在這」，不會存進支出裡。 */
+/**
+ * 按下定位鍵抓到的座標。
+ *
+ * **它現在會進到支出裡**（以前不會）。理由是原本的行為有兩個問題：
+ * 按了之後地圖上看得到、存完回來卻不見了；而且欄位裡上一次選的店還留著，
+ * 明明已經按過定位。
+ *
+ * 進去的是座標，名字仍然由使用者決定 —— 預設填成座標字串，打字蓋掉就好。
+ */
 const myLocation = ref<LatLng | null>(null);
 
 /**
@@ -94,8 +102,8 @@ const placeMarkers = computed<MapMarker[]>(() => {
  * 這一格的值只有一個真相來源：輸入的字加上選過的那一份建議。
  * 兩者任一改變就往上送 —— 母元件不需要知道這裡面有九個 ref。
  */
-watch([placeQuery, selectedPlace], () => {
-  place.value = currentPlace(placeQuery.value, selectedPlace.value);
+watch([placeQuery, selectedPlace, myLocation], () => {
+  place.value = currentPlace(placeQuery.value, selectedPlace.value, myLocation.value);
 });
 
 function onPlaceInput(value: string) {
@@ -164,6 +172,19 @@ async function useCurrentLocation() {
     myLocation.value = here;
     placeBias.value = here;
     emit("locate", here);
+
+    /*
+      把座標填進欄位，並且作廢上一次選的店。
+
+      少了這兩行，按定位對這一格毫無影響：欄位裡還留著剛剛選的「星巴克」，
+      而使用者以為自己已經改成「目前位置」了。存下去的是星巴克。
+
+      名字用座標是暫時的 —— 這一格可以打字，蓋掉它就好，座標會留著
+      （見 currentPlace 對 located 的處理）。四位小數大約 11 公尺，
+      夠精確又不會長到一整行都是數字。
+    */
+    selectedPlace.value = null;
+    placeQuery.value = `${here.lat.toFixed(4)}, ${here.lng.toFixed(4)}`;
   } catch (err) {
     placeError.value = err instanceof Error ? err.message : String(err);
   } finally {
