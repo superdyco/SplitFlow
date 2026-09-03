@@ -80,10 +80,7 @@ class ExpenseDetailPage extends StatelessWidget {
                 Text(
                   '${expense.currency} '
                   '${formatAmount(expense.amount, expense.currency)}',
-                  style: text.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                  style: figure(size: 26),
                 ),
                 if (converted != null)
                   Text('約 $baseCurrency $converted', style: text.bodySmall),
@@ -307,9 +304,7 @@ class _Row extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             value,
-            style: text.bodyMedium?.copyWith(
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
+            style: figure(size: 14, weight: FontWeight.w400),
             textAlign: TextAlign.end,
           ),
         ],

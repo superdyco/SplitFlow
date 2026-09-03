@@ -331,11 +331,12 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
                     Text(
                       '${balance.balance >= 0 ? '應收 ' : '應付 '}'
                       '${formatAmount(balance.balance.abs(), result.currency)}',
-                      style: text.bodyMedium?.copyWith(
+                      style: figure(
+                        size: 14,
+                        weight: FontWeight.w400,
                         color: balance.balance >= 0
                             ? AppColors.success
                             : AppColors.danger,
-                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ],
@@ -446,13 +447,7 @@ class _TransferRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(label, style: text.bodyMedium)),
-          Text(
-            amount,
-            style: text.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
+          Text(amount, style: figure(size: 14)),
           if (onRecord != null) ...[
             const SizedBox(width: 4),
             TextButton(
@@ -507,10 +502,7 @@ class _PaymentRow extends StatelessWidget {
                     children: [
                       Text(
                         '$currency ${formatAmount(payment.amount, currency)}',
-                        style: text.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
+                        style: figure(size: 12),
                       ),
                       const SizedBox(width: 8),
                       Text(
