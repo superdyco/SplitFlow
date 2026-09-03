@@ -80,6 +80,38 @@ class ExpensePlace {
       );
 }
 
+/// 支出當時、當地的天氣。
+///
+/// 是 functions/src/weather.ts 的 WeatherResult 的 Dart 版，欄位逐一對應。
+/// 兩邊各自宣告是刻意的：functions 是獨立套件，沒有共用程式碼。形狀要對得上，
+/// 改一邊要記得改另一邊 —— 這是那個切分的已知代價。
+///
+/// **查詢邏輯不在這裡也不在 Dart 的任何地方。** endpoint 分流、URL 組裝、
+/// 回應解析全部在雲端函式裡，這邊只呼叫 lookupWeather callable。
+class Weather {
+  /// WMO 天氣代碼 0–99。決定圖示。
+  final int code;
+
+  /// 當日最高溫，攝氏整數。
+  final int high;
+
+  /// 當日最低溫，攝氏整數。
+  final int low;
+
+  /// 那個小時的實測溫度。**只有支出填了時間才有。**
+  ///
+  /// 有它就印「28°」，沒有就印「24–33°」—— 顯示形式直接反映這筆有沒有記
+  /// 時間，不假裝出沒有的精度。
+  final int? exact;
+
+  const Weather({
+    required this.code,
+    required this.high,
+    required this.low,
+    required this.exact,
+  });
+}
+
 /// 一筆支出。
 class Expense {
   final String id;
@@ -121,6 +153,10 @@ class Expense {
 
   final ExpensePlace? place;
 
+  /// 那天那個地點的天氣。地點沒有座標、查不到、或離線記帳還沒被觸發器
+  /// 補寫時都是 null。缺席是正常狀態，不是錯誤。
+  final Weather? weather;
+
   final ExpenseReceipt? receipt;
 
   /// 記這筆帳的人。付錢的可以是別人 —— 小明幫阿華記一筆阿華付的錢，
@@ -146,6 +182,7 @@ class Expense {
     this.time,
     this.createdAt,
     this.place,
+    this.weather,
     this.receipt,
     this.createdBy = '',
     this.note = '',
