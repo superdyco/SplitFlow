@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WeatherChip from "@/components/expense/WeatherChip.vue";
 /**
  * 唯讀的支出詳情。
  *
@@ -159,7 +160,11 @@ onMounted(load);
         <div class="card stack">
           <div class="row">
             <span class="tiny label">分類</span>
-            <span>{{ meta.label }}</span>
+            <!--
+              帶上圖示。這一列本來只有純文字，是整頁唯一沒有顏色的東西 ——
+              而分類在列表與這一頁的抬頭都是有顏色的方塊，只有這裡是黑字。
+            -->
+            <span class="cat">{{ meta.icon }} {{ meta.label }}</span>
           </div>
           <div class="row">
             <span class="tiny label">日期</span>
@@ -183,10 +188,17 @@ onMounted(load);
           </div>
         </div>
 
-        <div v-if="expense.place" class="card stack">
-          <strong class="section-title">地點</strong>
-          <span>📍 {{ expense.place.name }}</span>
-          <span v-if="expense.place.address" class="tiny">{{ expense.place.address }}</span>
+        <!--
+          沒有地點但有天氣也要出現：用「定位」而不選店是合理的記法。
+          標題也跟著改，不然一張寫著「地點」卻只有天氣的卡片很怪。
+        -->
+        <div v-if="expense.place || expense.weather" class="card stack">
+          <strong class="section-title">{{ expense.place ? "地點" : "天氣" }}</strong>
+          <template v-if="expense.place">
+            <span>📍 {{ expense.place.name }}</span>
+            <span v-if="expense.place.address" class="tiny">{{ expense.place.address }}</span>
+          </template>
+          <span v-if="expense.weather" class="tiny"><WeatherChip :weather="expense.weather" show-label /></span>
           <PlaceMap v-if="mapAvailable && placeMarkers.length" :markers="placeMarkers" height="180px" />
         </div>
 
@@ -233,13 +245,14 @@ onMounted(load);
   justify-content: center;
   width: 56px;
   height: 56px;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background: var(--color-primary-soft);
+  /* emoji 的字符大小，綁的是這個 56px 方塊而不是排版尺度。不要套字級表。 */
   font-size: 26px;
 }
 
 .amount {
-  font-size: 26px;
+  font-size: var(--text-title);
 }
 
 .head .tiny {
@@ -250,7 +263,7 @@ onMounted(load);
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .row .label {
@@ -268,7 +281,7 @@ onMounted(load);
 .receipt {
   padding: 0;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: none;
   cursor: pointer;
 }
@@ -276,6 +289,13 @@ onMounted(load);
 .receipt img {
   display: block;
   width: 100%;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
+}
+
+/* 圖示與文字之間留一格，不然 emoji 會黏著字。 */
+.cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 </style>

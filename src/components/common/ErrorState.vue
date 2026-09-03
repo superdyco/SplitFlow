@@ -23,7 +23,7 @@ const emit = defineEmits<{ (e: "retry"): void }>();
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .retry {
@@ -31,10 +31,10 @@ const emit = defineEmits<{ (e: "retry"): void }>();
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid currentColor;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
-  font-size: 13px;
+  font-size: var(--text-control-sm);
   font-weight: 700;
 }
 

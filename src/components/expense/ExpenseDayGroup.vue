@@ -41,13 +41,13 @@ const label = computed(() => {
 .group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .head {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
   padding: 4px 2px;
   border: 0;
@@ -58,7 +58,7 @@ const label = computed(() => {
 }
 
 .chevron {
-  color: var(--color-soft);
+  color: var(--color-muted);
   flex: none;
 }
 
@@ -77,6 +77,6 @@ const label = computed(() => {
 .items {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 </style>

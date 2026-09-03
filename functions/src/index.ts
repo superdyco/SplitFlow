@@ -21,6 +21,7 @@ import { logger } from "firebase-functions";
 
 import { expenseNotification } from "./message.js";
 import { recipientIds } from "./recipients.js";
+import { readWeather, weatherUrl, type WeatherResult } from "./weather.js";
 import { pickSuccessor, type SuccessorCandidate } from "./successor.js";
 
 initializeApp();
@@ -35,6 +36,39 @@ const REGION = "asia-east1";
 
 /** FCM 一次最多送 500 個 token。 */
 const BATCH = 500;
+
+/** 天氣查詢的逾時。使用者在等預覽，不能讓表單卡住。 */
+const WEATHER_TIMEOUT_MS = 6000;
+
+/**
+ * 真的去打 Open-Meteo。**任何失敗都回 null，不丟例外。**
+ *
+ * 天氣是裝飾不是資料 —— 查不到就是沒有，跟自己打字的地點沒有座標是同一種
+ * 缺席。這個原則跟報告的地圖一樣：「地圖是加分不是必要，拍不出來也照樣
+ * 產得出報告」。
+ */
+async function fetchWeather(
+  lat: number,
+  lng: number,
+  date: string,
+  time: string
+): Promise<WeatherResult | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  const url = weatherUrl({ lat, lng, date, today });
+
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(WEATHER_TIMEOUT_MS) });
+    // 錯誤是 400 帶 JSON body，所以不看狀態碼直接讀 —— reason 是唯一講得出
+    // 「為什麼這筆沒天氣」的東西。
+    const json = await res.json();
+    const result = readWeather(json, time);
+    if (!result) logger.info("天氣查不到", { url, body: json });
+    return result;
+  } catch (err) {
+    logger.info("天氣查詢失敗", { url, err: String(err) });
+    return null;
+  }
+}
 
 export const onExpenseCreated = onDocumentCreated(
   {
@@ -125,6 +159,27 @@ export const onExpenseCreated = onDocumentCreated(
     }
   }
 );
+
+/**
+ * 表單的天氣預覽。地點與日期都有了就呼叫這裡。
+ *
+ * 為什麼不讓前端直接打 Open-Meteo：`functions/` 與 `src/` 是兩個獨立套件、
+ * 沒有共用程式碼，前端自己查的話網頁一份、Flutter 一份、離線補寫的觸發器
+ * 再一份 —— 同一段邏輯三份，分岔的症狀是「同一筆支出在手機和網頁顯示不同
+ * 天氣」。
+ */
+export const lookupWeather = onCall({ region: REGION }, async request => {
+  // 不驗證呼叫者的話，這就是一個掛在我們帳單上的公開天氣代理。
+  // 只要登入就好 —— 不必是那個任務的成員，因為天氣不是任何人的秘密。
+  if (!request.auth) throw new HttpsError("unauthenticated", "請先登入");
+
+  const { lat, lng, date, time } = request.data ?? {};
+  if (typeof lat !== "number" || typeof lng !== "number" || typeof date !== "string") {
+    throw new HttpsError("invalid-argument", "需要座標與日期");
+  }
+
+  return await fetchWeather(lat, lng, date, typeof time === "string" ? time : "");
+});
 
 /**
  * 刪除自己的帳號。App Store 指引 5.1.1(v) 要求 App 內就能發起。
@@ -223,3 +278,53 @@ export const deleteAccount = onCall({ region: REGION }, async request => {
   logger.info("帳號已刪除", { uid, deletedTasks, transferredTasks, leftTasks });
   return { deletedTasks, transferredTasks, leftTasks };
 });
+
+/**
+ * 補寫離線記的帳的天氣。
+ *
+ * **這個觸發器只服務一種情況**：使用者記帳當下沒訊號，拿不到 callable 的
+ * 預覽。文件之後同步上去，這裡才跑。有預覽的那些進來時已經帶著 weather，
+ * 會直接跳過。
+ *
+ * 刻意不併進 `onExpenseCreated`：那支函式把推播的所有步驟包在同一個
+ * try/catch 裡，而且對單人任務會提早 return。併進去會讓 Open-Meteo 掛掉時
+ * 推播也不送，而且單人旅程永遠不會有天氣。
+ */
+export const onExpenseWeather = onDocumentCreated(
+  {
+    document: "tasks/{taskId}/expenses/{expenseId}",
+    region: REGION
+  },
+  async event => {
+    const expense = event.data?.data();
+    if (!expense) return;
+
+    // 已經有了就不動 —— 前端存進來的預覽值優先，那是使用者看過的那個值。
+    if (expense.weather) return;
+
+    const place = expense.place as { lat?: number; lng?: number } | null | undefined;
+    const lat = place?.lat;
+    const lng = place?.lng;
+    // 自己打字的地點沒有座標。這跟地圖是同一個限制。
+    if (typeof lat !== "number" || typeof lng !== "number") return;
+
+    const date = typeof expense.date === "string" ? expense.date : "";
+    if (!date) return;
+
+    const weather = await fetchWeather(
+      lat,
+      lng,
+      date,
+      typeof expense.time === "string" ? expense.time : ""
+    );
+    if (!weather) return;
+
+    try {
+      await event.data!.ref.update({ weather });
+    } catch (err) {
+      // 補寫失敗就算了。這支函式的原則跟推播那支一樣：寧可少一個裝飾，
+      // 也不要讓例外冒出去在雲端留一則沒人看的錯誤日誌。
+      logger.info("天氣補寫失敗", { err: String(err) });
+    }
+  }
+);

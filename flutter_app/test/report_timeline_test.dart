@@ -14,6 +14,7 @@ void main() {
     String? time,
     ExpenseCategory category = ExpenseCategory.food,
     ExpensePlace? place,
+    Weather? weather,
     DateTime? createdAt,
   }) {
     return Expense(
@@ -28,6 +29,7 @@ void main() {
       date: date,
       time: time,
       place: place,
+      weather: weather,
       createdAt: createdAt,
     );
   }
@@ -135,6 +137,45 @@ void main() {
 
     expect(days.first.day, 1);
     expect(days.every((day) => day.day >= 1), isTrue);
+  });
+
+  group('每天的天氣', () {
+    const sunny = Weather(code: 0, high: 30, low: 22, exact: null);
+    const stormy = Weather(code: 95, high: 28, low: 21, exact: null);
+
+    test('取當天第一筆有天氣的支出', () {
+      final days = reportTimeline([
+        expense(id: 'a', date: '2026-03-01', time: '09:00', weather: stormy),
+        expense(id: 'b', date: '2026-03-01', time: '18:00', weather: sunny),
+      ], 'TWD');
+
+      expect(days[0].weather, same(stormy));
+    });
+
+    test('前面幾筆沒有天氣就往後找', () {
+      final days = reportTimeline([
+        expense(id: 'a', date: '2026-03-01', time: '09:00'),
+        expense(id: 'b', date: '2026-03-01', time: '18:00', weather: sunny),
+      ], 'TWD');
+
+      expect(days[0].weather, same(sunny));
+    });
+
+    test('整天都沒有就是 null，不是硬湊一個', () {
+      final days = reportTimeline([expense(date: '2026-03-01')], 'TWD');
+
+      expect(days[0].weather, isNull);
+    });
+
+    test('每一天各自算，不會沿用前一天的', () {
+      final days = reportTimeline([
+        expense(id: 'a', date: '2026-03-01', weather: stormy),
+        expense(id: 'b', date: '2026-03-02'),
+      ], 'TWD');
+
+      expect(days[0].weather, same(stormy));
+      expect(days[1].weather, isNull);
+    });
   });
 
   test('只放公開得起的欄位 —— 沒有名稱、沒有地址、沒有人', () {

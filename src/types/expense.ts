@@ -1,4 +1,5 @@
 import type { Timestamp } from "firebase/firestore";
+import type { ExpenseWeather } from "@/types/weather";
 
 export type ExpenseCategory = "food" | "transport" | "stay" | "ticket" | "shopping" | "other";
 
@@ -11,12 +12,22 @@ export interface ExpenseCategoryMeta {
   icon: string;
 }
 
+/*
+  三個 icon 後面跟著一個看不見的 U+FE0F（變體選擇符），不要手滑刪掉。
+
+  U+1F37D（餐飲）、U+1F39F（門票）、U+1F6CD（購物）在 Unicode 裡的預設是
+  **文字呈現**而不是 emoji 呈現，所以系統會把它們畫成單色字符 —— 一排六個
+  分類裡就那三個是灰黑的。另外三個預設就是彩色，所以不需要這個字元。
+
+  加上 U+FE0F 才是強制彩色的標準做法。用別的 emoji 換掉它們也可以，
+  但那是為了繞過一個有正解的問題而改掉使用者已經認得的圖示。
+*/
 export const EXPENSE_CATEGORIES: ExpenseCategoryMeta[] = [
-  { value: "food", label: "餐飲", icon: "🍽" },
+  { value: "food", label: "餐飲", icon: "🍽️" },
   { value: "transport", label: "交通", icon: "🚗" },
   { value: "stay", label: "住宿", icon: "🏨" },
-  { value: "ticket", label: "門票", icon: "🎟" },
-  { value: "shopping", label: "購物", icon: "🛍" },
+  { value: "ticket", label: "門票", icon: "🎟️" },
+  { value: "shopping", label: "購物", icon: "🛍️" },
   { value: "other", label: "其他", icon: "📦" }
 ];
 
@@ -73,6 +84,11 @@ export interface Expense {
   splits: Record<string, number>;
   /** 選填，沒填就是 null。 */
   place: ExpensePlace | null;
+  /**
+   * 那天那個地點的天氣。**選填**：地點沒有座標、API 查不到、或離線記帳
+   * 還沒被觸發器補寫時都是 null。缺席是正常狀態，不是錯誤。
+   */
+  weather?: ExpenseWeather | null;
   /** 收據照片，選填。這個功能之前建立的舊資料是 null。 */
   receipt: ExpenseReceipt | null;
   /**
@@ -119,4 +135,9 @@ export interface ExpenseInput {
   note: string;
   date: string;
   time: string;
+  /**
+   * 表單預覽拿到的天氣。查不到就是 null —— 那時 `onExpenseWeather` 會在
+   * 文件建立後補寫，所以離線記的帳最後還是會有。
+   */
+  weather: ExpenseWeather | null;
 }

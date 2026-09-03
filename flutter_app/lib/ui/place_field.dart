@@ -87,13 +87,11 @@ class _PlaceFieldState extends ConsumerState<PlaceField> {
   /// 這一格現在代表的地點。
   ///
   /// 名字跟選取的那一份對得起來才算數 —— 選完再改字的話，剩下的就只是文字。
-  ExpensePlace? get _value {
-    final text = _query.text.trim();
-    if (text.isEmpty) return null;
-    final selected = _selected;
-    if (selected != null && selected.name == text) return selected;
-    return ExpensePlace(name: text);
-  }
+  /// 規則在 `currentPlace` 裡，這裡只把三個狀態交出去。
+  ///
+  /// 抽出去是因為「改名之後哪一種座標留得下來」需要測試釘住，而那條
+  /// 規則兩邊必須一樣 —— 網頁版的同名函式有一組逐條對應的測試。
+  ExpensePlace? get _value => currentPlace(_query.text, _selected, _here);
 
   void _emit() => widget.onChanged(_value);
 
@@ -166,7 +164,15 @@ class _PlaceFieldState extends ConsumerState<PlaceField> {
 
   /// 定位鍵。
   ///
-  /// 刻意**不去查附近有什麼店、也不動地點欄位** —— 這顆鍵只回答「我在哪」。
+  /// 刻意**不去查附近有什麼店** —— 這顆鍵只回答「我在哪」，不猜你在哪家店。
+  ///
+  /// 但它**會動地點欄位**（以前不會）。以前不動造成兩件事：地圖上看得到
+  /// 你的位置、存完回來卻不見了；而且欄位裡上一次選的店還留著，明明已經
+  /// 按過定位 —— 存下去的是那家店。
+  ///
+  /// 填進去的是座標，名字仍然由使用者決定：這一格可以打字，蓋掉就好，
+  /// 座標會留著（見 currentPlace 對 located 的處理）。
+  ///
   /// 順帶把搜尋的位置偏好換成這裡：人就在這，比上一筆支出的座標更準，
   /// 而且 locationBias 是 autocomplete 請求上的一個欄位，不會多花錢。
   Future<void> _locate() async {
@@ -180,7 +186,13 @@ class _PlaceFieldState extends ConsumerState<PlaceField> {
       setState(() {
         _here = here;
         _bias = here;
+        // 作廢上一次選的店，並把座標填進欄位。四位小數大約 11 公尺，
+        // 夠精確又不會長到整行都是數字。
+        _selected = null;
+        _query.text =
+            '${here.lat.toStringAsFixed(4)}, ${here.lng.toStringAsFixed(4)}';
       });
+      _emit();
     } catch (err) {
       if (mounted) setState(() => _error = err.toString());
     } finally {

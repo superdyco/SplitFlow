@@ -72,13 +72,22 @@ class _Row extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Text('${meta.icon} ${meta.label}', style: text.bodyMedium),
+              child: Row(
+                children: [
+                  Icon(meta.icon, size: 16, color: AppColors.primaryDark),
+                  const SizedBox(width: AppSpace.x2),
+                  Text(meta.label, style: text.bodyMedium),
+                ],
+              ),
             ),
-            Text(
-              formatAmount(row.total, currency),
-              style: text.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                fontFeatures: const [FontFeature.tabularFigures()],
+            // 百分比本來就有固定欄寬，金額沒有 —— 所以分類名稱長的那幾列
+            // 會把金額推走，一整欄看下來是歪的。
+            SizedBox(
+              width: 72,
+              child: Text(
+                formatAmount(row.total, currency),
+                textAlign: TextAlign.right,
+                style: figure(size: 14, weight: FontWeight.w700),
               ),
             ),
             const SizedBox(width: 8),

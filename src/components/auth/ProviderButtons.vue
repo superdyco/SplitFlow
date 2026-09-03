@@ -54,11 +54,11 @@ const providers = computed(() =>
 
 <style scoped>
 .providers {
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .provider {
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .icon {

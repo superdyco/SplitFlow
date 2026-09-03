@@ -6,23 +6,35 @@
 
 library;
 
+import 'package:flutter/material.dart';
+
 enum ExpenseCategory { food, transport, stay, ticket, shopping, other }
 
 /// 分類的顯示資料。順序就是選單的順序，也是金額相同時的次要排序依據。
+///
+/// icon 是 IconData 而不是 emoji 字串：emoji 在不同 Android 版本與廠商 ROM
+/// 上長得不一樣，控制不了，而且上不了色 —— 跟「圖示用 primaryDark」這條
+/// 規則直接衝突。Material Icons 已經在 bundle 裡，不增加 APK 大小。
+///
+/// 網頁版還是 emoji。圖示不像顏色那樣是身分，兩邊不一致可以接受。
 class CategoryMeta {
   final ExpenseCategory value;
   final String label;
-  final String icon;
+  final IconData icon;
   const CategoryMeta(this.value, this.label, this.icon);
 }
 
 const List<CategoryMeta> expenseCategories = [
-  CategoryMeta(ExpenseCategory.food, '餐飲', '🍽'),
-  CategoryMeta(ExpenseCategory.transport, '交通', '🚗'),
-  CategoryMeta(ExpenseCategory.stay, '住宿', '🏨'),
-  CategoryMeta(ExpenseCategory.ticket, '門票', '🎟'),
-  CategoryMeta(ExpenseCategory.shopping, '購物', '🛍'),
-  CategoryMeta(ExpenseCategory.other, '其他', '📦'),
+  CategoryMeta(ExpenseCategory.food, '餐飲', Icons.restaurant_outlined),
+  CategoryMeta(ExpenseCategory.transport, '交通', Icons.directions_car_outlined),
+  CategoryMeta(ExpenseCategory.stay, '住宿', Icons.bed_outlined),
+  CategoryMeta(
+    ExpenseCategory.ticket,
+    '門票',
+    Icons.confirmation_number_outlined,
+  ),
+  CategoryMeta(ExpenseCategory.shopping, '購物', Icons.shopping_bag_outlined),
+  CategoryMeta(ExpenseCategory.other, '其他', Icons.inventory_2_outlined),
 ];
 
 const ExpenseCategory defaultCategory = ExpenseCategory.food;
@@ -68,6 +80,38 @@ class ExpensePlace {
       );
 }
 
+/// 支出當時、當地的天氣。
+///
+/// 是 functions/src/weather.ts 的 WeatherResult 的 Dart 版，欄位逐一對應。
+/// 兩邊各自宣告是刻意的：functions 是獨立套件，沒有共用程式碼。形狀要對得上，
+/// 改一邊要記得改另一邊 —— 這是那個切分的已知代價。
+///
+/// **查詢邏輯不在這裡也不在 Dart 的任何地方。** endpoint 分流、URL 組裝、
+/// 回應解析全部在雲端函式裡，這邊只呼叫 lookupWeather callable。
+class Weather {
+  /// WMO 天氣代碼 0–99。決定圖示。
+  final int code;
+
+  /// 當日最高溫，攝氏整數。
+  final int high;
+
+  /// 當日最低溫，攝氏整數。
+  final int low;
+
+  /// 那個小時的實測溫度。**只有支出填了時間才有。**
+  ///
+  /// 有它就印「28°」，沒有就印「24–33°」—— 顯示形式直接反映這筆有沒有記
+  /// 時間，不假裝出沒有的精度。
+  final int? exact;
+
+  const Weather({
+    required this.code,
+    required this.high,
+    required this.low,
+    required this.exact,
+  });
+}
+
 /// 一筆支出。
 class Expense {
   final String id;
@@ -109,6 +153,10 @@ class Expense {
 
   final ExpensePlace? place;
 
+  /// 那天那個地點的天氣。地點沒有座標、查不到、或離線記帳還沒被觸發器
+  /// 補寫時都是 null。缺席是正常狀態，不是錯誤。
+  final Weather? weather;
+
   final ExpenseReceipt? receipt;
 
   /// 記這筆帳的人。付錢的可以是別人 —— 小明幫阿華記一筆阿華付的錢，
@@ -134,6 +182,7 @@ class Expense {
     this.time,
     this.createdAt,
     this.place,
+    this.weather,
     this.receipt,
     this.createdBy = '',
     this.note = '',

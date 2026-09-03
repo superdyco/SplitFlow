@@ -7,11 +7,12 @@ import '../domain/place_bias.dart' as domain;
 import 'place_map.dart';
 import 'remote_receipt.dart';
 import 'theme.dart';
+import 'weather_chip.dart';
 
 /// 唯讀的支出詳情。`src/pages/ExpenseDetailPage.vue` 的 Flutter 版。
 ///
 /// 為什麼需要它：編輯頁只讓「自己建的、自己先付的、或管理員」動得了，
-/// 其他人點進去只會在存檔時被規則擋下。而列表標了「📎」，點下去卻沒有
+/// 其他人點進去只會在存檔時被規則擋下。而列表標了迴紋針，點下去卻沒有
 /// 東西可看 —— 收據的用途就是對帳，看不到照片等於這個功能對半數的人不存在。
 ///
 /// **不重讀支出，直接接收列表已經有的那個物件。** 網頁版要依 id 重讀是因為
@@ -69,7 +70,7 @@ class ExpenseDetailPage extends StatelessWidget {
           _Card(
             child: Column(
               children: [
-                Text(meta.icon, style: const TextStyle(fontSize: 30)),
+                Icon(meta.icon, size: 30, color: AppColors.primaryDark),
                 const SizedBox(height: 8),
                 Text(
                   expense.title,
@@ -80,10 +81,7 @@ class ExpenseDetailPage extends StatelessWidget {
                 Text(
                   '${expense.currency} '
                   '${formatAmount(expense.amount, expense.currency)}',
-                  style: text.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                  style: figure(size: 26),
                 ),
                 if (converted != null)
                   Text('約 $baseCurrency $converted', style: text.bodySmall),
@@ -129,17 +127,43 @@ class ExpenseDetailPage extends StatelessWidget {
             ),
           ),
 
-          if (place != null) ...[
+          // 沒有地點但有天氣也要出現：用「定位」而不選店是合理的記法。
+          // 標題跟著改，不然一張寫著「地點」卻只有天氣的卡片很怪。
+          if (place != null || expense.weather != null) ...[
             const SizedBox(height: 12),
             _Card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _SectionTitle('地點'),
-                  Text('📍 ${place.name}', style: text.bodyMedium),
-                  if (place.address != null && place.address!.isNotEmpty)
-                    Text(place.address!, style: text.bodySmall),
-                  if (place.lat != null && place.lng != null) ...[
+                  _SectionTitle(place != null ? '地點' : '天氣'),
+                  if (place != null) ...[
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.place_outlined,
+                          size: 16,
+                          color: AppColors.primaryDark,
+                        ),
+                        const SizedBox(width: AppSpace.x2),
+                        Flexible(
+                          child: Text(place.name, style: text.bodyMedium),
+                        ),
+                      ],
+                    ),
+                    if (place.address != null && place.address!.isNotEmpty)
+                      Text(place.address!, style: text.bodySmall),
+                  ],
+                  // 天氣跟地點、地圖同一區：它是關於這個地點那天的事。
+                  if (expense.weather != null) ...[
+                    const SizedBox(height: AppSpace.x2),
+                    WeatherChip(
+                      weather: expense.weather!,
+                      showLabel: true,
+                    ),
+                  ],
+                  if (place != null &&
+                      place.lat != null &&
+                      place.lng != null) ...[
                     const SizedBox(height: 8),
                     PlaceMap.enabled
                         ? PlaceMap.single(
@@ -307,9 +331,7 @@ class _Row extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             value,
-            style: text.bodyMedium?.copyWith(
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
+            style: figure(size: 14, weight: FontWeight.w400),
             textAlign: TextAlign.end,
           ),
         ],

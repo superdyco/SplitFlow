@@ -10,6 +10,7 @@ import '../state/providers.dart';
 import 'confirm_dialog.dart';
 import 'diagnostics_section.dart';
 import 'system_share.dart';
+import 'ledger.dart';
 import 'theme.dart';
 
 /// 個人設定。`src/pages/ProfilePage.vue` 的 Flutter 版。
@@ -197,35 +198,55 @@ class _FormState extends ConsumerState<_Form> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('暱稱', style: text.bodySmall),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _nickname,
-                  maxLength: 20,
-                  onChanged: (_) => setState(() => _saved = false),
-                  onTapOutside: (_) => setState(() => _touched = true),
-                ),
-                if (_nicknameError != null)
-                  Text(_nicknameError!,
-                      style: text.bodySmall?.copyWith(color: AppColors.danger)),
-                const SizedBox(height: 8),
-                Text('同行的人在支出與結算上看到的就是這個名字。',
-                    style: text.bodySmall),
-                const Divider(height: 28),
-                _Row(label: '電子郵件', value: user?.email ?? '未提供'),
-                _Row(
-                  label: '登入方式',
-                  value: auth.providerLabel(widget.profile.provider),
-                ),
-              ],
+        LedgerCard(
+          children: [
+            const LedgerStrip(title: '個人資料'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpace.x4,
+                AppSpace.x4,
+                AppSpace.x4,
+                AppSpace.x3,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('暱稱', style: text.bodySmall),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _nickname,
+                    maxLength: 20,
+                    onChanged: (_) => setState(() => _saved = false),
+                    onTapOutside: (_) => setState(() => _touched = true),
+                  ),
+                  if (_nicknameError != null)
+                    Text(
+                      _nicknameError!,
+                      style: text.bodySmall?.copyWith(color: AppColors.danger),
+                    ),
+                  const SizedBox(height: AppSpace.x2),
+                  Text(
+                    '同行的人在支出與結算上看到的就是這個名字。',
+                    style: text.bodySmall,
+                  ),
+                ],
+              ),
             ),
-          ),
+            const LedgerDivider(indent: 0),
+            // 唯讀的兩項用 LedgerRow：左標籤右值，跟任務頁的列同一個形狀。
+            LedgerRow(
+              title: '電子郵件',
+              trailing: Text(user?.email ?? '未提供', style: text.bodyMedium),
+            ),
+            const LedgerDivider(),
+            LedgerRow(
+              title: '登入方式',
+              trailing: Text(
+                auth.providerLabel(widget.profile.provider),
+                style: text.bodyMedium,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         Text(
@@ -238,14 +259,14 @@ class _FormState extends ConsumerState<_Form> {
               style: text.bodyMedium?.copyWith(color: AppColors.danger)),
         ],
         const SizedBox(height: 20),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('資料匯出', style: text.titleMedium),
-                const SizedBox(height: 8),
+        LedgerCard(
+          children: [
+            const LedgerStrip(title: '資料匯出'),
+            Padding(
+              padding: const EdgeInsets.all(AppSpace.x4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 Text(
                   '匯出帳號、任務、成員、支出、付款、結算紀錄與 Base64 收據圖片。'
                   '檔案包含私人帳務資料，收據較多時可能很大。',
@@ -263,9 +284,10 @@ class _FormState extends ConsumerState<_Form> {
                   const SizedBox(height: 8),
                   Text(_exportProgress, style: text.bodySmall),
                 ],
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
         ),
         const SizedBox(height: 12),
         // 排在資料匯出之後、儲存之前：這一區是「出問題時才看」的東西，
@@ -297,50 +319,38 @@ class _FormState extends ConsumerState<_Form> {
           child: const Text('登出'),
         ),
         const SizedBox(height: 32),
-        const Divider(),
-        const SizedBox(height: 16),
-        Text('刪除帳號', style: text.titleMedium),
-        const SizedBox(height: 8),
-        Text(
-          '你的支出與結算會留在同行的人那裡 —— 那些帳同時也是他們的紀錄。'
-          '你的帳號、個人資料與收藏會永久消失，無法復原。',
-          style: text.bodySmall,
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton(
-          style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
-          onPressed: _deleting ? null : _deleteAccount,
-          child: Text(_deleting ? '刪除中...' : '刪除帳號'),
+        // 不可逆的動作也給一張卡。原本它靠一條 Divider 跟上面隔開，
+        // 那條線跟卡片裡的分隔線長得一樣 —— 分區跟分列用同一個記號，
+        // 就等於沒有分區。
+        LedgerCard(
+          children: [
+            const LedgerStrip(title: '刪除帳號'),
+            Padding(
+              padding: const EdgeInsets.all(AppSpace.x4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    '你的支出與結算會留在同行的人那裡 —— 那些帳同時也是他們的紀錄。'
+                    '你的帳號、個人資料與收藏會永久消失，無法復原。',
+                    style: text.bodySmall,
+                  ),
+                  const SizedBox(height: AppSpace.x3),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                    ),
+                    onPressed: _deleting ? null : _deleteAccount,
+                    child: Text(_deleting ? '刪除中...' : '刪除帳號'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 }
 
-class _Row extends StatelessWidget {
-  final String label;
-  final String value;
 
-  const _Row({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: text.bodySmall),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

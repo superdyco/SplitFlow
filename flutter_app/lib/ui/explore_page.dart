@@ -6,6 +6,7 @@ import '../domain/report.dart';
 import '../state/providers.dart';
 import 'report_card.dart';
 import 'report_page.dart';
+import 'ledger.dart';
 import 'theme.dart';
 
 /// 探索：別人願意公開的旅程。`src/pages/ExplorePage.vue` 的 Flutter 版。
@@ -72,19 +73,19 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
               ref.invalidate(publicReportsProvider);
               await ref.read(publicReportsProvider.future);
             },
-            child: ListView.separated(
+            /*
+              一組報告一張卡。改成非惰性的 children 是刻意的：
+              listPublicReports 的上限是 50 筆，而且資料本來就整批取回 ——
+              惰性省下的只有 widget 建構，換來的是每一列各自浮一張卡。
+            */
+            child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              itemCount: list.length + (_error == null ? 0 : 1),
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                if (index == list.length) {
-                  return Text(
-                    '收藏沒有存成功：$_error',
-                    style:
-                        text.bodySmall?.copyWith(color: AppColors.danger),
-                  );
-                }
-
+              children: [
+                LedgerCard(
+                  children: [
+                    for (var index = 0; index < list.length; index++) ...[
+                      if (index > 0) const LedgerDivider(),
+                      Builder(builder: (context) {
                 final item = list[index];
                 final report = item.report;
                 final isSaved =
@@ -115,7 +116,18 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
                     label: Text(isSaved ? '已收藏' : '收藏'),
                   ),
                 );
-              },
+                      }),
+                    ],
+                  ],
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    '收藏沒有存成功：$_error',
+                    style: text.bodySmall?.copyWith(color: AppColors.danger),
+                  ),
+                ],
+              ],
             ),
           );
         },

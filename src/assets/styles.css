@@ -3,17 +3,127 @@
   --color-surface: #fbfaf8;
   --color-card: #ffffff;
   --color-ink: #1a1613;
-  --color-muted: #8a8078;
-  --color-soft: #a39a90;
+
+  /*
+    灰階整條往下移一階。舊的 --color-soft (#a39a90) 對頁面底色只有 2.4:1，
+    而 .tiny 正是用它印日期與成員數 —— 那是內文，不是裝飾。
+
+    做法不是加新顏色，是把每一階都調深：舊的 muted 變成新的 soft，
+    舊的 soft 退役。階數與色相都不變，只是每一階都看得見。
+  */
+  --color-muted: #6f665e; /* 4.9:1 on --color-bg。所有次要文字。 */
+  --color-soft: #8a8078; /* 3.4:1。過得了非文字 UI 的 3:1，過不了文字的 4.5:1。 */
+
+  /*
+    橘色按「上面有沒有要讀的東西」拆開，而不是整條換深 ——
+    整條換深會把品牌色從畫面上抹掉。
+
+    --color-primary 白字在上只有 3.6:1，所以它只當裝飾底（佔比條、tint、
+    .brand-mark）。標誌依 WCAG 免除對比要求，那是這個亮橘唯一純粹是身分的地方。
+  */
+  --color-primary: #e8590c;
+  --color-primary-dark: #c2410c; /* 白字 5.2:1、當文字 4.6:1。按鈕底與所有橘色文字。 */
+  --color-primary-deep: #9a3412; /* 白字 7.3:1。primary-dark 升格成靜止色之後空出來的 hover。 */
+  --color-primary-soft: #fff0e4;
+
+  /* 佔比條的三階明度。同色相分段，不引入新色相。條子上不放文字。 */
+  --color-primary-b1: #e8590c;
+  --color-primary-b2: #f0a072;
+  --color-primary-b3: #f7d3bd;
+
   --color-line: #ede7e0;
   --color-line-strong: #e2dcd4;
-  --color-primary: #e8590c;
-  --color-primary-dark: #c2410c;
-  --color-primary-soft: #fff0e4;
   --color-danger: #d63939;
   --color-success: #0e9f6e;
   --color-success-soft: #e6f6ef;
-  --shadow-card: 0 18px 44px -30px rgba(26, 22, 19, 0.5);
+
+  /*
+    上一輪稽核硬寫顏色時只掃了 .vue，沒掃這個檔案本身，所以這六個漏網。
+    後三個還是上一輪自己加進去的。
+  */
+  --color-track: #f0ebe4;
+
+  /*
+    天氣圖示裡「跟水有關」的那三組（毛毛雨、雨、雪）。
+
+    這是整個調色盤唯一的非暖色，刻意只加一個。天氣是少數「藍色代表水」
+    比品牌一致性更有用的地方 —— 但那不是把調色盤打開的理由，所以八種
+    天氣只有三種顏色：暖橘（晴、雷）、灰（雲、霧）、這個藍。
+
+    4.5:1 on #fff。它畫的是圖示不是文字，門檻只有 3:1，但天氣旁邊就是
+    溫度數字，兩個一起看的時候不該有一個特別淡。
+  */
+  --color-weather-wet: #3d7fa6;
+
+  /*
+    太陽與閃電。
+
+    這個黃對白底只有 2.3:1，過不了圖形的 3:1 —— 而那是物理限制，不是
+    調得不夠好：任何看起來像陽光的黃都太亮。兩個東西讓它站得住：
+
+      1. 圖示旁邊一律有文字（「晴 28°」），意義不靠它獨自承擔。3:1 管的
+         是「非得看懂它不可」的圖形，這裡不是。
+      2. 太陽畫成**實心**。細線在淺色下會消失，色塊不會 —— 消失的線條
+         才是真正的無障礙問題，而不是比值差 0.7。
+
+    溫度與名稱那些**文字**仍然用 ink/muted，沒有一個字是這個顏色。
+  */
+  --color-weather-sun: #e0a020; /* 頁籤與分段控制的底槽，比頁面底色再深一階 */
+  --color-danger-line: #f3d2ce;
+  --color-danger-soft: #fff5f5;
+  --color-danger-quiet: #b8837c; /* 平時的刪除鈕。正紅留給 hover。 */
+  --color-skeleton: #efeae3;
+  --color-skeleton-hi: #f7f3ee;
+
+  /*
+    陰影四階。原本只有一個又大又軟的 --shadow-card，所有卡片一律套用，
+    結果四個元件必須寫 box-shadow: none 把它關掉 —— 要靠取消來做層次，
+    就是沒有層次的證據。現在「不浮起」是一個正常的值。
+  */
+  --shadow-flat: none;
+  --shadow-rest: 0 1px 2px rgba(26, 22, 19, 0.045);
+  --shadow-raise: 0 10px 24px -14px rgba(26, 22, 19, 0.42);
+  --shadow-pop: 0 18px 44px -30px rgba(26, 22, 19, 0.5);
+
+  /* 字級。20 與 14 之間本來是空的，卡片標題只能在「太大」與「跟內文一樣」之間二選一。 */
+  --text-hero: 46px; /* 只有公開報告頁的主數字。見 2026-08-05 的規格。 */
+  --text-display: 34px;
+  --text-title: 30px;
+  --text-section: 20px;
+  --text-card: 17px;
+  --text-body: 14px;
+  --text-tiny: 12px;
+
+  /* 控制項有自己的兩個尺寸，不吃上面的排版尺度。 */
+  --text-control: 15px;
+  --text-control-sm: 13px;
+
+  /* 4px 網格。原本有 6 與 10，不在任何網格上。 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  /*
+    不屬於網格。只給同一組文字的上下兩行（標籤在上、數值在下）——
+    那是行距微調不是版面間距，硬拉到 4px 會讓標籤跟它描述的數字看起來像兩件事。
+  */
+  --space-text: 2px;
+
+  /* 圓角。原本有 8/10/12/14/16/18/20/22 八種。 */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --dur-press: 90ms;
+  --dur-base: 140ms;
+  --dur-lift: 190ms;
+  --dur-count: 620ms;
+
   font-family: "Noto Sans TC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--color-ink);
   background: var(--color-bg);
@@ -48,7 +158,7 @@ a {
 
 .page {
   min-height: 100vh;
-  padding: 22px;
+  padding: var(--space-6);
 }
 
 .shell {
@@ -61,14 +171,14 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   margin-bottom: 18px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   font-weight: 900;
 }
 
@@ -78,7 +188,7 @@ a {
   align-items: center;
   justify-content: center;
   flex: none;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--color-primary);
   color: #fff;
   font-weight: 900;
@@ -92,7 +202,7 @@ a {
 .brand-logo {
   width: 38px;
   height: 38px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   object-fit: cover;
 }
 
@@ -102,84 +212,163 @@ a {
   border-radius: 50%;
 }
 
+/*
+  卡片有三種身分，不是一種卡片加上例外。
+
+  原本只有一個 .card 配一個大陰影，所以「這東西不該浮起來」只能寫
+  box-shadow: none 去取消 —— 有四個檔案這樣做。宣告身分比取消繼承好讀，
+  也讓「不浮起」變成一個正常的值。
+*/
 .card {
   background: var(--color-card);
   border: 1px solid var(--color-line);
-  border-radius: 20px;
-  padding: 18px;
-  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-rest);
+}
+
+/* 巢狀在別的卡裡、或本身是列表的一列。自己不該再浮一層。 */
+.card.flat {
+  box-shadow: var(--shadow-flat);
+}
+
+/* 真的浮在頁面之上的東西：對話框、選單。 */
+.card.raised {
+  box-shadow: var(--shadow-pop);
 }
 
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .spread {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .muted {
   color: var(--color-muted);
 }
 
+/*
+  .tiny 是內文不是裝飾 —— 日期、成員數、支出筆數都印在這裡。
+  所以用 --color-muted（4.9:1）而不是 --color-soft（3.4:1）。
+
+  --color-soft 不放「讀得到的文字」。它給的是圖示、邊界、placeholder
+  這類非文字 UI 元件（門檻 3:1），以及停用中的控制項 —— WCAG 1.4.3
+  明文豁免停用元件的對比要求，那正是「這個現在按不了」該有的樣子。
+*/
 .tiny {
-  color: var(--color-soft);
-  font-size: 12px;
+  color: var(--color-muted);
+  font-size: var(--text-tiny);
   line-height: 1.7;
 }
 
 .title {
   margin: 0;
-  font-size: 30px;
+  font-size: var(--text-title);
   line-height: 1.15;
   font-weight: 900;
 }
 
 .section-title {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--text-section);
   font-weight: 900;
+}
+
+/*
+  卡片內的小標，比 .section-title 輕一級。
+
+  用 --text-card 而不是 --text-section：那是卡片標題不是頁面區段，
+  而 --text-card 正是為了「太大」與「跟內文一樣」之間那一格才加的。
+
+  本來寫在 ExpenseFormPage 的 scoped 樣式裡，理由是「只有一頁有，
+  提前共用化只會多一個沒有第二個使用者的類別」。ProfilePage 是第二個，
+  所以照當初說好的搬上來。
+*/
+.card-head {
+  margin: 0;
+  font-size: var(--text-card);
+  font-weight: 800;
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-height: 48px;
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-line);
   background: #fff;
   color: var(--color-ink);
-  padding: 0 16px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-control);
   font-weight: 700;
+  transition:
+    border-color var(--dur-base) var(--ease),
+    background var(--dur-base) var(--ease),
+    transform var(--dur-press) var(--ease);
 }
 
+.btn:hover:not(:disabled) {
+  border-color: var(--color-line-strong);
+}
+
+/*
+  按下去縮一點點。2.5% 小到說不出哪裡變了，但沒有它的話按鈕就是
+  「按了沒反應」—— 這一層就是「畫面很硬」的直接成因。
+
+  :not(:disabled) 是必要的：停用的按鈕縮一下等於在說它被按到了。
+*/
+.btn:active:not(:disabled) {
+  transform: scale(0.975);
+}
+
+/*
+  底色用 primary-dark 而不是 primary：白字印在 #e8590c 上只有 3.6:1，
+  過不了 AA。#c2410c 是 5.2:1。
+
+  亮橘沒有消失 —— 它留在焦點框、佔比條、tint 與品牌標記，那些上面
+  沒有要讀的東西。
+*/
 .btn-primary {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
+  border-color: var(--color-primary-dark);
+  background: var(--color-primary-dark);
   color: #fff;
+  box-shadow: 0 4px 12px -6px rgba(194, 65, 12, 0.75);
+  transition:
+    background var(--dur-base) var(--ease),
+    box-shadow var(--dur-lift) var(--ease),
+    transform var(--dur-press) var(--ease);
 }
 
+/* primary-dark 升格成靜止色之後 hover 就空了，補一階 #9a3412（白字 7.3:1）。 */
 .btn-primary:hover {
-  background: var(--color-primary-dark);
+  background: var(--color-primary-deep);
+  border-color: var(--color-primary-deep);
+  box-shadow: 0 9px 20px -8px rgba(194, 65, 12, 0.85);
+}
+
+.btn-primary:active {
+  transform: scale(0.975);
 }
 
 .btn-ghost {
   background: var(--color-primary-soft);
   border-color: var(--color-primary-soft);
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
 }
 
 /*
@@ -198,7 +387,45 @@ a {
 }
 
 .btn-danger {
-  border-color: #f3d2ce;
+  border-color: var(--color-danger-line);
+  color: var(--color-danger);
+}
+
+/*
+  卡片內的次要動作。原本這種按鈕做成 outline 藥丸，結果一張卡下緣
+  多一列灰色藥丸 —— 在一張已經有三顆標籤的卡片上，那是第四、第五個
+  搶注意力的東西。
+
+  拿掉外框改用純文字，靠位置（固定在右下角）與間距說明它可按。
+*/
+.btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  min-height: auto;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-muted);
+  font-size: var(--text-tiny);
+  font-weight: 700;
+  transition: color var(--dur-base) var(--ease);
+}
+
+.btn-quiet:hover:not(:disabled) {
+  color: var(--color-primary-dark);
+}
+
+/*
+  刪除鈕平時用低飽和的紅棕，hover 才轉正紅。
+
+  平時就用正紅的話，一排卡片上會有一整列紅字在對你喊 —— 而刪除是
+  一輩子按不到幾次的操作，不該長期佔用畫面上最強的顏色。
+*/
+.btn-quiet.danger {
+  color: var(--color-danger-quiet);
+}
+
+.btn-quiet.danger:hover:not(:disabled) {
   color: var(--color-danger);
 }
 
@@ -208,9 +435,9 @@ a {
 
 .btn-sm {
   min-height: 36px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 0 12px;
-  font-size: 13px;
+  font-size: var(--text-control-sm);
 }
 
 .btn:disabled {
@@ -221,12 +448,12 @@ a {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .label {
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: var(--text-tiny);
   font-weight: 700;
 }
 
@@ -235,7 +462,7 @@ a {
   width: 100%;
   min-height: 52px;
   border: 1px solid var(--color-line);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-ink);
   padding: 0 14px;
@@ -295,22 +522,37 @@ a {
   cursor: pointer;
 }
 
+/*
+  巢狀圓角：內層 = 外層 − padding。差一點點就會看到內外的弧線互相撞到。
+
+  這一組被機械替換弄壞過一次 —— 原本是 16/12/padding 4（16 − 4 = 12，精確
+  嵌套），收 token 時兩個都被塞進 --radius-md 變成 14/14。規則寫在這裡，
+  下次才不會再被一起收掉。
+*/
 .tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  padding: 4px;
-  border-radius: 16px;
-  background: #f0ebe4;
+  gap: var(--space-2);
+  padding: var(--space-1); /* 4 */
+  border-radius: var(--radius-md); /* 14 */
+  background: var(--color-track);
+}
+
+/* 兩個頁籤的變體。原本 TaskPage 與 ExpenseFormPage 各自寫了一份。 */
+.tabs.two {
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .tab {
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-sm); /* 14 − 4 = 10 ✓ */
   background: transparent;
   min-height: 38px;
   color: var(--color-muted);
   font-weight: 700;
+  transition:
+    background var(--dur-base) var(--ease),
+    color var(--dur-base) var(--ease);
 }
 
 .tab.active {
@@ -318,29 +560,82 @@ a {
   color: #fff;
 }
 
+/*
+  次層級的切換（清單／地圖）。跟 .tabs 同一組 token、同一條巢狀規則，
+  但選中態是白底而不是 .tab.active 的墨黑底。
+
+  次層級不該跟頂層搶同一個視覺重量 —— 如果這裡也用墨黑，就只是把兩排
+  膠囊換成一排加一組膠囊，兩層相疊的問題沒有解掉。
+*/
+.seg {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--color-track);
+}
+
+.seg-item {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 6px 12px;
+  color: var(--color-muted);
+  font-size: var(--text-tiny);
+  font-weight: 700;
+  transition:
+    background var(--dur-base) var(--ease),
+    color var(--dur-base) var(--ease);
+}
+
+.seg-item.active {
+  background: var(--color-card);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-rest);
+}
+
 .empty {
   border: 1px dashed var(--color-line-strong);
-  border-radius: 22px;
+  border-radius: var(--radius-xl);
   padding: 32px 18px;
   text-align: center;
 }
 
 .error {
-  border: 1px solid #f3d2ce;
-  background: #fff5f5;
+  border: 1px solid var(--color-danger-line);
+  background: var(--color-danger-soft);
   color: var(--color-danger);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   padding: 12px 14px;
-  font-size: 13px;
+  font-size: var(--text-control-sm);
   line-height: 1.6;
 }
 
 @media (min-width: 760px) {
   .page {
-    padding: 36px;
+    padding: var(--space-8);
   }
 
   .shell {
     max-width: 820px;
+  }
+}
+
+/*
+  系統設定「減少動態」的人（前庭障礙、暈動症）看到完全靜止的版本。
+  這不是選配 —— 動畫對他們可能造成實際的生理不適。
+
+  不用 animation: none：那會讓靠動畫結束事件推進的邏輯永遠等不到。
+  改成把時間壓到幾乎為零，事件照樣觸發。
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

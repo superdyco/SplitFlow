@@ -10,6 +10,7 @@ import '../domain/report.dart';
 import '../state/providers.dart';
 import 'report_card.dart';
 import 'theme.dart';
+import 'weather_chip.dart';
 
 /// 一份公開的旅費報告。`src/pages/ReportPage.vue` 的 Flutter 版。
 ///
@@ -221,9 +222,18 @@ class _Body extends StatelessWidget {
         ],
         const SizedBox(height: 16),
 
-        // 每人平均是這一頁唯一的主角，所以獨立成一塊、字放到最大。
+        /*
+          每人平均是這一頁唯一的主角，所以字最大、而且是這一頁唯一有顏色的字。
+
+          底色從 primarySoft 換回白：primaryDark 印在 primarySoft 上只有
+          4.17:1，過不了 4.5。要嘛字不上色、要嘛底是白的，選後者 ——
+          這一頁需要一個主張，而顏色是它最便宜的表達方式。
+          theme_contrast_test 裡有一條把這個組合釘死成「不准」。
+
+          字級走 figure() 而不是 text.headlineMedium：這個 app 的 textTheme
+          根本沒有定義 headlineMedium，那一行一直在吃 Material 的預設值。
+        */
         Card(
-          color: AppColors.primarySoft,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
             child: Column(
@@ -233,18 +243,18 @@ class _Body extends StatelessWidget {
                 Text(
                   '${report.currency} '
                   '${formatAmount(report.perPerson, report.currency)}',
-                  style: text.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                  style: figure(size: 38, color: AppColors.primaryDark),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '總花費 ${report.currency} '
-                  '${formatAmount(report.total, report.currency)} · '
-                  '${report.expenseCount} 筆 · ${report.places.length} 個地點',
-                  style: text.bodySmall,
-                  textAlign: TextAlign.center,
+                const SizedBox(height: AppSpace.x3),
+                // 三個數字排成一列格子，而不是用「·」串成一句話：
+                // 它們是三個獨立的量，串起來讀的人要自己斷句。
+                _StatRow(
+                  labels: const ['總花費', '筆數', '地點'],
+                  values: [
+                    formatAmount(report.total, report.currency),
+                    '${report.expenseCount}',
+                    '${report.places.length}',
+                  ],
                 ),
               ],
             ),
@@ -258,8 +268,8 @@ class _Body extends StatelessWidget {
             children: [
               for (final item in report.categories)
                 _BarRow(
-                  label: '${categoryMeta(item.category).icon} '
-                      '${categoryMeta(item.category).label}',
+                  icon: categoryMeta(item.category).icon,
+                  label: categoryMeta(item.category).label,
                   note: '${item.share.round()}%',
                   amount: formatAmount(item.total, report.currency),
                   bar: item.share / 100,
@@ -392,6 +402,11 @@ class _Timeline extends StatelessWidget {
                         text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
+                // 舊報告沒有這個欄位，一定要判斷而不是假設它存在。
+                if (day.weather != null) ...[
+                  WeatherChip(weather: day.weather!, showLabel: true),
+                  const SizedBox(width: AppSpace.x3),
+                ],
                 Text(
                   formatAmount(day.total, report.currency),
                   style: text.bodyMedium,
@@ -413,12 +428,17 @@ class _Timeline extends StatelessWidget {
                         style: text.bodySmall,
                       ),
                     ),
+                  Icon(
+                    categoryMeta(entry.category).icon,
+                    size: 16,
+                    color: AppColors.primaryDark,
+                  ),
+                  const SizedBox(width: AppSpace.x2),
                   Expanded(
                     child: Text(
-                      '${categoryMeta(entry.category).icon} '
                       // 沒有支出名稱可放（報告裡刻意沒有），
                       // 所以沒地點時退回顯示分類。
-                      '${entry.place ?? categoryMeta(entry.category).label}',
+                      entry.place ?? categoryMeta(entry.category).label,
                       style: text.bodySmall,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -462,7 +482,64 @@ class _Section extends StatelessWidget {
 }
 
 /// 一列：名稱、筆數或百分比、金額，底下一條長條。
+/// 一列等寬的統計格子。報告頁的「總花費／筆數／地點」與任務列表的
+/// 各幣別總計是同一個形狀。
+class _StatRow extends StatelessWidget {
+  final List<String> labels;
+  final List<String> values;
+
+  const _StatRow({required this.labels, required this.values});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.rowLine),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < labels.length; i++) ...[
+              if (i > 0)
+                const VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: AppColors.rowLine,
+                ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpace.x3,
+                    vertical: 9,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(labels[i], style: text.bodySmall),
+                      Text(
+                        values[i],
+                        style: figure(size: 14, weight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _BarRow extends StatelessWidget {
+  /// null 就不畫圖示。地點那一組沒有分類可放，分類那一組有。
+  final IconData? icon;
   final String label;
   final String note;
   final String amount;
@@ -472,6 +549,7 @@ class _BarRow extends StatelessWidget {
   final bool soft;
 
   const _BarRow({
+    this.icon,
     required this.label,
     required this.note,
     required this.amount,
@@ -490,6 +568,10 @@ class _BarRow extends StatelessWidget {
         children: [
           Row(
             children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: AppColors.primaryDark),
+                const SizedBox(width: AppSpace.x2),
+              ],
               Expanded(
                 child: Text(
                   label,
@@ -498,12 +580,26 @@ class _BarRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Text(note, style: text.bodySmall),
-              const SizedBox(width: 10),
-              Text(
-                amount,
-                style: text.bodyMedium?.copyWith(
-                  fontFeatures: const [FontFeature.tabularFigures()],
+              /*
+                百分比與金額走固定欄寬。長條本來就是整寬畫在下面那一行，
+                所以它們一直是對齊的 —— 沒對齊的是這兩欄：名稱長的那幾列
+                把數字往右推，一整欄看下來是歪的。
+              */
+              SizedBox(
+                width: 34,
+                child: Text(
+                  note,
+                  textAlign: TextAlign.right,
+                  style: text.bodySmall,
+                ),
+              ),
+              const SizedBox(width: AppSpace.x2),
+              SizedBox(
+                width: 62,
+                child: Text(
+                  amount,
+                  textAlign: TextAlign.right,
+                  style: figure(size: 14, weight: FontWeight.w600),
                 ),
               ),
             ],

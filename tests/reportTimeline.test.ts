@@ -128,6 +128,54 @@ describe("reportTimeline", () => {
     expect(result[1].day).toBe(10);
   });
 
+  describe("每天的天氣", () => {
+    const sunny = { code: 0, high: 30, low: 22, exact: null };
+    const stormy = { code: 95, high: 28, low: 21, exact: null };
+
+    it("取當天第一筆有天氣的支出", () => {
+      const days = reportTimeline(
+        [
+          expense({ date: "2026-03-01", time: "09:00", weather: stormy }),
+          expense({ date: "2026-03-01", time: "18:00", weather: sunny })
+        ],
+        "TWD"
+      );
+
+      expect(days[0].weather).toEqual(stormy);
+    });
+
+    it("前面幾筆沒有天氣就往後找", () => {
+      const days = reportTimeline(
+        [
+          expense({ date: "2026-03-01", time: "09:00" }),
+          expense({ date: "2026-03-01", time: "18:00", weather: sunny })
+        ],
+        "TWD"
+      );
+
+      expect(days[0].weather).toEqual(sunny);
+    });
+
+    it("整天都沒有就是 null，不是硬湊一個", () => {
+      const days = reportTimeline([expense({ date: "2026-03-01" })], "TWD");
+
+      expect(days[0].weather).toBeNull();
+    });
+
+    it("每一天各自算，不會沿用前一天的", () => {
+      const days = reportTimeline(
+        [
+          expense({ date: "2026-03-01", weather: stormy }),
+          expense({ date: "2026-03-02" })
+        ],
+        "TWD"
+      );
+
+      expect(days[0].weather).toEqual(stormy);
+      expect(days[1].weather).toBeNull();
+    });
+  });
+
   it("只放公開得起的欄位 —— 沒有名稱、沒有 uid、沒有 id", () => {
     // 這份資料會寫進任何人拿到連結都讀得到的文件裡，欄位跑進來就是外洩。
     const [entry] = reportTimeline([expense({ title: "阿明的點心", time: "15:00" })], "TWD")[0].entries;

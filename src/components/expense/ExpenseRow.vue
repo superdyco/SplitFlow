@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WeatherChip from "@/components/expense/WeatherChip.vue";
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import type { Expense } from "@/types/expense";
@@ -65,14 +66,25 @@ const missingRate = computed(
     所以用 stretched link：連結本身只放在標題上，再用 ::after 覆蓋整張卡，
     「再記一筆」則疊在它上面。這樣兩個動作都能點，HTML 也是合法的。
   -->
-  <div class="card expense-row">
+  <div class="card flat expense-row">
     <span class="icon" :aria-label="meta.label">{{ meta.icon }}</span>
     <div class="body">
       <strong>
         <RouterLink :to="target" class="stretch">{{ expense.title }}</RouterLink>
       </strong>
       <p class="tiny">{{ shownDate }} · {{ meta.label }} · {{ paidByName }} 先付 · {{ splitLabel }}</p>
-      <p v-if="expense.place" class="tiny place">📍 {{ expense.place.name }}</p>
+      <!--
+        天氣跟地點同一行，不另開一欄：列上已經有分類圖示，再並排一個天氣
+        圖示是兩個圖示搶注意力 —— 而天氣本來就屬於地點，貼著它最自然。
+
+        但**沒有地點也要顯示天氣**。用「定位」而不選店是合理的記法：
+        想記那天在下大雨，不見得想記是哪一家店。包在 place 的條件裡的話，
+        那種支出的天氣就查到了卻永遠看不到。
+      -->
+      <p v-if="expense.place || expense.weather" class="tiny place">
+        <template v-if="expense.place">📍 {{ expense.place.name }}</template>
+        <WeatherChip v-if="expense.weather" :weather="expense.weather" />
+      </p>
       <!-- 只標示有沒有，不放縮圖：一天十筆就是十個網路請求，漫遊網路下會很難看。 -->
       <p v-if="expense.receipt" class="tiny">📎 有收據</p>
       <p v-if="expense.note" class="tiny note">📝 {{ expense.note }}</p>
@@ -95,8 +107,7 @@ const missingRate = computed(
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  box-shadow: none;
+  gap: var(--space-3);
 }
 
 .icon {
@@ -106,8 +117,9 @@ const missingRate = computed(
   flex: none;
   width: 42px;
   height: 42px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--color-primary-soft);
+  /* emoji 的字符大小，綁的是這個 42px 方塊而不是排版尺度。不要套字級表。 */
   font-size: 20px;
 }
 
@@ -160,7 +172,7 @@ const missingRate = computed(
   margin-top: 6px;
   padding: 3px 10px;
   border: 1px solid var(--color-line-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   color: var(--color-muted);
   cursor: pointer;
@@ -168,7 +180,7 @@ const missingRate = computed(
 
 .repeat:hover {
   border-color: var(--color-primary);
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
 }
 
 .amount {

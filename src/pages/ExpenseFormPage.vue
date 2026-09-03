@@ -13,19 +13,11 @@ import { useTask } from "@/composables/useTask";
 import { useTaskMembers } from "@/composables/useTaskMembers";
 import { createExpense, deleteExpense, getExpense, updateExpense } from "@/services/expenseService";
 import { getRate } from "@/services/rateService";
-import {
-  autocompletePlaces,
-  getPlaceDetails,
-  newSessionToken,
-  placesEnabled,
-  recallPlaceBias,
-  rememberPlaceBias,
-  type PlaceSuggestion
-} from "@/services/placeService";
-import { geolocationAvailable, getCurrentLatLng } from "@/services/geolocation";
-import { biasFromPlaces, type LatLng } from "@/utils/placeBias";
-import { mapsEnabled } from "@/services/mapsLoader";
-import PlaceMap, { type MapMarker } from "@/components/map/PlaceMap.vue";
+import PlaceField from "@/components/expense/PlaceField.vue";
+import WeatherChip from "@/components/expense/WeatherChip.vue";
+import { lookupWeather } from "@/services/weatherService";
+import type { WeatherAt } from "@/services/weatherService";
+import type { ExpenseWeather } from "@/types/weather";
 import {
   CURRENCIES,
   allocate,
@@ -82,8 +74,6 @@ const saving = ref(false);
 const removing = ref(false);
 const loadError = ref<string | null>(null);
 const error = ref<string | null>(null);
-/** 離線排隊時要告訴使用者資料沒有不見，只是還沒送出去。 */
-const queuedNotice = ref(false);
 
 const title = ref("");
 /**
@@ -113,50 +103,74 @@ const involvedIds = ref<string[]>([]);
 const note = ref("");
 
 const rate = ref("1");
-const rateUpdatedAt = ref("");
 const rateLoading = ref(false);
 const rateError = ref<string | null>(null);
 
-const placeQuery = ref("");
-const selectedPlace = ref<ExpensePlace | null>(null);
-const suggestions = ref<PlaceSuggestion[]>([]);
-const placeLoading = ref(false);
-const locating = ref(false);
-const placeError = ref<string | null>(null);
-const placeSearchable = placesEnabled();
-/** 按下定位鍵抓到的座標。只用來在地圖上標出「你在這」，不會存進支出裡。 */
-const myLocation = ref<LatLng | null>(null);
-/**
- * 搜尋的位置偏好。沒有它的話「星巴克」會回傳全世界的分店 ——
- * 人在曼谷卻搜到台北那間。第一筆支出還沒有參考點，就退回原本的全球搜尋。
- */
-const placeBias = ref<LatLng | null>(recallPlaceBias(taskId));
-const mapAvailable = mapsEnabled();
-/**
- * 定位鍵的用途就是把「你在這」畫在下面那張地圖上，沒有地圖金鑰就沒有地圖可畫，
- * 按了不會有任何反應 —— 那種按鈕不如不要出現。
- */
-const canLocate = mapAvailable && geolocationAvailable();
-let placeSession = newSessionToken();
-let placeTimer: number | undefined;
+/** 這筆支出的地點。搜尋、定位、地圖全在 PlaceField 裡，這裡只收結果。 */
+const place = ref<ExpensePlace | null>(null);
+
+const weather = ref<ExpenseWeather | null>(null);
+const weatherLoading = ref(false);
 
 /**
- * 地圖上永遠只有一個標記，而且選好的地點優先。
+ * 按「定位」抓到的座標。**不會存進支出** —— 它只用來查天氣。
  *
- * 定位只是還沒決定地點時的參考 —— 一旦選了店，地圖要標的就是那家店。
- * 兩個一起畫的話，地圖上兩顆紅點誰是誰看不出來，存進支出的又只有其中一個。
- *
- * 目前位置是「隱藏」不是「清掉」：把地點欄位清空或改字之後，
- * 那個參考點會自己回來，不用再按一次定位。
- * 只打名字沒選建議的地點沒有座標，畫不出來，那時也是回頭標目前位置。
+ * 不選地點只按定位是合理的用法：想記「那天在下大雨」，不見得想記是
+ * 哪一家店。少了這個，那種記法就完全查不到天氣。
  */
-const placeMarkers = computed<MapMarker[]>(() => {
-  const place = selectedPlace.value;
-  if (place && place.lat !== null && place.lng !== null) {
-    return [{ id: place.placeId ?? "place", lat: place.lat, lng: place.lng, title: place.name }];
+const locatedAt = ref<WeatherAt | null>(null);
+
+/**
+ * 查天氣用哪個座標：選好的地點優先，沒有就用定位抓到的。
+ *
+ * 地點優先是因為它更精確 —— 選了店就是問那家店，不是問你站的地方。
+ */
+const weatherAt = computed<WeatherAt | null>(() => {
+  const picked = place.value;
+  if (picked && picked.lat !== null && picked.lng !== null) {
+    return { lat: picked.lat, lng: picked.lng };
   }
-  const here = myLocation.value;
-  return here ? [{ id: "me", lat: here.lat, lng: here.lng, title: "你目前的位置" }] : [];
+  return locatedAt.value;
+});
+
+/**
+ * 載入既有支出時，不要因為填入欄位就去重查天氣。
+ *
+ * 沒有這個守衛的話：編輯一筆舊支出 → 填入 place/date 觸發 watch → 那時如果
+ * 離線，查詢回 null → weather 被清空 → 只是改個備註，卻把它本來就有的天氣
+ * 洗掉了。使用者不會知道發生過這件事。
+ *
+ * watch 對同一個 tick 裡的多個變更只會觸發一次，所以一個旗標就夠。
+ */
+let skipWeatherLookup = false;
+
+/**
+ * 地點與日期都有了就查天氣。
+ *
+ * **改了任一個就重查，查不到就清空。** 停在那裡的舊天氣是「三月三號清邁的雨」
+ * 配上「三月五號曼谷的晚餐」，而畫面上看不出來 —— 跟未換算支出同一個立場：
+ * 寧可沒有，不要錯的。
+ *
+ * 先清空再查，所以查詢中畫面上不會是上一次的結果。
+ */
+watch([weatherAt, date, time], async () => {
+  if (skipWeatherLookup) {
+    skipWeatherLookup = false;
+    return;
+  }
+
+  // 先清空再查：**改了就重查，查不到就清空。** 停在那裡的舊天氣是
+  // 「三月三號清邁的雨」配上「三月五號曼谷的晚餐」，而畫面上看不出來 ——
+  // 跟未換算支出同一個立場：寧可沒有，不要錯的。
+  weather.value = null;
+  if (!weatherAt.value || !date.value) return;
+
+  weatherLoading.value = true;
+  try {
+    weather.value = await lookupWeather(weatherAt.value, date.value, time.value);
+  } finally {
+    weatherLoading.value = false;
+  }
 });
 
 const baseCurrency = computed(() => taskState.task.value?.defaultCurrency || "TWD");
@@ -247,95 +261,6 @@ function memberName(memberUid: string) {
   return memberDisplayName(member);
 }
 
-/**
- * 使用者可能只想打個名字不選建議，所以輸入本身就是有效的地點名稱。
- * 選了建議才會補上地址與座標。
- */
-function currentPlace(): ExpensePlace | null {
-  const text = placeQuery.value.trim();
-  if (!text) return null;
-  if (selectedPlace.value && selectedPlace.value.name === text) return selectedPlace.value;
-  return { name: text, address: null, lat: null, lng: null, placeId: null };
-}
-
-function onPlaceInput(value: string) {
-  placeQuery.value = value;
-  selectedPlace.value = null;
-  placeError.value = null;
-  if (!placeSearchable) return;
-
-  window.clearTimeout(placeTimer);
-  if (value.trim().length < 2) {
-    suggestions.value = [];
-    return;
-  }
-  // 每打一個字就打一次 API 太浪費，等使用者停下來再查。
-  placeTimer = window.setTimeout(searchPlaces, 350);
-}
-
-async function searchPlaces() {
-  placeLoading.value = true;
-  placeError.value = null;
-  try {
-    suggestions.value = await autocompletePlaces(placeQuery.value, placeSession, placeBias.value);
-  } catch (err) {
-    suggestions.value = [];
-    placeError.value = err instanceof Error ? err.message : String(err);
-  } finally {
-    placeLoading.value = false;
-  }
-}
-
-async function pickPlace(suggestion: PlaceSuggestion) {
-  placeLoading.value = true;
-  placeError.value = null;
-  try {
-    const detail = await getPlaceDetails(suggestion.placeId, placeSession);
-    selectedPlace.value = detail;
-    placeQuery.value = detail.name;
-    suggestions.value = [];
-    // 這個任務接下來的搜尋就以這裡為中心。選到沒有座標的地點時保留原本的偏好。
-    rememberPlaceBias(taskId, detail);
-    placeBias.value = biasFromPlaces([detail]) ?? placeBias.value;
-    // 一次 autocomplete + details 算一個 session，選完就換新的。
-    placeSession = newSessionToken();
-  } catch (err) {
-    placeError.value = err instanceof Error ? err.message : String(err);
-  } finally {
-    placeLoading.value = false;
-  }
-}
-
-/**
- * 定位鍵：抓現在的座標，標在下面那張地圖上。
- *
- * 刻意不去查附近有什麼店、也不動地點欄位 —— 這顆鍵只回答「我在哪」。
- * 順帶把搜尋的位置偏好換成這裡：人就在這，比上一筆支出的座標更準，
- * 而且這是 autocomplete 請求上的一個欄位，不會多花錢。
- */
-async function useCurrentLocation() {
-  locating.value = true;
-  placeError.value = null;
-  try {
-    const here = await getCurrentLatLng();
-    myLocation.value = here;
-    placeBias.value = here;
-  } catch (err) {
-    placeError.value = err instanceof Error ? err.message : String(err);
-  } finally {
-    locating.value = false;
-  }
-}
-
-function clearPlace() {
-  window.clearTimeout(placeTimer);
-  placeQuery.value = "";
-  selectedPlace.value = null;
-  suggestions.value = [];
-  placeError.value = null;
-  // 目前位置不清掉：那是「我在哪」，跟這一格填了什麼地點無關。
-}
-
 async function loadRate() {
   if (!needsRate.value) {
     rate.value = "1";
@@ -346,8 +271,9 @@ async function loadRate() {
   rateError.value = null;
   try {
     const quote = await getRate(currency.value, baseCurrency.value);
+    // quote.updatedAt 沒有人讀了：「參考匯率更新於…」那句隨著匯率區塊
+    // 壓成兩行一起刪掉，留一個沒人讀的 ref 比刪掉更難懂。
     rate.value = String(Number(quote.rate.toFixed(6)));
-    rateUpdatedAt.value = quote.updatedAt;
   } catch (err) {
     rateError.value = `${err instanceof Error ? err.message : String(err)}。請手動填寫匯率。`;
   } finally {
@@ -374,8 +300,7 @@ async function applyRepeatSource() {
   splitMemberIds.value = selectableMembers.value
     .map(member => member.uid)
     .filter(memberUid => memberUid in fields.splits);
-  selectedPlace.value = fields.place;
-  placeQuery.value = fields.place?.name ?? "";
+  place.value = fields.place;
 
   // 自訂分攤的金額跟著原金額走，但新的一筆金額還沒填，留空讓使用者重填。
   if (fields.splitMode === "custom") customAmounts.value = {};
@@ -439,10 +364,12 @@ async function load() {
         amountToInput(value, expense.currency)
       ])
     );
-    selectedPlace.value = expense.place;
-    placeQuery.value = expense.place?.name ?? "";
-    // 編輯這筆支出時，它自己的座標比 localStorage 裡那個更能代表要找的區域。
-    placeBias.value = biasFromPlaces([expense.place]) ?? placeBias.value;
+    // 這一批填入不該觸發重查，見 skipWeatherLookup 的說明。
+    skipWeatherLookup = true;
+    place.value = expense.place;
+    weather.value = expense.weather ?? null;
+    // 「編輯時用這筆支出的座標當搜尋偏好」搬進 PlaceField 了 ——
+    // 它從初始值自己推得出來，母元件不必知道有位置偏好這件事。
     // 舊支出沒存日期，帶出 createdAt 換算的那天當預設，存回去就補上了。
     date.value = expenseDate(expense);
     // 時間沒有這種退路（見 expenseTime 的說明）：原本沒記就維持空白，
@@ -518,7 +445,8 @@ async function submit() {
       paidBy: paidBy.value,
       splitMode: splitMode.value,
       splits,
-      place: currentPlace(),
+      place: place.value,
+      weather: weather.value,
       // 先寫既有的值；新選的照片要等下面拿到 id 之後才處理。
       receipt: receiptState.receipt.value,
       note: note.value.trim(),
@@ -554,7 +482,19 @@ async function submit() {
       return;
     }
 
-    if (outcome === "queued") queuedNotice.value = true;
+    /*
+      離線排隊時應該要告訴使用者「已經存在這台裝置上，連上網會自動同步」——
+      那正是最需要安撫的時刻。原本有這段提示，但它壞了：設完旗標立刻導走，
+      元件跟著卸載，那個 <p> 沒有機會渲染。
+
+      刪掉壞的實作，把原意留在這裡。修法不只一種（延後導航、在任務頁顯示、
+      改用全域提示），每一種的影響範圍都超出這次改版 —— 但下一個人至少
+      知道有人想過這件事，不會以為從來沒有。
+
+      outcome 因此暫時沒有讀取者。留著它是刻意的：那兩行賦值是送出流程的
+      一部分，為了消掉一個沒人抱怨的未使用變數去改 settleWrite 的呼叫方式，
+      代價比留著大。
+    */
     await router.push(`/tasks/${taskId}`);
   } catch (err) {
     error.value = firebaseErrorMessage(err);
@@ -596,7 +536,7 @@ onMounted(load);
 
 <template>
   <AppLayout>
-    <div class="stack">
+    <div class="stack form-page">
       <LoadingState v-if="loading" title="讀取中" message="正在讀取任務與成員資料。" />
 
       <AccessDenied v-else-if="taskState.denied.value" />
@@ -678,6 +618,30 @@ onMounted(load);
             </label>
           </div>
 
+          <div v-if="needsRate" class="field">
+            <span class="label">匯率（1 {{ currency }} = ? {{ baseCurrency }}）</span>
+            <div class="row">
+              <input v-model="rate" class="input grow" inputmode="decimal" placeholder="0" />
+              <button type="button" class="btn btn-sm" :disabled="rateLoading" @click="loadRate">
+                {{ rateLoading ? "查詢中..." : "重新查詢" }}
+              </button>
+            </div>
+            <!--
+              三塊壓成一行。格式錯誤與查詢失敗維持獨立顯示 —— 那是錯誤，該有重量；
+              三者互斥，所以最多只佔一行。代價是刪掉「記帳後就固定不再變動」與
+              「參考匯率更新於…可以自己改」兩句說明。
+            -->
+            <span v-if="rateFormatError" class="tiny warn">{{ rateFormatError }}</span>
+            <span v-else-if="rateError" class="tiny warn">{{ rateError }}</span>
+            <span v-else-if="baseAmount !== null" class="tiny">
+              ≈ {{ baseCurrency }} {{ formatAmount(baseAmount, baseCurrency) }}
+            </span>
+          </div>
+        </div>
+
+        <div class="card stack">
+          <h2 class="card-head">這趟的細節</h2>
+
           <div class="field">
             <div class="row">
               <label class="field grow">
@@ -695,81 +659,25 @@ onMounted(load);
             </span>
           </div>
 
-          <div v-if="needsRate" class="field">
-            <span class="label">匯率（1 {{ currency }} = ? {{ baseCurrency }}）</span>
-            <div class="row">
-              <input v-model="rate" class="input grow" inputmode="decimal" placeholder="0" />
-              <button type="button" class="btn btn-sm" :disabled="rateLoading" @click="loadRate">
-                {{ rateLoading ? "查詢中..." : "重新查詢" }}
-              </button>
-            </div>
-            <span v-if="rateFormatError" class="tiny warn">{{ rateFormatError }}</span>
-            <span v-else-if="rateError" class="tiny warn">{{ rateError }}</span>
-            <span v-else-if="rateUpdatedAt" class="tiny">參考匯率更新於 {{ rateUpdatedAt }}，可以自己改成實際成交匯率。</span>
-            <span v-if="baseAmount !== null" class="tiny">
-              換算後約 {{ baseCurrency }} {{ formatAmount(baseAmount, baseCurrency) }}，記帳後就固定不再變動。
-            </span>
-          </div>
+          <!--
+            天氣掛在地點欄位的那一列，跟定位鍵並排 —— 它是「剛選完地點」
+            這個動作的回饋，擺在別的地方就看不出是同一件事的兩半。
 
-          <div class="field">
-            <div class="spread">
-              <span class="label">地點（選填）</span>
-              <button v-if="placeQuery" type="button" class="link" @click="clearPlace">清除</button>
-            </div>
-            <div class="place">
-              <div class="row">
-                <input
-                  :value="placeQuery"
-                  class="input grow"
-                  :placeholder="placeSearchable ? '輸入店名或地址，從清單選一個' : '輸入地點名稱'"
-                  autocomplete="off"
-                  @input="onPlaceInput(($event.target as HTMLInputElement).value)"
-                />
-                <!--
-                  只有一個圖示，所以 aria-label 是它唯一的名字，不能省。
-                  title 讓滑鼠停著也看得到說明。
-                -->
-                <button
-                  v-if="canLocate"
-                  type="button"
-                  class="btn icon-btn"
-                  :class="{ working: locating }"
-                  :disabled="locating"
-                  aria-label="標出我目前的位置"
-                  title="標出我目前的位置"
-                  @click="useCurrentLocation"
-                >
-                  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
-                    <circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="2" />
-                    <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-                    <path
-                      d="M12 1.5v3.5M12 19v3.5M1.5 12h3.5M19 12h3.5"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <ul v-if="suggestions.length" class="suggestions">
-                <li v-for="item in suggestions" :key="item.placeId">
-                  <button type="button" class="suggestion" @click="pickPlace(item)">
-                    <strong>{{ item.primary }}</strong>
-                    <span v-if="item.secondary" class="tiny">{{ item.secondary }}</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
-            <span v-if="locating" class="tiny">正在取得目前位置...</span>
-            <span v-else-if="placeLoading" class="tiny">搜尋中...</span>
-            <span v-else-if="placeError" class="tiny warn">{{ placeError }}</span>
-            <span v-else-if="selectedPlace?.address" class="tiny">{{ selectedPlace.address }}</span>
-            <span v-else-if="!placeSearchable" class="tiny">
-              沒有設定地點服務金鑰，目前只會存你打的名稱，不會有地址與座標。
-            </span>
-            <PlaceMap v-if="mapAvailable && placeMarkers.length" :markers="placeMarkers" height="180px" />
-          </div>
+            查不到就整格不出現，沒有錯誤訊息：使用者正在記一筆帳，
+            那才是他來這一頁的目的。
+          -->
+          <PlaceField :task-id="taskId" v-model="place" @locate="locatedAt = $event">
+            <template #trailing>
+              <span v-if="weatherLoading" class="weather-wait tiny">查天氣</span>
+              <WeatherChip v-else-if="weather" :weather="weather" variant="chip" show-label />
+            </template>
+          </PlaceField>
 
+          <!--
+            ReceiptField 的提示寫「要按下面的『新增支出』」。送出鈕現在固定在
+            畫面底部而不是捲動流的下面 —— 那句話還算對（它就在下方），但措辭是
+            為了舊版面寫的。改它要看它的其他使用者，是獨立的一件事，不塞進這次。
+          -->
           <ReceiptField
             :preview-url="receiptState.previewUrl.value"
             :state="receiptState.state.value"
@@ -797,6 +705,10 @@ onMounted(load);
               placeholder="例如：含小費、阿明先付現金、發票在小美那"
             ></textarea>
           </label>
+        </div>
+
+        <div class="card stack">
+          <h2 class="card-head">怎麼分</h2>
 
           <label class="field">
             <span class="label">誰先付</span>
@@ -809,9 +721,25 @@ onMounted(load);
 
           <div class="field">
             <span class="label">分攤方式</span>
-            <div class="tabs two">
-              <button class="tab" :class="{ active: splitMode === 'even' }" @click="setSplitMode('even')">均分</button>
-              <button class="tab" :class="{ active: splitMode === 'custom' }" @click="setSplitMode('custom')">
+            <!--
+              用 .seg 不用 .tabs：.tabs 是任務頁最上層的頁籤，墨黑實心，那是頁面
+              層級的重量。這裡只是表單裡的一個二選一，.seg 就是為次層級切換做的。
+            -->
+            <div class="seg">
+              <button
+                type="button"
+                class="seg-item"
+                :class="{ active: splitMode === 'even' }"
+                @click="setSplitMode('even')"
+              >
+                均分
+              </button>
+              <button
+                type="button"
+                class="seg-item"
+                :class="{ active: splitMode === 'custom' }"
+                @click="setSplitMode('custom')"
+              >
                 自訂金額
               </button>
             </div>
@@ -886,15 +814,14 @@ onMounted(load);
           </div>
         </div>
 
-        <p v-if="queuedNotice" class="card tiny">
-          目前沒有連線，已經先存在這台裝置上，連上網路後會自動同步。
-        </p>
+        <!--
+          刪除與取消留在捲動流裡，不進固定列。93be088 動的正是這個檔案：
+          手機上系統對話框的 OK 落在哪不是我們能決定的，而它傾向落在拇指下 ——
+          螢幕底部那一條就是拇指的定位點，不可逆的操作不該常駐在那裡。
 
-        <ErrorState :message="error" />
-
-        <button class="btn btn-primary btn-block" :disabled="saving || !canSubmit" @click="submit">
-          {{ saving ? "儲存中..." : isEdit ? "儲存變更" : "新增支出" }}
-        </button>
+          附帶好處：刪除需要刻意捲下去才找得到，那正是它應得的摩擦。
+          取消也留著 —— 它是「放棄剛打的東西」，而返回鍵本來就能離開。
+        -->
         <button
           v-if="isEdit"
           class="btn btn-danger btn-block"
@@ -904,6 +831,24 @@ onMounted(load);
           {{ removing ? "刪除中..." : "刪除支出" }}
         </button>
         <button class="btn btn-block" @click="router.push(`/tasks/${taskId}`)">取消</button>
+
+        <!--
+          送出鈕固定在畫面底部，錯誤訊息跟著進去 —— 不然送出失敗時使用者停在
+          表單上方，訊息印在捲動流的底部，他會按了送出、什麼都沒發生、也不知道
+          為什麼。
+
+          用 sticky 不用 fixed：這一頁到處是文字輸入框，而 iOS Safari 的虛擬
+          鍵盤跳出來時 fixed 元素的行為不可靠 —— 可能被鍵盤蓋住、也可能浮在
+          鍵盤上方擋住正在打字的欄位。sticky 黏在捲動容器內，跟著內容走。
+
+          它必須是捲動流的最後一個元素，sticky bottom 才有東西可黏。
+        -->
+        <div class="submit-bar">
+          <ErrorState :message="error" />
+          <button class="btn btn-primary btn-block" :disabled="saving || !canSubmit" @click="submit">
+            {{ saving ? "儲存中..." : isEdit ? "儲存變更" : "新增支出" }}
+          </button>
+        </div>
       </template>
 
       <ReceiptViewer
@@ -926,6 +871,43 @@ onMounted(load);
 </template>
 
 <style scoped>
+/*
+  固定送出列。sticky 而不是 fixed 的理由見 template 的註解。
+
+  bottom 是負的 --space-6：AppLayout 的 .page 有 24px 的 padding，sticky
+  貼在 viewport 底部時那 24px 會露出頁面背景，看起來像卡在半空中。往下
+  拉滿讓它真的貼底，再用自己的 padding 把按鈕推回原位。左右的負 margin
+  同理 —— 兩個值都跟 .page 的 padding 綁在一起，改一邊就要改另一邊。
+
+  背景不能透明：下面的欄位會直接穿過去。
+
+  z-index 刻意比 PlaceField 的 .suggestions（5）低。建議清單是使用者正在
+  互動的東西，它蓋過送出列是對的；反過來的話，地點在卡 2 底部時清單會被
+  送出列切掉。
+*/
+.submit-bar {
+  position: sticky;
+  bottom: calc(var(--space-6) * -1);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 calc(var(--space-6) * -1);
+  padding: var(--space-3) var(--space-6) var(--space-6);
+  background: var(--color-bg);
+}
+
+/*
+  固定列會蓋住捲動流的最後一段，所以頁面底部要補足夠的空白 ——
+  不然「取消」按鈕永遠有一半藏在送出鈕下面。
+
+  用 .form-page 不用 .stack：scoped 的 .stack 會連三張 card stack 與
+  custom-list 一起命中，卡片內部也被加上 32px 的下方留白，那是錯的。
+*/
+.form-page {
+  padding-bottom: var(--space-8);
+}
+
 .grow {
   flex: 1;
   min-width: 0;
@@ -962,24 +944,20 @@ onMounted(load);
   flex-wrap: wrap;
 }
 
-.tabs.two {
-  grid-template-columns: repeat(2, 1fr);
-}
-
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   min-height: 40px;
   padding: 0 14px;
   border: 1px solid var(--color-line);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-muted);
   font-weight: 700;
@@ -988,17 +966,17 @@ onMounted(load);
 .chip.active {
   border-color: var(--color-primary);
   background: var(--color-primary-soft);
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
 }
 
 .custom-list {
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .custom-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .custom-row .who {
@@ -1021,27 +999,23 @@ onMounted(load);
   border: 0;
   background: none;
   padding: 0;
-  color: var(--color-primary);
-  font-size: 12px;
+  color: var(--color-primary-dark);
+  font-size: var(--text-tiny);
   font-weight: 700;
 }
 
-.place {
-  position: relative;
-}
-
-/* 只有圖示的方形按鈕（定位、語音），高度對齊旁邊的輸入框（.input 是 52px）。 */
+/* 只有圖示的方形按鈕（語音），高度對齊旁邊的輸入框（.input 是 52px）。 */
 .icon-btn {
   flex: none;
   width: 52px;
   min-height: 52px;
   padding: 0;
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
 }
 
 /*
   進行中的回饋：這種按鈕上沒有文字可以改成「定位中...」，只好讓圖示自己動。
-  抓 GPS 或等語音辨識動輒好幾秒，沒有任何動靜的話會被當成沒反應而一直重按。
+  等語音辨識動輒好幾秒，沒有任何動靜的話會被當成沒反應而一直重按。
 */
 .icon-btn.working {
   border-color: var(--color-primary);
@@ -1065,44 +1039,22 @@ onMounted(load);
   }
 }
 
-.suggestions {
-  position: absolute;
-  z-index: 5;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  margin: 0;
-  padding: 6px;
-  list-style: none;
-  border: 1px solid var(--color-line);
-  border-radius: 16px;
-  background: var(--color-card);
-  box-shadow: var(--shadow-card);
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.suggestion {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 12px;
-  background: none;
-  text-align: left;
-}
-
-.suggestion:hover {
-  background: var(--color-primary-soft);
-}
-
-.suggestion .tiny {
-  line-height: 1.4;
-}
-
 .warn {
   color: var(--color-danger);
+}
+
+/*
+  讀取中的佔位。跟天氣那一格同高同框 —— 不然查到的瞬間整列會抖一下，
+  而那一列裡還有使用者正在打字的輸入框。
+*/
+.weather-wait {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
 }
 </style>

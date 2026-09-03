@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'models.dart';
+import 'place_bias.dart';
 
 /// Places API (New) 的請求與回應形狀。`src/services/placeService.ts` 裡
 /// 不碰網路的那半。
@@ -149,3 +150,27 @@ String? _text(dynamic value) =>
     value is Map ? _string(value['text']) : _string(value);
 
 double? _number(dynamic value) => value is num ? value.toDouble() : null;
+
+/// 這一格現在代表哪個地點。網頁版 `src/utils/placeSearch.ts` 的 `currentPlace`。
+///
+/// 選過建議就是完整的那一份（含座標），空的就是 null。
+///
+/// 名字跟選取的那一份對得起來才算數 —— 選完再改字的話，那一份就不算了。
+/// 這條不是龜毛：留著座標會存進一個名字對不上位置的地點，
+/// 而那種錯誤在畫面上看起來完全正常。
+///
+/// **[located] 是例外，而且例外的理由是它講的是另一件事。**
+///
+/// 從建議來的座標是一句斷言：「這是那家店」。改了名字那句話就不成立。
+/// 定位來的座標是另一句：「我在這」。把它改名成「路邊攤」不會讓它變假 ——
+/// 使用者描述的正是他站的地方。所以只打名字時它留著，選了建議時它讓位。
+ExpensePlace? currentPlace(
+  String query,
+  ExpensePlace? selected, [
+  LatLng? located,
+]) {
+  final text = query.trim();
+  if (text.isEmpty) return null;
+  if (selected != null && selected.name == text) return selected;
+  return ExpensePlace(name: text, lat: located?.lat, lng: located?.lng);
+}

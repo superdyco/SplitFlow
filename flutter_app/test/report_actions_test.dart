@@ -51,26 +51,35 @@ void main() {
   }
 
   group('canShareReport', () {
-    test('只有 owner 能產生與撤銷', () {
-      expect(canShareReport(task: task(), uid: 'owner'), isTrue);
-    });
-
-    test('admin 也不行 —— 公開別人的消費資料只有 owner 能決定', () {
-      expect(canShareReport(task: task(), uid: 'admin'), isFalse);
-    });
-
-    test('一般成員不行', () {
-      expect(canShareReport(task: task(), uid: 'u3'), isFalse);
-    });
-
-    test('沒登入不行 —— 空字串不能因為任務沒有 owner 就矇混過去', () {
-      expect(canShareReport(task: task(ownerId: ''), uid: ''), isFalse);
-    });
-
-    test('封存的任務照樣能產生 —— 報告本來就是旅程結束後才做的', () {
+    test('owner 在封存之後能產生與撤銷', () {
       expect(
         canShareReport(task: task(status: 'archived'), uid: 'owner'),
         isTrue,
+      );
+    });
+
+    test('未封存不能產生 —— 數字還沒定案，分享出去是誤導', () {
+      expect(canShareReport(task: task(), uid: 'owner'), isFalse);
+    });
+
+    test('admin 也不行 —— 公開別人的消費資料只有 owner 能決定', () {
+      expect(
+        canShareReport(task: task(status: 'archived'), uid: 'admin'),
+        isFalse,
+      );
+    });
+
+    test('一般成員不行', () {
+      expect(
+        canShareReport(task: task(status: 'archived'), uid: 'u3'),
+        isFalse,
+      );
+    });
+
+    test('沒登入不行 —— 空字串不能因為任務沒有 owner 就矇混過去', () {
+      expect(
+        canShareReport(task: task(ownerId: '', status: 'archived'), uid: ''),
+        isFalse,
       );
     });
   });

@@ -6,7 +6,9 @@ import '../domain/member_name.dart';
 import '../domain/models.dart';
 import '../domain/offline_write.dart';
 import '../state/providers.dart';
+import 'ledger.dart';
 import 'remove_member_dialog.dart';
+import 'rename_dialog.dart';
 import 'theme.dart';
 
 /// 任務的成員分頁。`src/components/member/MemberRow.vue` 與 TaskPage 的
@@ -91,9 +93,11 @@ class _MembersTabState extends ConsumerState<MembersTab> {
 
   /// 改名只對虛擬成員開放 —— 真實成員的暱稱來自個人資料，他自己改。
   Future<void> _rename(TaskMember member) async {
-    final next = await showDialog<String>(
-      context: context,
-      builder: (context) => _RenameDialog(initial: member.nickname),
+    final next = await showRenameDialog(
+      context,
+      title: '改名',
+      initial: member.nickname,
+      maxLength: 20,
     );
 
     if (next == null || next.isEmpty || next == member.nickname) return;
@@ -203,29 +207,36 @@ class _MembersTabState extends ConsumerState<MembersTab> {
                 style: text.bodyMedium?.copyWith(color: AppColors.danger)),
             const SizedBox(height: 12),
           ],
-          for (final member in list) ...[
-            _MemberCard(
-              member: member,
-              isSelf: member.uid == uid,
-              canManage: canManage,
-              busy: _busyUid == member.uid,
-              onPromote: () => _run(
-                member.uid,
-                () => ref
-                    .read(taskRepositoryProvider)
-                    .setMemberRole(widget.task.id, member.uid, 'admin'),
-              ),
-              onDemote: () => _run(
-                member.uid,
-                () => ref
-                    .read(taskRepositoryProvider)
-                    .setMemberRole(widget.task.id, member.uid, 'member'),
-              ),
-              onRemove: () => _remove(member),
-              onRename: () => _rename(member),
-            ),
-            const SizedBox(height: 10),
-          ],
+          // 一組成員一張卡，不是一人一張。這個 ListView 本來就是非惰性的
+          // （children 不是 itemBuilder），折起來不會多建任何東西。
+          LedgerCard(
+            children: [
+              for (var i = 0; i < list.length; i++) ...[
+                if (i > 0) const LedgerDivider(),
+                _MemberCard(
+                  member: list[i],
+                  isSelf: list[i].uid == uid,
+                  canManage: canManage,
+                  busy: _busyUid == list[i].uid,
+                  onPromote: () => _run(
+                    list[i].uid,
+                    () => ref
+                        .read(taskRepositoryProvider)
+                        .setMemberRole(widget.task.id, list[i].uid, 'admin'),
+                  ),
+                  onDemote: () => _run(
+                    list[i].uid,
+                    () => ref
+                        .read(taskRepositoryProvider)
+                        .setMemberRole(widget.task.id, list[i].uid, 'member'),
+                  ),
+                  onRemove: () => _remove(list[i]),
+                  onRename: () => _rename(list[i]),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: AppSpace.x3),
           if (canManage) ...[
             Card(
               child: Padding(
@@ -283,55 +294,6 @@ class _MembersTabState extends ConsumerState<MembersTab> {
 /// 拆掉就踩到 element 拆解的檢查。
 ///
 /// State 的 `dispose()` 是在路由真的離開之後才呼叫的，時機才對。
-class _RenameDialog extends StatefulWidget {
-  final String initial;
-
-  const _RenameDialog({required this.initial});
-
-  @override
-  State<_RenameDialog> createState() => _RenameDialogState();
-}
-
-class _RenameDialogState extends State<_RenameDialog> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initial);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() => Navigator.of(context).pop(_controller.text.trim());
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('改名'),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        maxLength: 20,
-        decoration: const InputDecoration(counterText: ''),
-        onSubmitted: (_) => _submit(),
-      ),
-      actions: [
-        TextButton(
-          style: TextButton.styleFrom(foregroundColor: AppColors.muted),
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
-        ),
-        TextButton(onPressed: _submit, child: const Text('儲存')),
-      ],
-    );
-  }
-}
-
 class _MemberCard extends StatelessWidget {
   final TaskMember member;
   final bool isSelf;
@@ -369,15 +331,19 @@ class _MemberCard extends StatelessWidget {
       _ => member.virtual ? '成員 · 無帳號' : '成員',
     };
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+    // 自己不再是一張卡 —— 外面那張 LedgerCard 是容器，這裡只負責一列。
+    return Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.x4,
+          vertical: AppSpace.x3,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 CircleAvatar(
+                  radius: 18,
                   backgroundColor:
                       member.active ? AppColors.primarySoft : AppColors.line,
                   child: Text(
@@ -385,8 +351,17 @@ class _MemberCard extends StatelessWidget {
                         ? '?'
                         : member.nickname.characters.first,
                     style: TextStyle(
-                      color:
-                          member.active ? AppColors.primary : AppColors.muted,
+                      /*
+                        primaryDeep 而不是 primary。這是**文字**印在
+                        primarySoft 上：primary 只有 3.2:1，primaryDark 是
+                        4.17，兩個都過不了 4.5。primaryDeep 約 6.6。
+
+                        上一輪的稽核說 Flutter 沒有把 primary 當文字用的
+                        地方，這是它漏掉的第二處。
+                      */
+                      color: member.active
+                          ? AppColors.primaryDeep
+                          : AppColors.muted,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -453,7 +428,6 @@ class _MemberCard extends StatelessWidget {
             ],
           ],
         ),
-      ),
     );
   }
 }

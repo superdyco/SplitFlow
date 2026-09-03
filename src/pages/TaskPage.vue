@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import { memberDisplayName } from "@/utils/memberName";
+import { parseMapMode, parseTaskView, type TaskView } from "@/utils/taskView";
+import SettlementSummary from "@/components/settlement/SettlementSummary.vue";
 import AccessDenied from "@/components/common/AccessDenied.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
@@ -27,6 +29,7 @@ import { reportTrace } from "@/services/perfService";
 import { finishTrace, markPhase } from "@/utils/perfTrace";
 import { useExpenses } from "@/composables/useExpenses";
 import { usePayments } from "@/composables/usePayments";
+import { renameTask } from "@/services/taskService";
 import { useTask } from "@/composables/useTask";
 import { useTaskMembers } from "@/composables/useTaskMembers";
 import { useTripReport } from "@/composables/useTripReport";
@@ -46,15 +49,81 @@ import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import PromptDialog from "@/components/common/PromptDialog.vue";
 import { isInstalledApp } from "@/utils/platform";
 
-type Tab = "expenses" | "members" | "settlement";
+// 檢視狀態的型別現在來自 utils/taskView —— 解析規則跟型別住在一起。
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const uid = authStore.user!.uid;
 const taskId = computed(() => String(route.params.taskId || ""));
-const activeTab = ref<Tab>("expenses");
+/*
+  檢視狀態住在網址而不是本地 ref。原本重整一定跳回支出、沒辦法把「成員」
+  的連結傳給人、返回鍵在任何頁籤上都直接離開任務頁。
+*/
+const view = computed(() => parseTaskView(route.query.view));
+const mapMode = computed(() => parseMapMode(route.query.map, view.value));
+
+/**
+ * 摘要卡的「完整結算」連到這裡。RouterLink 預設是 push，正合適 ——
+ * 次頁就該用返回鍵回得來。
+ *
+ * 順手丟掉 map：地圖只屬於支出清單，帶到結算的網址上只是雜訊。
+ */
+const settlementTo = computed(() => {
+  const query: LocationQueryRaw = { ...route.query, view: "settlement" };
+  delete query.map;
+  return { query };
+});
+
+/** 結算次頁的返回目的地。保留 denied 之類的其他 query，只拿掉 view 與 map。 */
+const backQuery = computed(() => {
+  const query: LocationQueryRaw = { ...route.query };
+  delete query.view;
+  delete query.map;
+  return query;
+});
+
+/*
+  頁籤一律用 replace。
+
+  它是同層級切換，不是「去了別的地方」—— 用 push 的話，逛過三個頁籤之後
+  要按四次返回才離得開任務頁。replace 維持今天的返回語意（按返回離開任務
+  頁），只是多了可重整、可傳連結。
+
+  進出結算不走這裡：進去是摘要卡的 RouterLink（push），出來是次頁的返回列
+  （replace）。頁籤在結算次頁是隱藏的，所以這個函式永遠不會收到 settlement。
+*/
+function goView(next: TaskView) {
+  const query: LocationQueryRaw = { ...route.query };
+  // 換檢視就丟掉地圖模式 —— 它只屬於支出清單。
+  delete query.map;
+  // 預設值不寫進網址：分享出去的連結不該多一段沒有資訊的雜訊。
+  if (next === "expenses") delete query.view;
+  else query.view = next;
+  router.replace({ query });
+}
+
+function goMap(on: boolean) {
+  const query: LocationQueryRaw = { ...route.query };
+  if (on) query.map = "1";
+  else delete query.map;
+  router.replace({ query });
+}
 const copied = ref(false);
+
+/*
+  預設收起。這一塊只在「已封存且是 owner」時出現，本來就是低頻操作，
+  而它展開後是輸入框＋四顆按鈕＋checkbox＋兩種警告的一整片。
+*/
+const shareOpen = ref(false);
+
+/** 收起時最該知道的就是狀態，所以標頭右邊講它。 */
+const shareStatus = computed(() => {
+  const report = reportState.report.value;
+  if (!report) return "尚未產生";
+  if (!report.active) return "連結已關閉";
+  return report.listed ? "連結開著 · 已列入公開頁" : "連結開著";
+});
 const denied = computed(() => route.query.denied === "1");
 const actionError = ref<string | null>(null);
 const busyUid = ref<string | null>(null);
@@ -156,7 +225,6 @@ const loadError = computed(() => {
   return null;
 });
 
-const expenseView = ref<"list" | "map">("list");
 const mapAvailable = mapsEnabled();
 
 /** 只有帶座標的支出畫得上地圖，純文字地點與沒填地點的不算。 */
@@ -323,6 +391,34 @@ async function addVirtualMember() {
  * 存 uid 而不是布林值：成員列上每一列都能開這個對話框，它得知道改的是誰，
  * 而且要拿現在的名字當預填值。
  */
+const renamingTask = ref(false);
+const renamingTaskBusy = ref(false);
+
+/**
+ * 改任務名稱。
+ *
+ * 錯誤處理跟 runMemberAction 一樣，但沒有走它 —— 那支要一個 targetUid
+ * 來標示哪一列在忙，而這裡忙的是整個對話框。
+ */
+async function submitTaskRename(next: string) {
+  const name = next.trim();
+  // 對話框的 maxlength 擋得住打字，擋不住貼上 —— 截字是最後一道。
+  const trimmed = name.slice(0, 40);
+  if (!trimmed) return;
+
+  renamingTaskBusy.value = true;
+  actionError.value = null;
+  try {
+    await renameTask(taskId.value, trimmed);
+    await taskState.load();
+    renamingTask.value = false;
+  } catch (err) {
+    actionError.value = firebaseErrorMessage(err);
+  } finally {
+    renamingTaskBusy.value = false;
+  }
+}
+
 const renaming = ref<string | null>(null);
 
 const renamingMember = computed(() =>
@@ -457,9 +553,31 @@ onMounted(async () => {
               本來就是很多 App 的習慣，而這裡的版面已經夠擠了。
               用 button 而不是在 h1 上掛 @click：鍵盤 Tab 到得了、Enter 按得下去。
             -->
-            <button class="title-reload" :disabled="reloading" @click="reload">
-              <h1 class="title">{{ taskState.task.value.name }}</h1>
-            </button>
+            <div class="title-row">
+              <button class="title-reload" :disabled="reloading" @click="reload">
+                <h1 class="title">{{ taskState.task.value.name }}</h1>
+              </button>
+              <!--
+                只有一個圖示，所以 aria-label 是它唯一的名字，不能省。
+                條件跟這一頁其他寫入一樣是 canWrite（管理員且沒封存）——
+                改名不需要另一套權限，規則那邊也是同一條。
+              -->
+              <button
+                v-if="canWrite"
+                type="button"
+                class="btn-quiet rename"
+                aria-label="修改任務名稱"
+                title="修改任務名稱"
+                @click="renamingTask = true"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+                     stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                     stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+                </svg>
+              </button>
+            </div>
             <p class="tiny">
               {{ taskState.task.value.defaultCurrency }} ·
               {{ taskState.task.value.memberCount }} 位成員 ·
@@ -472,135 +590,176 @@ onMounted(async () => {
           </button>
         </div>
 
+        <!--
+          「我還要付誰多少」是這個 app 存在的理由，原本要切到第三個頁籤才看得到。
+
+          資料還沒到時整張卡不出現，不畫骨架 —— 頁面層級已經有 LoadingState，
+          再疊一個骨架等於同一件事說兩次。結算次頁不顯示它：完整面板已經涵蓋。
+        -->
+        <SettlementSummary
+          v-if="view !== 'settlement' && !expenseState.loading.value"
+          :settlement="settlement"
+          :uid="uid"
+          :member-names="memberNames"
+          :settlement-to="settlementTo"
+        />
+
         <p v-if="isArchived" class="card tiny archived-banner">
           這個任務已封存，目前唯讀。到「我的分帳」解除封存後才能繼續記帳。
         </p>
 
         <section v-if="isArchived && taskState.isOwner.value" class="card stack">
-          <strong class="section-title">分享這趟旅程</strong>
+          <!--
+            照 ExpenseDayGroup 既有的收摺模式：button + aria-expanded + chevron。
+            全專案沒有用過 <details>，不在這裡開先例。
 
-          <p v-if="!expenseState.expenses.value.length" class="tiny warn">
-            這個任務還沒有支出，沒有東西可以報告。
-          </p>
-
-          <template v-else-if="reportState.report.value">
-            <div class="row wrap">
-              <input :value="reportState.shareUrl.value" class="input grow" readonly />
-              <button class="btn btn-sm" @click="copyShareUrl">
-                {{ reportCopied ? "已複製" : "複製" }}
-              </button>
-              <!--
-                只在連結開著時才給這顆。規則是
-                `active == true || isTaskMember(taskId)`，owner 是成員，所以連結
-                關掉之後 owner 自己還是讀得到完整報告 —— 這時給一顆「開啟」，
-                他會看到正常的頁面、以為連結還通著，但別人打開是「找不到」。
-                旁邊那句「目前已關閉，連結打不開」已經把狀態講清楚了。
-
-                用連結而不是 button + window.open()：中鍵開新分頁、長按選單、
-                「複製連結網址」都會是瀏覽器原生行為，也不會被彈出視窗封鎖擋掉。
-                RouterLink 一樣是渲染成 <a href>，這些行為都還在。
-              -->
-              <RouterLink
-                v-if="reportState.report.value.active"
-                class="btn btn-sm"
-                :to="reportState.sharePath.value"
-                :target="newTabTarget"
-                rel="noopener"
-              >
-                開啟
-              </RouterLink>
-            </div>
-            <p v-if="!reportState.report.value.active" class="tiny warn">
-              目前已關閉，連結打不開。
-            </p>
-            <!--
-              兩層是兩件事：連結是「拿到網址的人看不看得到」，公開是「陌生人
-              在探索頁找不找得到」。只想傳給朋友的人，連結開著但這個不勾。
-
-              連結關掉時整條停用並取消勾選 —— 列出去只會是一張點進去讀不到的
-              卡片，而那比沒列出去更糟。
-            -->
-            <label class="listed" :class="{ off: !reportState.report.value.active }">
-              <input
-                type="checkbox"
-                :checked="reportState.report.value.listed"
-                :disabled="!reportState.report.value.active || reportState.busy.value"
-                @change="reportState.setListed(!reportState.report.value.listed)"
-              />
-              <span>
-                列入公開頁
-                <span class="tiny muted block">
-                  {{
-                    reportState.report.value.active
-                      ? "讓所有簡單分帳使用者在「探索」找得到這趟旅程"
-                      : "連結關著的時候不能公開"
-                  }}
-                </span>
-              </span>
-            </label>
-
-            <div class="row">
-              <button class="btn btn-sm" :disabled="reportState.busy.value" @click="generateReport">
-                重新產生
-              </button>
-              <button
-                class="btn btn-sm"
-                :disabled="reportState.busy.value"
-                @click="reportState.setActive(!reportState.report.value.active)"
-              >
-                {{ reportState.report.value.active ? "關閉連結" : "重新開啟" }}
-              </button>
-            </div>
-          </template>
-
+            收起時右邊講狀態，因為那正是收起時唯一該知道的事。
+          -->
           <button
-            v-else
-            class="btn btn-primary btn-block"
-            :disabled="!canGenerateReport || reportState.busy.value"
-            @click="generateReport"
+            type="button"
+            class="share-head"
+            :aria-expanded="shareOpen"
+            @click="shareOpen = !shareOpen"
           >
-            {{ reportState.busy.value ? "產生中..." : "產生分享報告" }}
+            <span class="chevron" aria-hidden="true">{{ shareOpen ? "▾" : "▸" }}</span>
+            <strong class="section-title">分享這趟旅程</strong>
+            <span class="tiny share-status">{{ shareStatus }}</span>
           </button>
 
-          <p v-if="reportState.error.value" class="tiny warn">{{ reportState.error.value }}</p>
-          <!--
-            報告是成功的，只是沒有地圖 —— 用 muted 而不是 warn，
-            不然看起來像整份報告失敗了。
-          -->
-          <p v-if="reportState.mapWarning.value" class="tiny">
-            報告已產生，但沒有地圖：{{ reportState.mapWarning.value }}
-          </p>
+          <div v-if="shareOpen" class="stack">
+
+            <p v-if="!expenseState.expenses.value.length" class="tiny warn">
+              這個任務還沒有支出，沒有東西可以報告。
+            </p>
+
+            <template v-else-if="reportState.report.value">
+              <div class="row wrap">
+                <input :value="reportState.shareUrl.value" class="input grow" readonly />
+                <button class="btn btn-sm" @click="copyShareUrl">
+                  {{ reportCopied ? "已複製" : "複製" }}
+                </button>
+                <!--
+                  只在連結開著時才給這顆。規則是
+                  `active == true || isTaskMember(taskId)`，owner 是成員，所以連結
+                  關掉之後 owner 自己還是讀得到完整報告 —— 這時給一顆「開啟」，
+                  他會看到正常的頁面、以為連結還通著，但別人打開是「找不到」。
+                  旁邊那句「目前已關閉，連結打不開」已經把狀態講清楚了。
+
+                  用連結而不是 button + window.open()：中鍵開新分頁、長按選單、
+                  「複製連結網址」都會是瀏覽器原生行為，也不會被彈出視窗封鎖擋掉。
+                  RouterLink 一樣是渲染成 <a href>，這些行為都還在。
+                -->
+                <RouterLink
+                  v-if="reportState.report.value.active"
+                  class="btn btn-sm"
+                  :to="reportState.sharePath.value"
+                  :target="newTabTarget"
+                  rel="noopener"
+                >
+                  開啟
+                </RouterLink>
+              </div>
+              <p v-if="!reportState.report.value.active" class="tiny warn">
+                目前已關閉，連結打不開。
+              </p>
+              <!--
+                兩層是兩件事：連結是「拿到網址的人看不看得到」，公開是「陌生人
+                在探索頁找不找得到」。只想傳給朋友的人，連結開著但這個不勾。
+
+                連結關掉時整條停用並取消勾選 —— 列出去只會是一張點進去讀不到的
+                卡片，而那比沒列出去更糟。
+              -->
+              <label class="listed" :class="{ off: !reportState.report.value.active }">
+                <input
+                  type="checkbox"
+                  :checked="reportState.report.value.listed"
+                  :disabled="!reportState.report.value.active || reportState.busy.value"
+                  @change="reportState.setListed(!reportState.report.value.listed)"
+                />
+                <span>
+                  列入公開頁
+                  <span class="tiny muted block">
+                    {{
+                      reportState.report.value.active
+                        ? "讓所有簡單分帳使用者在「探索」找得到這趟旅程"
+                        : "連結關著的時候不能公開"
+                    }}
+                  </span>
+                </span>
+              </label>
+
+              <div class="row">
+                <button class="btn btn-sm" :disabled="reportState.busy.value" @click="generateReport">
+                  重新產生
+                </button>
+                <button
+                  class="btn btn-sm"
+                  :disabled="reportState.busy.value"
+                  @click="reportState.setActive(!reportState.report.value.active)"
+                >
+                  {{ reportState.report.value.active ? "關閉連結" : "重新開啟" }}
+                </button>
+              </div>
+            </template>
+
+            <button
+              v-else
+              class="btn btn-primary btn-block"
+              :disabled="!canGenerateReport || reportState.busy.value"
+              @click="generateReport"
+            >
+              {{ reportState.busy.value ? "產生中..." : "產生分享報告" }}
+            </button>
+
+            <p v-if="reportState.error.value" class="tiny warn">{{ reportState.error.value }}</p>
+            <!--
+              報告是成功的，只是沒有地圖 —— 用 muted 而不是 warn，
+              不然看起來像整份報告失敗了。
+            -->
+            <p v-if="reportState.mapWarning.value" class="tiny">
+              報告已產生，但沒有地圖：{{ reportState.mapWarning.value }}
+            </p>
+          </div>
         </section>
 
-        <div class="tabs">
-          <button class="tab" :class="{ active: activeTab === 'expenses' }" @click="activeTab = 'expenses'">支出</button>
-          <button class="tab" :class="{ active: activeTab === 'members' }" @click="activeTab = 'members'">成員</button>
-          <button class="tab" :class="{ active: activeTab === 'settlement' }" @click="activeTab = 'settlement'">結算</button>
+        <!-- 結算已經是次頁，不再是同層級的頁籤。 -->
+        <div v-if="view !== 'settlement'" class="tabs two">
+          <button class="tab" :class="{ active: view === 'expenses' }" @click="goView('expenses')">
+            支出
+          </button>
+          <button class="tab" :class="{ active: view === 'members' }" @click="goView('members')">
+            成員
+          </button>
         </div>
 
         <ErrorState :message="loadError" />
 
-        <section v-if="activeTab === 'expenses'" class="stack">
+        <section v-if="view === 'expenses'" class="stack">
           <LoadingState v-if="expenseState.loading.value" title="讀取支出中" message="正在讀取 Firestore 支出資料。" />
           <template v-else>
-            <RouterLink
-              v-if="!isArchived"
-              :to="`/tasks/${taskId}/expenses/new`"
-              class="btn btn-primary btn-block"
-            >
-              新增支出
-            </RouterLink>
-
-            <div v-if="mapAvailable && expenseMarkers.length" class="tabs two">
-              <button class="tab" :class="{ active: expenseView === 'list' }" @click="expenseView = 'list'">
-                清單
-              </button>
-              <button class="tab" :class="{ active: expenseView === 'map' }" @click="expenseView = 'map'">
-                地圖（{{ expenseMarkers.length }}）
-              </button>
+            <!--
+              「新增支出」與檢視切換同一列。原本檢視切換是第二排頁籤，跟上面
+              那排長得一模一樣，只能靠位置分辨哪一排是主層級。
+            -->
+            <div class="actbar">
+              <RouterLink
+                v-if="!isArchived"
+                :to="`/tasks/${taskId}/expenses/new`"
+                class="btn btn-primary grow-btn"
+              >
+                新增支出
+              </RouterLink>
+              <div v-if="mapAvailable && expenseMarkers.length" class="seg">
+                <button class="seg-item" :class="{ active: !mapMode }" @click="goMap(false)">
+                  清單
+                </button>
+                <button class="seg-item" :class="{ active: mapMode }" @click="goMap(true)">
+                  地圖 {{ expenseMarkers.length }}
+                </button>
+              </div>
             </div>
 
-            <template v-if="expenseView === 'map'">
+            <template v-if="mapMode">
               <PlaceMap :markers="expenseMarkers" height="360px" />
               <p class="tiny">
                 只顯示有座標的支出。從地點搜尋清單選出來的才會有座標，自己打字的沒有。
@@ -636,7 +795,7 @@ onMounted(async () => {
           </template>
         </section>
 
-        <section v-if="activeTab === 'members'" class="stack">
+        <section v-if="view === 'members'" class="stack">
           <LoadingState v-if="memberState.loading.value" title="讀取成員中" message="正在讀取 Firestore 成員資料。" />
           <template v-else>
             <p v-if="taskState.isAdmin.value" class="tiny">
@@ -689,7 +848,18 @@ onMounted(async () => {
           />
         </section>
 
-        <section v-if="activeTab === 'settlement'" class="stack">
+        <section v-if="view === 'settlement'" class="stack">
+          <!--
+            返回用 RouterLink 而不是 button：中鍵開新分頁、長按選單、「複製連結
+            網址」都會是瀏覽器原生行為。這一頁的「開啟」按鈕已經寫過同一個理由。
+
+            replace 是必要的：進來時是 push，歷史是「支出→結算」。返回列如果也
+            push，會變成「支出→結算→支出」，使用者按返回反而回到結算 —— 跟他
+            剛按下「回到支出」的意圖正好相反。
+          -->
+          <RouterLink :to="{ query: backQuery }" replace class="btn-quiet back">
+            ← 回到支出
+          </RouterLink>
           <LoadingState v-if="expenseState.loading.value" title="讀取支出中" message="結算會依最新支出重新計算。" />
           <EmptyState
             v-else-if="expenseState.isEmpty.value"
@@ -724,6 +894,20 @@ onMounted(async () => {
           </template>
         </section>
       </template>
+
+      <PromptDialog
+        :open="renamingTask"
+        title="改成什麼名字？"
+        message="只是換個顯示的名字，帳目與成員都不受影響。已經發出去的邀請連結仍然會顯示舊名字。"
+        label="任務名稱"
+        confirm-label="改名"
+        :initial="taskState.task.value?.name ?? ''"
+        placeholder="例如：京都・大阪 五天四夜"
+        :maxlength="40"
+        :busy="renamingTaskBusy"
+        @confirm="submitTaskRename"
+        @cancel="renamingTask = false"
+      />
 
       <PromptDialog
         :open="renaming !== null"
@@ -763,7 +947,64 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* 主要動作與檢視切換同一列 —— 原本檢視切換自成一排，跟頂層頁籤撞在一起。 */
+.actbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* 主要動作吃掉剩餘寬度，切換靠右且不被壓縮。 */
+.grow-btn {
+  flex: 1;
+}
+
+.share-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+}
+
+.chevron {
+  flex: none;
+  color: var(--color-muted);
+}
+
+/* 狀態靠右，因為收起時它是這一行唯一新增的資訊。 */
+.share-status {
+  margin: 0 0 0 auto;
+  text-align: right;
+}
+
+.back {
+  align-self: flex-start;
+  font-size: var(--text-body);
+}
+
 /* 標題本身就是按鈕，但看起來要跟原本的標題一模一樣。 */
+/* 標題與鉛筆同一列，鉛筆貼著標題 —— 它改的是標題，不是這一頁。 */
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rename {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1);
+  color: var(--color-muted);
+}
+
+.rename:hover {
+  color: var(--color-primary-dark);
+}
+
 .title-reload {
   display: block;
   margin: 0;
@@ -781,7 +1022,7 @@ onMounted(async () => {
 
 .listed {
   display: flex;
-  gap: 10px;
+  gap: var(--space-3);
   align-items: flex-start;
   line-height: 1.5;
 }
@@ -822,9 +1063,5 @@ onMounted(async () => {
 
 .warn {
   color: var(--color-danger);
-}
-
-.tabs.two {
-  grid-template-columns: repeat(2, 1fr);
 }
 </style>

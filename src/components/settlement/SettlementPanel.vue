@@ -124,7 +124,7 @@ function copySettlement() {
 
 <template>
   <div class="stack">
-    <div v-if="settlement.unconverted.length" class="card warn-card stack">
+    <div v-if="settlement.unconverted.length" class="card flat warn-card stack">
       <strong>有 {{ settlement.unconverted.length }} 筆支出還沒有匯率</strong>
       <p class="tiny">
         這些支出是在匯率功能之前記的，沒有存換算金額，所以沒有算進下面的結算。
@@ -282,9 +282,8 @@ function copySettlement() {
 
 <style scoped>
 .warn-card {
-  box-shadow: none;
-  border-color: #f3d2ce;
-  background: #fff5f5;
+  border-color: var(--color-danger-line);
+  background: var(--color-danger-soft);
 }
 
 .list {
@@ -293,7 +292,7 @@ function copySettlement() {
 }
 
 .rows {
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .balance,
@@ -306,7 +305,7 @@ function copySettlement() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .balance:first-child,
@@ -315,7 +314,7 @@ function copySettlement() {
 }
 
 .transfer .spread {
-  gap: 10px;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
@@ -323,13 +322,13 @@ function copySettlement() {
   flex: none;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .who {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -361,18 +360,18 @@ function copySettlement() {
 .ends {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .arrow {
-  color: var(--color-soft);
+  color: var(--color-muted);
 }
 
 .draft {
   margin-top: 10px;
   padding: 12px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
 }
 

@@ -128,7 +128,7 @@ function onChange(event: Event) {
 .drop {
   min-height: 96px;
   border: 1px dashed var(--color-line-strong);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   background: none;
   color: var(--color-muted);
   font-weight: 700;
@@ -141,7 +141,7 @@ function onChange(event: Event) {
 .preview {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .thumb {
@@ -151,7 +151,7 @@ function onChange(event: Event) {
   height: 96px;
   padding: 0;
   border: 1px solid var(--color-line);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--color-surface);
 }
@@ -168,10 +168,10 @@ function onChange(event: Event) {
   top: 4px;
   right: 4px;
   padding: 2px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-line-strong);
   color: var(--color-surface);
-  font-size: 11px;
+  font-size: var(--text-tiny);
   font-weight: 700;
 }
 
@@ -204,7 +204,7 @@ function onChange(event: Event) {
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .warn {

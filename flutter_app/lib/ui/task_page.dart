@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../domain/currency.dart';
 import '../domain/expense_actions.dart';
 import '../domain/expense_groups.dart';
 import '../domain/expense_markers.dart';
 import '../domain/member_name.dart';
 import '../domain/models.dart';
+import '../domain/offline_write.dart';
 import '../domain/report_actions.dart';
-
+import '../domain/settlement_summary.dart';
 import '../domain/task_status.dart';
 import '../state/providers.dart';
 import 'expense_day_group.dart';
@@ -16,10 +18,12 @@ import 'expense_detail_page.dart';
 import 'expense_form_page.dart';
 import 'expense_row.dart';
 import 'invite_sheet.dart';
+import 'ledger.dart';
 import 'members_tab.dart';
 import 'place_map.dart';
+import 'rename_dialog.dart';
 import 'report_share_page.dart';
-import 'settlement_tab.dart';
+import 'settlement_page.dart';
 import 'theme.dart';
 
 /// 任務詳情。`src/pages/TaskPage.vue` 的 Flutter 版。
@@ -154,7 +158,7 @@ class _Loaded extends ConsumerWidget {
         (task.ownerId == uid || task.adminIds.contains(uid)) && !archived;
 
     return DefaultTabController(
-      length: 3,
+      length: 2,
       child: Scaffold(
         appBar: AppBar(
           // 點標題重新載入。網頁版加這個是因為進到任務頁之後沒有任何地方
@@ -165,7 +169,35 @@ class _Loaded extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(task.name, style: text.titleMedium),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        task.name,
+                        style: text.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    // 條件跟這一頁其他寫入一樣（管理員且沒封存）——
+                    // 改名不需要另一套權限，規則那邊也是同一條。
+                    if (canInvite) ...[
+                      const SizedBox(width: AppSpace.x2),
+                      InkWell(
+                        onTap: () => _renameTask(context, ref, task),
+                        child: const Padding(
+                          padding: EdgeInsets.all(AppSpace.x1),
+                          child: Icon(
+                            Icons.edit_outlined,
+                            size: 16,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 Text(
                   '${task.defaultCurrency} · ${task.memberCount} 位成員 · '
                   '${task.expenseCount} 筆支出',
@@ -186,8 +218,8 @@ class _Loaded extends ConsumerWidget {
                 ),
                 child: const Text('邀請'),
               ),
-            // 報告是旅程結束後的東西，只有 owner 做得了 —— rules 也是這樣寫的。
-            // 封存的任務更需要它，所以不看封存狀態。
+            // 報告是旅程結束後的東西，只有已封存任務的 owner 做得了 ——
+            // 條件在 canShareReport 裡，理由也寫在那裡。
             if (canShareReport(task: task, uid: uid))
               TextButton(
                 onPressed: () => Navigator.of(context).push<void>(
@@ -198,14 +230,20 @@ class _Loaded extends ConsumerWidget {
                 child: const Text('報告'),
               ),
           ],
+          /*
+            兩個頁籤，不是三個。結算搬到上面的摘要卡與它的次頁 ——
+            這個 app 存在的理由不該藏在第三個頁籤裡。
+
+            labelColor 用 primaryDark 而不是 primary：選中的頁籤是**文字**，
+            而 primary 對頁面底色只有 3.6:1。
+          */
           bottom: const TabBar(
-            labelColor: AppColors.primary,
+            labelColor: AppColors.primaryDark,
             unselectedLabelColor: AppColors.muted,
-            indicatorColor: AppColors.primary,
+            indicatorColor: AppColors.primaryDark,
             tabs: [
               Tab(text: '支出'),
               Tab(text: '成員'),
-              Tab(text: '結算'),
             ],
           ),
         ),
@@ -221,6 +259,7 @@ class _Loaded extends ConsumerWidget {
                   style: text.bodySmall,
                 ),
               ),
+            _SettlementSummary(task: task, archived: archived),
             Expanded(
               child: TabBarView(
                 children: [
@@ -231,12 +270,192 @@ class _Loaded extends ConsumerWidget {
                     onToggleDay: onToggleDay,
                   ),
                   MembersTab(task: task, archived: archived),
-                  SettlementTab(task: task, archived: archived),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 改任務名稱。
+///
+/// 放在 widget 外面而不是 _Loaded 的方法裡：_Loaded 是 ConsumerWidget，
+/// 沒有 state 可以放「正在改名」的旗標。實務上這個寫入很快，而且對話框
+/// 關掉之後畫面自己會跟著 provider 更新。
+Future<void> _renameTask(
+  BuildContext context,
+  WidgetRef ref,
+  Task task,
+) async {
+  final next = await showRenameDialog(
+    context,
+    title: '改任務名稱',
+    initial: task.name,
+    maxLength: 40,
+    hint: '已經發出去的邀請連結仍然會顯示舊名字。',
+  );
+
+  // 沒填、沒改、或按了取消都不用動。
+  if (next == null || next.isEmpty || next == task.name) return;
+
+  try {
+    await settleWrite(
+      ref.read(taskRepositoryProvider).renameTask(task.id, next),
+    );
+    ref.invalidate(taskProvider(task.id));
+  } catch (err) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('改名失敗：$err')),
+    );
+  }
+}
+
+// ---------------------------------------------------------------- 結算摘要
+
+/// 「我還要付誰多少」。原本要切到第三個頁籤才看得到。
+///
+/// 資料還沒到時整張卡不出現，不畫骨架 —— 頁面層級已經有 loading，
+/// 再疊一個骨架等於同一件事說兩次。算不出來時也不出現：完整結算頁會把
+/// 錯誤講清楚，摘要卡在這裡再喊一次只是噪音。
+class _SettlementSummary extends ConsumerWidget {
+  final Task task;
+  final bool archived;
+
+  const _SettlementSummary({required this.task, required this.archived});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settlement = ref.watch(settlementProvider(task.id));
+    final members = ref.watch(membersProvider(task.id));
+    final text = Theme.of(context).textTheme;
+    final uid = ref.watch(authStateProvider).value?.uid ?? '';
+
+    final result = settlement.value;
+    if (result == null) return const SizedBox.shrink();
+
+    final names = {
+      for (final m in members.value ?? const <TaskMember>[])
+        m.uid: memberDisplayName(m),
+    };
+    String name(String uid) => names[uid] ?? '已離開的成員';
+
+    String money(int amount) => formatAmount(amount, result.currency);
+
+    final owed = myOwed(result.balances, uid);
+    final mine = myTransfers(result.transfers, uid);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpace.x4,
+        AppSpace.x3,
+        AppSpace.x4,
+        0,
+      ),
+      child: LedgerCard(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpace.x4,
+              AppSpace.x4,
+              AppSpace.x4,
+              AppSpace.x3,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('我的分攤', style: text.bodySmall),
+                const SizedBox(height: AppSpace.text),
+                // 這是頁面上唯一的主數字，所以幣別跟金額連寫 —— 沒有要對齊的
+                // 對象，拆開反而讓它看起來不像一個完整的金額。
+                Text(
+                  '${result.currency} ${money(owed)}',
+                  style: figure(size: 32, color: AppColors.primaryDark),
+                ),
+                const SizedBox(height: AppSpace.text),
+                Text(
+                  '這趟總額 ${money(result.total)} · ${result.expenseCount} 筆',
+                  style: text.bodySmall,
+                ),
+              ],
+            ),
+          ),
+
+          // 數字不完整時，話要講在數字旁邊。未換算的支出根本沒進結算，
+          // 上面那個總額是偏低的。
+          if (result.unconverted.isNotEmpty) ...[
+            const LedgerDivider(indent: 0),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpace.x4,
+                vertical: AppSpace.x3,
+              ),
+              child: Text(
+                '有 ${result.unconverted.length} 筆支出還沒有匯率，沒有算進上面的數字。',
+                style: text.bodySmall?.copyWith(color: AppColors.danger),
+              ),
+            ),
+          ],
+
+          const LedgerDivider(indent: 0),
+
+          /*
+            方向不能只靠顏色。文案本身就是「你付給 X」與「X 付給你」，
+            色覺障礙的人讀文字就分得出來 —— 綠色只是加分，不是唯一線索。
+          */
+          for (final line in mine.lines) ...[
+            LedgerRow(
+              icon: line.outgoing ? Icons.arrow_forward : Icons.arrow_back,
+              title: line.outgoing
+                  ? '你付給 ${name(line.to)}'
+                  : '${name(line.from)} 付給你',
+              amount: money(line.amount),
+              amountColor: line.outgoing ? AppColors.ink : AppColors.success,
+            ),
+            const LedgerDivider(indent: LedgerRow.iconIndent),
+          ],
+
+          if (mine.rest > 0) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpace.x4,
+                vertical: AppSpace.x2,
+              ),
+              child: Text('還有 ${mine.rest} 筆', style: text.bodySmall),
+            ),
+            const LedgerDivider(indent: 0),
+          ],
+
+          // 已結清是好消息，值得一行字。留白會讓人以為是還沒算出來。
+          if (mine.lines.isEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpace.x4,
+                vertical: AppSpace.x3,
+              ),
+              child: Text('已經結清', style: text.bodyMedium),
+            ),
+            const LedgerDivider(indent: 0),
+          ],
+
+          LedgerRow(
+            title: '完整結算與付款紀錄',
+            trailing: const Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: AppColors.muted,
+            ),
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) =>
+                    SettlementPage(task: task, archived: archived),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

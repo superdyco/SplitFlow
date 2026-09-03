@@ -14,6 +14,7 @@ import 'create_task_page.dart';
 import 'explore_page.dart';
 import 'favorites_page.dart';
 import 'join_task_page.dart';
+import 'ledger.dart';
 import 'profile_page.dart';
 import 'report_page.dart';
 import 'confirm_dialog.dart';
@@ -286,18 +287,55 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
                   onCalculate: () => _loadCosts(costable),
                 ),
                 const SizedBox(height: 16),
-                for (final task in parts.active) ...[
-                  _card(task, uid),
-                  const SizedBox(height: 12),
+
+                /*
+                  一組任務一張卡，不是一趟一張。三張浮起來的卡等於同一句
+                  「這個比周圍重要」講三次，於是一次也沒成立。
+
+                  分組標題改成淺色小字加筆數：它是分隔不是內容，用
+                  titleMedium 會跟卡裡的任務名稱一樣重。
+                */
+                if (parts.active.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: AppSpace.x1,
+                      bottom: AppSpace.x2,
+                    ),
+                    child: Text(
+                      '進行中 ${parts.active.length}',
+                      style: text.bodySmall,
+                    ),
+                  ),
+                  LedgerCard(
+                    children: [
+                      for (var i = 0; i < parts.active.length; i++) ...[
+                        if (i > 0) const LedgerDivider(),
+                        _card(parts.active[i], uid),
+                      ],
+                    ],
+                  ),
                 ],
+
                 if (parts.archived.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text('已封存', style: text.titleMedium),
-                  const SizedBox(height: 12),
-                  for (final task in parts.archived) ...[
-                    _card(task, uid),
-                    const SizedBox(height: 12),
-                  ],
+                  const SizedBox(height: AppSpace.x6),
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: AppSpace.x1,
+                      bottom: AppSpace.x2,
+                    ),
+                    child: Text(
+                      '已封存 ${parts.archived.length}',
+                      style: text.bodySmall,
+                    ),
+                  ),
+                  LedgerCard(
+                    children: [
+                      for (var i = 0; i < parts.archived.length; i++) ...[
+                        if (i > 0) const LedgerDivider(),
+                        _card(parts.archived[i], uid),
+                      ],
+                    ],
+                  ),
                 ],
               ],
             ),
@@ -352,33 +390,78 @@ class _CostSection extends StatelessWidget {
         CurrencyAmount(task.defaultCurrency, costs![task.id] ?? 0),
     ]);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Wrap(
-            spacing: 24,
-            runSpacing: 10,
-            children: [
-              if (totals.isEmpty) Text('目前還沒有算得出金額的支出。', style: text.bodySmall),
-              for (final item in totals)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item.currency, style: text.bodySmall),
-                    Text(
-                      formatAmount(item.amount, item.currency),
-                      style: figureStyle,
+        Row(
+          children: [
+            Expanded(child: Text('我的總花費', style: text.bodySmall)),
+            TextButton(
+              onPressed: busy ? null : onCalculate,
+              child: Text(busy ? '計算中...' : '重新計算'),
+            ),
+          ],
+        ),
+        if (totals.isEmpty)
+          Text('目前還沒有算得出金額的支出。', style: text.bodySmall)
+        else
+          /*
+            各幣別排成有框線的格子，跟報告頁的三格統計同一套。
+
+            原本是 Wrap 加 24px 間距：幣別多的時候會換行，而換行之後
+            兩排數字的左緣對不上，看起來像兩件事。格子讓每一欄等寬，
+            也讓「這是一組互相比較的數字」這件事自己講出來。
+          */
+          DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.rowLine),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < totals.length; i++) ...[
+                    if (i > 0)
+                      const VerticalDivider(
+                        width: 1,
+                        thickness: 1,
+                        color: AppColors.rowLine,
+                      ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpace.x3,
+                          vertical: 10,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(totals[i].currency, style: text.bodySmall),
+                            Text(
+                              formatAmount(
+                                totals[i].amount,
+                                totals[i].currency,
+                              ),
+                              style: figure(size: 16, weight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
-                ),
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
-        TextButton(
-          onPressed: busy ? null : onCalculate,
-          child: Text(busy ? '計算中...' : '重新計算'),
-        ),
+        if (error != null) ...[
+          const SizedBox(height: AppSpace.x2),
+          Text(
+            error!,
+            style: text.bodySmall?.copyWith(color: AppColors.danger),
+          ),
+        ],
       ],
     );
   }

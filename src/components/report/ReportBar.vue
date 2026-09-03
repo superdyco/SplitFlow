@@ -27,14 +27,14 @@ const width = computed(() => `${Math.min(1, Math.max(0, props.value)) * 100}%`);
 .track {
   width: 100%;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-line);
   overflow: hidden;
 }
 
 .fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-primary);
 }
 

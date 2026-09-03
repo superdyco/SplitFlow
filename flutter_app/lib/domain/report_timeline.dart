@@ -42,12 +42,23 @@ class ReportDay {
 
   /// 當天小計。
   final int total;
+
+  /// 當天的天氣，取**當天第一筆有天氣的支出**。整天都沒有就是 null。
+  ///
+  /// 掛在「天」不掛在「筆」：同一天三筆支出印三次一樣的天氣是噪音，
+  /// 而且這份要寫進公開文件，小一點也好。
+  ///
+  /// 一天跨兩個城市時會顯示第一個 —— 這是已知且接受的不精確。替代方案
+  /// （取眾數、列出全部）都讓規則沒辦法一句話講完，而報告是給不在場的人
+  /// 看的，那個精度沒有意義。
+  final Weather? weather;
   final List<ReportEntry> entries;
 
   const ReportDay({
     required this.date,
     required this.day,
     required this.total,
+    this.weather,
     required this.entries,
   });
 }
@@ -90,6 +101,7 @@ class _Building {
   /// 帶著加入順序，排序時當最後一道 tie-break。
   final List<(int, ReportEntry)> entries = [];
   int total = 0;
+  Weather? weather;
   _Building(this.date);
 }
 
@@ -116,6 +128,9 @@ List<ReportDay> reportTimeline(
 
     final group = days.putIfAbsent(date, () => _Building(date));
     group.total += amount;
+    // 第一筆有天氣的說了算。「第一筆」的順序來自上面的 oldestFirst，
+    // 不是呼叫端傳進來的順序。
+    group.weather ??= expense.weather;
     group.entries.add((
       group.entries.length,
       ReportEntry(
@@ -143,6 +158,7 @@ List<ReportDay> reportTimeline(
         // 日期格式壞掉時退回用序號，寧可 Day 編號不準也不要整個時間軸消失。
         day: daysBetween(origin, group.date) ?? index + 1,
         total: group.total,
+        weather: group.weather,
         entries: [for (final entry in group.entries) entry.$2],
       ),
   ];

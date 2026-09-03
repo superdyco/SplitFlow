@@ -24,7 +24,7 @@ const emit = defineEmits<{ (e: "close"): void }>();
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: var(--space-4);
   padding: 16px;
   /* 收據常常是白底，深色背景才看得出邊界。 */
   background: rgba(0, 0, 0, 0.85);
@@ -35,13 +35,13 @@ const emit = defineEmits<{ (e: "close"): void }>();
   /* 留空間給關閉鈕，也避免在 iOS 上被瀏覽器列切到。 */
   max-height: 80vh;
   object-fit: contain;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
 }
 
 .close {
   padding: 10px 24px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-surface);
   color: var(--color-text);
   font-weight: 700;

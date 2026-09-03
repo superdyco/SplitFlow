@@ -31,7 +31,7 @@ const isArchived = computed(() => props.task.status === "archived");
     所以用 stretched link：連結本身只放在標題上，再用 ::after 覆蓋整張卡，
     動作按鈕則疊在它上面。這樣兩個動作都能點，HTML 也是合法的。
   -->
-  <div class="card task-card" :class="{ archived: isArchived }">
+  <div class="card task-card" :class="isArchived ? 'flat archived' : ''">
     <div class="spread">
       <div>
         <h2 class="section-title">
@@ -39,15 +39,18 @@ const isArchived = computed(() => props.task.status === "archived");
         </h2>
         <p class="tiny">{{ task.startDate || "未設定" }} - {{ task.endDate || "未設定" }}</p>
       </div>
-      <span class="role-pill">{{ ROLE_LABELS[role] }}</span>
-    </div>
-
-    <div class="task-meta">
-      <span>{{ task.memberCount }} 位成員</span>
-      <span>{{ task.expenseCount }} 筆支出</span>
       <!-- 進行中不掛標籤 —— 沒消息就是好消息，每張卡貼一個「進行中」只是噪音。 -->
       <span v-if="isArchived" class="archived-pill">{{ STATUS_LABELS.archived }}</span>
     </div>
+
+    <!--
+      角色、成員數、支出數是屬性不是狀態，所以是文字不是藥丸。
+      三顆橘色藥丸並排會稀釋掉橘色「這個可以按」的意思，然後右下角
+      真正可按的兩顆反而是灰的。
+    -->
+    <p class="tiny meta">
+      {{ ROLE_LABELS[role] }} · {{ task.memberCount }} 位成員 · {{ task.expenseCount }} 筆支出
+    </p>
 
     <p v-if="myCost !== null" class="my-cost">
       <span class="tiny">我的花費</span>
@@ -64,12 +67,12 @@ const isArchived = computed(() => props.task.status === "archived");
       <button
         v-if="isArchived"
         type="button"
-        class="action"
+        class="btn-quiet"
         @click.prevent.stop="emit('unarchive', task)"
       >
         解除封存
       </button>
-      <button v-else type="button" class="action" @click.prevent.stop="emit('archive', task)">
+      <button v-else type="button" class="btn-quiet" @click.prevent.stop="emit('archive', task)">
         封存
       </button>
       <!--
@@ -80,7 +83,7 @@ const isArchived = computed(() => props.task.status === "archived");
       <button
         v-if="!isArchived"
         type="button"
-        class="action danger"
+        class="btn-quiet danger"
         @click.prevent.stop="emit('delete', task)"
       >
         刪除
@@ -93,16 +96,31 @@ const isArchived = computed(() => props.task.status === "archived");
 .task-card {
   /* stretch 的 ::after 要靠這個定位，少了它覆蓋層會跑去對齊 viewport。 */
   position: relative;
+  transition:
+    transform var(--dur-lift) var(--ease),
+    box-shadow var(--dur-lift) var(--ease),
+    border-color var(--dur-lift) var(--ease);
+}
+
+/* 整張卡都可點，所以整張卡都該有被指到的回饋。 */
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-raise);
+  border-color: var(--color-line-strong);
 }
 
 /*
-  封存的卡片要一眼就看得出「沒在用」。做法是讓它退回頁面底色並拿掉陰影 ——
-  陰影代表浮起來、正在進行，平貼下去就是已經收起來的東西。
+  封存的卡片一眼要看得出「沒在用」。退回頁面底色並且不浮起 ——
+  浮起代表正在進行，平貼下去就是已經收起來的東西。
 */
 .task-card.archived {
   background: var(--color-bg);
   border-color: var(--color-line-strong);
-  box-shadow: none;
+}
+
+.task-card.archived:hover {
+  transform: none;
+  box-shadow: var(--shadow-flat);
 }
 
 .task-card.archived .section-title,
@@ -110,11 +128,8 @@ const isArchived = computed(() => props.task.status === "archived");
   color: var(--color-muted);
 }
 
-/* 進行中的橘色標籤在封存卡片上會太搶眼，但「已封存」那顆要留著看得見。 */
-.task-card.archived .task-meta span:not(.archived-pill),
-.task-card.archived .role-pill {
-  background: var(--color-line);
-  color: var(--color-soft);
+.meta {
+  margin: var(--space-3) 0 var(--space-2);
 }
 
 /* 連結只包標題，但 ::after 撐滿整張卡片，所以整張卡都可點。 */
@@ -136,64 +151,33 @@ const isArchived = computed(() => props.task.status === "archived");
   z-index: 1;
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 10px;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
 }
 
-.action {
-  padding: 5px 12px;
-  border: 1px solid var(--color-line-strong);
-  border-radius: 999px;
-  background: none;
-  color: var(--color-muted);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.action:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.action.danger:hover {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-}
-
+/* 狀態才配藥丸，而且一張卡最多一顆。 */
 .archived-pill {
+  flex: none;
+  border-radius: var(--radius-pill);
+  padding: 6px 10px;
   background: var(--color-line-strong);
   color: var(--color-ink);
-}
-
-.task-meta {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 14px 0 8px;
+  font-size: var(--text-tiny);
+  font-weight: 700;
 }
 
 .my-cost {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   margin: 0 0 6px;
-  padding-top: 8px;
+  padding-top: var(--space-2);
   border-top: 1px solid var(--color-line);
 }
 
 .my-cost strong {
+  font-size: var(--text-card);
   font-variant-numeric: tabular-nums;
-}
-
-.task-meta span,
-.role-pill {
-  border-radius: 999px;
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 700;
 }
 </style>

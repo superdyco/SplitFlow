@@ -414,6 +414,71 @@ async function main() {
     await assertSucceeds(setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e2"), newExpense()));
   });
 
+  // --- 支出的天氣 ---
+  await test("完整的天氣可以寫", async () => {
+    await seed();
+    await assertSucceeds(
+      setDoc(
+        doc(as(MEMBER), "tasks", TASK, "expenses", "e_w1"),
+        newExpense({ weather: { code: 61, high: 33, low: 25, exact: 28 } })
+      )
+    );
+  });
+
+  await test("沒有 exact 也可以 —— 沒填時間的支出就是這樣", async () => {
+    await seed();
+    await assertSucceeds(
+      setDoc(
+        doc(as(MEMBER), "tasks", TASK, "expenses", "e_w2"),
+        newExpense({ weather: { code: 3, high: 30, low: 22, exact: null } })
+      )
+    );
+  });
+
+  await test("沒有 weather 欄位也可以 —— 它是選填的", async () => {
+    await seed();
+    await assertSucceeds(
+      setDoc(doc(as(MEMBER), "tasks", TASK, "expenses", "e_w3"), newExpense())
+    );
+  });
+
+  /*
+    這一條是整組裡最重要的。
+
+    validWeather() 裡 exact 的那組括號如果漏掉，`A && B || C` 會變成
+    `(A && B) || C` —— 只要 exact 合法，前面所有檢查就全部被短路，
+    code 非法也會過。而規則檔看起來完全正常。
+  */
+  await test("code 超出範圍要擋下 —— 即使 exact 是合法的", async () => {
+    await seed();
+    await assertFails(
+      setDoc(
+        doc(as(MEMBER), "tasks", TASK, "expenses", "e_w4"),
+        newExpense({ weather: { code: 150, high: 33, low: 25, exact: 28 } })
+      )
+    );
+  });
+
+  await test("溫度不是整數要擋下", async () => {
+    await seed();
+    await assertFails(
+      setDoc(
+        doc(as(MEMBER), "tasks", TASK, "expenses", "e_w5"),
+        newExpense({ weather: { code: 61, high: 33.5, low: 25, exact: null } })
+      )
+    );
+  });
+
+  await test("exact 是字串要擋下", async () => {
+    await seed();
+    await assertFails(
+      setDoc(
+        doc(as(MEMBER), "tasks", TASK, "expenses", "e_w6"),
+        newExpense({ weather: { code: 61, high: 33, low: 25, exact: "28" } })
+      )
+    );
+  });
+
   // --- 公開旅費報告 ---
   await test("未登入的人可以讀公開的報告 —— 這就是這個功能的重點", async () => {
     await seed();

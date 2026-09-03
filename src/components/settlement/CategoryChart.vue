@@ -149,14 +149,14 @@ onBeforeUnmount(() => chart.value?.destroy());
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .legend li {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   padding-top: 6px;
   border-top: 1px solid var(--color-line);
 }

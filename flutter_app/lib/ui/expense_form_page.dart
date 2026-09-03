@@ -17,6 +17,7 @@ import '../state/providers.dart';
 import 'place_field.dart';
 import 'receipt_field.dart';
 import 'theme.dart';
+import 'weather_chip.dart';
 
 /// 新增／編輯支出。`src/pages/ExpenseFormPage.vue` 的 Flutter 版。
 ///
@@ -74,6 +75,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   String _currency = 'TWD';
   String _date = todayInput();
   String _time = nowTimeInput();
+
+  Weather? _weather;
+  bool _weatherLoading = false;
   String _paidBy = '';
   SplitMode _splitMode = SplitMode.even;
 
@@ -120,6 +124,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       _date = existing.date ?? expenseDate(existing);
       _time = existing.time ?? '';
       _place = existing.place;
+      /*
+        沿用已存的天氣，**不重查**。
+
+        重查的話：離線編輯 → 查回 null → 存檔把原本正確的天氣洗掉，
+        而使用者只是改個備註，畫面上完全看不出來發生過這件事。
+        網頁版踩過這個坑。
+      */
+      _weather = existing.weather;
       // 備註一定要回填。存檔時一律寫入 note 欄位，這裡不填就等於
       // 每編輯一次就把原本的備註洗掉一次。
       _note.text = existing.note;
@@ -139,11 +151,42 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       _paidBy = repeat.paidBy;
       _splitMode = repeat.splitMode;
       _place = repeat.place;
+      // 「再記一筆」不帶日期，所以是今天 —— 天氣要照今天重查，不能沿用
+      // 來源那筆的。initState 不能 await，交給第一幀之後。
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshWeather());
       // 只帶「分攤給誰」，**不帶各人的金額**。自訂金額是跟著來源那筆的
       // 總額算出來的，而新的一筆總額還沒填 —— 預填進去只會讓驗證對著
       // 使用者根本沒打過的數字喊「合計對不上」。
       _splitWith.addAll(repeat.splits.keys);
     }
+  }
+
+  /// 地點與日期都有了就查天氣。
+  ///
+  /// **只在使用者改動地點、日期或時間時呼叫，載入既有支出時不呼叫。**
+  /// 載入時呼叫的話，離線編輯會查回 null 把原本正確的天氣清掉 ——
+  /// 而使用者只是改個備註，畫面上完全看不出來發生過這件事。
+  Future<void> _refreshWeather() async {
+    // 先清空：改了就重查，查不到就沒有。停在那裡的舊天氣是「三月三號
+    // 清邁的雨」配上「三月五號曼谷的晚餐」，跟未換算支出同一個立場 ——
+    // 寧可沒有，不要錯的。
+    final canLookup = _place?.lat != null && _date.isNotEmpty;
+    setState(() {
+      _weather = null;
+      _weatherLoading = canLookup;
+    });
+    if (!canLookup) return;
+
+    final found = await ref.read(weatherRepositoryProvider).lookup(
+          place: _place,
+          date: _date,
+          time: _time,
+        );
+    if (!mounted) return;
+    setState(() {
+      _weather = found;
+      _weatherLoading = false;
+    });
   }
 
   @override
@@ -292,6 +335,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 'lat': place.lat,
                 'lng': place.lng,
                 'placeId': place.placeId,
+              },
+        // 查不到就是 null —— 那時 onExpenseWeather 觸發器會在文件建立後
+        // 補寫，所以離線記的帳最後還是會有天氣。
+        'weather': _weather == null
+            ? null
+            : {
+                'code': _weather!.code,
+                'high': _weather!.high,
+                'low': _weather!.low,
+                'exact': _weather!.exact,
               },
         'note': _note.text.trim(),
         'date': _date.isEmpty ? todayInput() : _date,
@@ -488,309 +541,380 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           //
           // 表單不是長列表，十幾個欄位一次全建起來沒有任何效能問題。
           : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpace.x4,
+                AppSpace.x2,
+                AppSpace.x4,
+                AppSpace.x8,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _Field(
-                    label: '支出名稱',
-                    child: _TitleField(
-                      controller: _title,
-                      dictation: _dictation,
-                      // 講出來的內容**直接取代**欄位內容，不是接在後面 ——
-                      // 「晚」加上聽到的「晚餐」會變成「晚晚餐」，那比重打
-                      // 一次還煩。名稱本來就短，講錯再講一次就好。
-                      onText: (text) => setState(() {
-                        _title.text = text.length > 60
-                            ? text.substring(0, 60)
-                            : text;
-                      }),
-                      onChanged: () => setState(() {}),
-                    ),
-                  ),
-                  _Field(
-                    label: '分類',
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final meta in expenseCategories)
-                          ChoiceChip(
-                            label: Text('${meta.icon} ${meta.label}'),
-                            selected: _category == meta.value,
-                            onSelected: (_) =>
-                                setState(() => _category = meta.value),
-                          ),
-                      ],
-                    ),
-                  ),
-                  _Field(
-                    label: '金額',
-                    hint: minorUnits(_currency) > 0
-                        ? '最多 ${minorUnits(_currency)} 位小數'
-                        : '$_currency 不使用小數',
-                    error: amountErr,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _amount,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        DropdownButton<String>(
-                          value: _currency,
-                          items: [
-                            for (final code in currencies)
-                              DropdownMenuItem(value: code, child: Text(code)),
-                          ],
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() {
-                              _currency = value;
-                              _rateUpdatedAt = '';
-                              if (value == task.defaultCurrency) {
-                                _rate.text = '1';
-                              }
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (needsRate)
-                    _Field(
-                      label: '匯率（1 $_currency = ? ${task.defaultCurrency}）',
-                      hint: _rateUpdatedAt.isEmpty
-                          ? '匯率在記帳當下鎖住，之後波動不影響這筆帳'
-                          : '更新於 $_rateUpdatedAt',
-                      error: rateErr ?? _rateError,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _rate,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                      decimal: true),
-                              onChanged: (_) => setState(() {}),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          OutlinedButton(
-                            onPressed:
-                                _rateLoading ? null : () => _lookupRate(task),
-                            child: Text(_rateLoading ? '查詢中' : '查匯率'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (base != null && needsRate)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(
-                        '換算後 ${task.defaultCurrency} '
-                        '${formatAmount(base, task.defaultCurrency)}',
-                        style: text.bodySmall,
-                      ),
-                    ),
-                  _Field(
-                    label: '日期與時間',
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () async {
-                              final parts =
-                                  _date.split('-').map(int.tryParse).toList();
-                              final initial = parts.length == 3 &&
-                                      parts.every((p) => p != null)
-                                  ? DateTime(parts[0]!, parts[1]!, parts[2]!)
-                                  : DateTime.now();
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: initial,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2100),
-                              );
-                              if (picked != null) {
-                                setState(() => _date = toDateInput(picked));
-                              }
-                            },
-                            child: Text(_date.isEmpty ? '選日期' : _date),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () async {
-                              final picked = await showTimePicker(
-                                context: context,
-                                initialTime: TimeOfDay.now(),
-                              );
-                              if (picked != null) {
-                                setState(() => _time =
-                                    '${picked.hour.toString().padLeft(2, '0')}:'
-                                        '${picked.minute.toString().padLeft(2, '0')}');
-                              }
-                            },
-                            child: Text(_time.isEmpty ? '沒記時間' : _time),
-                          ),
-                        ),
-                        if (_time.isNotEmpty)
-                          IconButton(
-                            tooltip: '清除時間',
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () => setState(() => _time = ''),
-                          ),
-                      ],
-                    ),
-                  ),
-                  _Field(
-                    label: '誰先付的',
-                    child: DropdownButton<String>(
-                      value: selectable.any((m) => m.uid == _paidBy)
-                          ? _paidBy
-                          : (selectable.isEmpty ? null : selectable.first.uid),
-                      isExpanded: true,
-                      items: [
-                        for (final m in selectable)
-                          DropdownMenuItem(
-                            value: m.uid,
-                            child: Text(
-                              memberDisplayName(m),
-                            ),
-                          ),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => _paidBy = value ?? _paidBy),
-                    ),
-                  ),
-                  _Field(
-                    label: '怎麼分',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SegmentedButton<SplitMode>(
-                          segments: const [
-                            ButtonSegment(
-                                value: SplitMode.even, label: Text('均分')),
-                            ButtonSegment(
-                                value: SplitMode.custom, label: Text('自訂')),
-                          ],
-                          selected: {_splitMode},
-                          onSelectionChanged: (s) =>
-                              setState(() => _splitMode = s.first),
-                        ),
-                        const SizedBox(height: 12),
-                        if (_splitMode == SplitMode.even)
-                          for (final m in selectable)
-                            CheckboxListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              value: _splitWith.contains(m.uid),
-                              title: Text(
-                                memberDisplayName(m),
+                  // 分類排在名稱前面：先按一下分類，名稱要打什麼通常也就想好了，
+                  // 而且手指從分類滑到名稱是連續動作。
+                  _Card(
+                    children: [
+                      _Field(
+                        label: '分類',
+                        /*
+                          四欄格子而不是一排 chip。六個分類的 chip 在 390px
+                          寬度下會換行成兩排長短不一的膠囊，最後兩個常常掉到
+                          第二排的左邊，看起來像另一組東西。
+
+                          格子等寬，六個剛好兩列，而且每一格 66px 高，
+                          比 chip 的命中區大得多。
+                        */
+                        child: GridView.count(
+                          crossAxisCount: 4,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          mainAxisSpacing: AppSpace.x2,
+                          crossAxisSpacing: AppSpace.x2,
+                          childAspectRatio: 1.25,
+                          children: [
+                            for (final meta in expenseCategories)
+                              _CategoryTile(
+                                meta: meta,
+                                selected: _category == meta.value,
+                                onTap: () =>
+                                    setState(() => _category = meta.value),
                               ),
-                              onChanged: (on) => setState(() {
-                                on == true
-                                    ? _splitWith.add(m.uid)
-                                    : _splitWith.remove(m.uid);
-                              }),
-                            )
-                        else ...[
-                          for (final m in selectable)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Row(
+                          ],
+                        ),
+                      ),
+                      _Field(
+                        label: '支出名稱',
+                        child: _TitleField(
+                          controller: _title,
+                          dictation: _dictation,
+                          // 講出來的內容**直接取代**欄位內容，不是接在後面 ——
+                          // 「晚」加上聽到的「晚餐」會變成「晚晚餐」，那比重打
+                          // 一次還煩。名稱本來就短，講錯再講一次就好。
+                          onText: (text) => setState(() {
+                            _title.text = text.length > 60
+                                ? text.substring(0, 60)
+                                : text;
+                          }),
+                          onChanged: () => setState(() {}),
+                        ),
+                      ),
+                      _Field(
+                        label: '金額',
+                        hint: minorUnits(_currency) > 0
+                            ? '最多 ${minorUnits(_currency)} 位小數'
+                            : '$_currency 不使用小數',
+                        error: amountErr,
+                        child: Row(
+                          children: [
+                            // 金額是這一頁存在的理由，所以它是這一頁最大的
+                            // 字。不另外開一張卡：_Card 的註解已經論證過
+                            // 「依主題分卡會讓總高變長」，那跟密度是反向的。
+                            Expanded(
+                              child: TextField(
+                                controller: _amount,
+                                keyboardType: const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
+                                style: figure(size: 32),
+                                decoration: const InputDecoration(
+                                  hintText: '0',
+                                  isDense: true,
+                                ),
+                                onChanged: (_) => setState(() {}),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            DropdownButton<String>(
+                              value: _currency,
+                              items: [
+                                for (final code in currencies)
+                                  DropdownMenuItem(value: code, child: Text(code)),
+                              ],
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _currency = value;
+                                  _rateUpdatedAt = '';
+                                  if (value == task.defaultCurrency) {
+                                    _rate.text = '1';
+                                  }
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (needsRate)
+                        _Field(
+                          label: '匯率（1 $_currency = ? ${task.defaultCurrency}）',
+                          hint: _rateUpdatedAt.isEmpty
+                              ? '匯率在記帳當下鎖住，之後波動不影響這筆帳'
+                              : '更新於 $_rateUpdatedAt',
+                          error: rateErr ?? _rateError,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
                                 children: [
                                   Expanded(
-                                    child: Text(
-                                      memberDisplayName(m),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 130,
                                     child: TextField(
-                                      controller: _custom[m.uid],
-                                      textAlign: TextAlign.right,
+                                      controller: _rate,
                                       keyboardType:
                                           const TextInputType.numberWithOptions(
                                               decimal: true),
-                                      decoration:
-                                          const InputDecoration(isDense: true),
                                       onChanged: (_) => setState(() {}),
                                     ),
                                   ),
+                                  const SizedBox(width: AppSpace.x3),
+                                  OutlinedButton(
+                                    onPressed: _rateLoading
+                                        ? null
+                                        : () => _lookupRate(task),
+                                    child: Text(_rateLoading ? '查詢中' : '查匯率'),
+                                  ),
                                 ],
                               ),
-                            ),
-                          // 差額一定要顯示。合計不等於金額時送出鍵是灰的，
-                          // 不講差多少的話使用者只能自己一個一個加。
-                          Builder(builder: (context) {
-                            final diff = _customDiff();
-                            return Text(
-                              diff == 0
-                                  ? '合計正好等於支出金額'
-                                  : diff > 0
-                                      ? '還差 ${formatAmount(diff, _currency)}'
-                                      : '超出 ${formatAmount(-diff, _currency)}',
-                              style: text.bodySmall?.copyWith(
-                                color: diff == 0
-                                    ? AppColors.success
-                                    : AppColors.danger,
+                              // 換算後金額本來是浮在欄位外的一整塊。它是匯率的結果，
+                              // 不是另一件事 —— 網頁版壓成 ≈ TWD 672 一行，這裡照做。
+                              if (base != null) ...[
+                                const SizedBox(height: AppSpace.x2),
+                                Text(
+                                  '≈ ${task.defaultCurrency} '
+                                  '${formatAmount(base, task.defaultCurrency)}',
+                                  style: text.bodySmall,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                  _Card(
+                    title: '這趟的細節',
+                    children: [
+                      _Field(
+                        label: '日期與時間',
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () async {
+                                  final parts =
+                                      _date.split('-').map(int.tryParse).toList();
+                                  final initial = parts.length == 3 &&
+                                          parts.every((p) => p != null)
+                                      ? DateTime(parts[0]!, parts[1]!, parts[2]!)
+                                      : DateTime.now();
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: initial,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2100),
+                                  );
+                                  if (picked != null) {
+                                    setState(() => _date = toDateInput(picked));
+                                    _refreshWeather();
+                                  }
+                                },
+                                child: Text(_date.isEmpty ? '選日期' : _date),
                               ),
-                            );
-                          }),
-                        ],
-                      ],
-                    ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () async {
+                                  final picked = await showTimePicker(
+                                    context: context,
+                                    initialTime: TimeOfDay.now(),
+                                  );
+                                  if (picked != null) {
+                                    setState(() => _time =
+                                        '${picked.hour.toString().padLeft(2, '0')}:'
+                                            '${picked.minute.toString().padLeft(2, '0')}');
+                                    _refreshWeather();
+                                  }
+                                },
+                                child: Text(_time.isEmpty ? '沒記時間' : _time),
+                              ),
+                            ),
+                            if (_time.isNotEmpty)
+                              IconButton(
+                                tooltip: '清除時間',
+                                icon: const Icon(Icons.close, size: 18),
+                                onPressed: () {
+                                  setState(() => _time = '');
+                                  _refreshWeather();
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                      _Field(
+                        label: '地點（選填）',
+                        hint: PlaceService.placesEnabled
+                            ? '選建議的地點會一起記下座標，報告的地圖才標得出來'
+                            : '沒有設定地點金鑰，目前只能打名字',
+                        child: PlaceField(
+                          taskId: widget.taskId,
+                          initial: widget.existing?.place,
+                          // 這一格自己管輸入，父層只要知道最後算出來是什麼。
+                          onChanged: (value) {
+                            _place = value;
+                            _refreshWeather();
+                          },
+                        ),
+                      ),
+                      // 天氣是加分不是必要：查不到就整段不出現，沒有錯誤
+                      // 訊息。使用者正在記一筆帳，那才是他來這一頁的目的。
+                      if (_weatherLoading)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: AppSpace.x4,
+                          ),
+                          child: Text('查天氣中...', style: text.bodySmall),
+                        )
+                      else if (_weather != null)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: AppSpace.x4,
+                          ),
+                          child: WeatherChip(
+                            weather: _weather!,
+                            variant: WeatherChipVariant.chip,
+                            showLabel: true,
+                          ),
+                        ),
+                      _Field(
+                        label: '收據（選填）',
+                        hint: _isEdit ? null : '按下儲存時才會上傳，傳完才算數',
+                        child: ReceiptField(
+                          existing: widget.existing?.receipt,
+                          taskId: widget.taskId,
+                          expenseId: widget.existing?.id,
+                          canManage: true,
+                          onChanged: (value) => setState(() => _receipt = value),
+                        ),
+                      ),
+                      _Field(
+                        label: '備註（選填）',
+                        child: TextField(controller: _note, maxLines: 3),
+                      ),
+                    ],
                   ),
-                  _Field(
-                    label: '地點（選填）',
-                    hint: PlaceService.placesEnabled
-                        ? '選建議的地點會一起記下座標，報告的地圖才標得出來'
-                        : '沒有設定地點金鑰，目前只能打名字',
-                    child: PlaceField(
-                      taskId: widget.taskId,
-                      initial: widget.existing?.place,
-                      // 這一格自己管輸入，父層只要知道最後算出來是什麼。
-                      onChanged: (value) => _place = value,
-                    ),
+                  _Card(
+                    title: '怎麼分',
+                    children: [
+                      _Field(
+                        label: '誰先付的',
+                        child: DropdownButton<String>(
+                          value: selectable.any((m) => m.uid == _paidBy)
+                              ? _paidBy
+                              : (selectable.isEmpty ? null : selectable.first.uid),
+                          isExpanded: true,
+                          items: [
+                            for (final m in selectable)
+                              DropdownMenuItem(
+                                value: m.uid,
+                                child: Text(
+                                  memberDisplayName(m),
+                                ),
+                              ),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _paidBy = value ?? _paidBy),
+                        ),
+                      ),
+                      _Field(
+                        label: '分攤方式',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SegmentedButton<SplitMode>(
+                              segments: const [
+                                ButtonSegment(
+                                    value: SplitMode.even, label: Text('均分')),
+                                ButtonSegment(
+                                    value: SplitMode.custom, label: Text('自訂')),
+                              ],
+                              selected: {_splitMode},
+                              onSelectionChanged: (s) =>
+                                  setState(() => _splitMode = s.first),
+                            ),
+                            const SizedBox(height: 12),
+                            if (_splitMode == SplitMode.even)
+                              for (final m in selectable)
+                                CheckboxListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  value: _splitWith.contains(m.uid),
+                                  title: Text(
+                                    memberDisplayName(m),
+                                  ),
+                                  onChanged: (on) => setState(() {
+                                    on == true
+                                        ? _splitWith.add(m.uid)
+                                        : _splitWith.remove(m.uid);
+                                  }),
+                                )
+                            else ...[
+                              for (final m in selectable)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          memberDisplayName(m),
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 130,
+                                        child: TextField(
+                                          controller: _custom[m.uid],
+                                          textAlign: TextAlign.right,
+                                          keyboardType:
+                                              const TextInputType.numberWithOptions(
+                                                  decimal: true),
+                                          decoration:
+                                              const InputDecoration(isDense: true),
+                                          onChanged: (_) => setState(() {}),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              // 差額一定要顯示。合計不等於金額時送出鍵是灰的，
+                              // 不講差多少的話使用者只能自己一個一個加。
+                              Builder(builder: (context) {
+                                final diff = _customDiff();
+                                return Text(
+                                  diff == 0
+                                      ? '合計正好等於支出金額'
+                                      : diff > 0
+                                          ? '還差 ${formatAmount(diff, _currency)}'
+                                          : '超出 ${formatAmount(-diff, _currency)}',
+                                  style: text.bodySmall?.copyWith(
+                                    color: diff == 0
+                                        ? AppColors.success
+                                        : AppColors.danger,
+                                  ),
+                                );
+                              }),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  _Field(
-                    label: '收據（選填）',
-                    hint: _isEdit ? null : '按下儲存時才會上傳，傳完才算數',
-                    child: ReceiptField(
-                      existing: widget.existing?.receipt,
-                      taskId: widget.taskId,
-                      expenseId: widget.existing?.id,
-                      canManage: true,
-                      onChanged: (value) => setState(() => _receipt = value),
-                    ),
-                  ),
-                  _Field(
-                    label: '備註（選填）',
-                    child: TextField(controller: _note, maxLines: 3),
-                  ),
-                  if (_error != null) ...[
-                    Text(_error!,
-                        style:
-                            text.bodyMedium?.copyWith(color: AppColors.danger)),
-                    const SizedBox(height: 12),
-                  ],
-                  FilledButton(
-                    onPressed: (_saving || !_canSubmit(task, selectable))
-                        ? null
-                        : () => _submit(task, selectable),
-                    child: Text(_saving ? '儲存中...' : '儲存'),
-                  ),
-                  if (_isEdit) ...[
-                    const SizedBox(height: 12),
+                  /*
+                    刪除留在捲動流裡，不進固定列。網頁版的 93be088 講的就是
+                    手機：系統對話框的 OK 落在哪不是我們能決定的，而它傾向
+                    落在拇指下 —— 螢幕底部那一列就是拇指的定位點，不可逆的
+                    操作不該常駐在那裡。
+
+                    附帶好處：刪除需要刻意捲下去才找得到，那正是它應得的摩擦。
+                  */
+                  if (_isEdit)
                     OutlinedButton(
                       onPressed: _saving ? null : _delete,
                       style: OutlinedButton.styleFrom(
@@ -798,8 +922,90 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       ),
                       child: const Text('刪除這筆支出'),
                     ),
-                  ],
                 ],
+              ),
+            ),
+      /*
+        送出鈕固定在畫面底部。記帳常常是在餐廳裡站著單手做的，而它原本在
+        十一個區塊之後。
+
+        用 bottomNavigationBar 而不是把它塞進捲動流底部：
+        resizeToAvoidBottomInset 預設是 true，鍵盤跳出來時 body 會縮、
+        這一列會被推到鍵盤正上方。這是框架直接管 view insets ——
+        網頁版為了同一件事得用 sticky 再繞開 iOS Safari 把 fixed 元素頂歪
+        的行為。這一項在 Flutter 是用對元件，不是 workaround。
+
+        錯誤訊息跟著進來：不然送出失敗時使用者停在表單上方，訊息印在捲動流
+        底部，他會按了送出、什麼都沒發生、也不知道為什麼。
+
+        背景是 card（白）不是 bg：danger 對頁面底色只有 4.10:1、對白底才有
+        4.66:1，而錯誤訊息就印在這一列上。這是 test/theme_contrast_test.dart
+        逼出來的結論，不是配色偏好。
+
+        SafeArea 是必要的（iPhone 底部那條橫槓）。讀取中與沒權限時不給這一列
+        —— 那兩個畫面上沒有東西可以送出。
+      */
+      bottomNavigationBar: (task == null || blocked)
+          ? null
+          : Container(
+              decoration: const BoxDecoration(
+                color: AppColors.card,
+                border: Border(top: BorderSide(color: AppColors.line)),
+              ),
+              child: SafeArea(
+                minimum: const EdgeInsets.fromLTRB(
+                  AppSpace.x4,
+                  AppSpace.x2,
+                  AppSpace.x4,
+                  AppSpace.x2,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_error != null) ...[
+                      Text(
+                        _error!,
+                        style: text.bodySmall?.copyWith(
+                          color: AppColors.danger,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpace.x2),
+                    ],
+                    Row(
+                      children: [
+                        /*
+                          跨幣別時把換算後的合計放在送出鈕旁邊。那是按下去
+                          之後真正會被記進帳裡的數字，而它原本只出現在卷軸
+                          上方的匯率欄位裡 —— 按鈕在畫面底部，看不到它。
+                        */
+                        if (base != null) ...[
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('合計', style: text.bodySmall),
+                              Text(
+                                '${task.defaultCurrency} '
+                                '${formatAmount(base, task.defaultCurrency)}',
+                                style: figure(size: 16, weight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: AppSpace.x3),
+                        ],
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: (_saving || !_canSubmit(task, selectable))
+                                ? null
+                                : () => _submit(task, selectable),
+                            child: Text(_saving ? '儲存中...' : '儲存'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
     );
@@ -842,6 +1048,100 @@ class _Blocked extends StatelessWidget {
   }
 }
 
+/// 一張卡，帶一個可選的小標。
+///
+/// 十一個欄位平鋪時每個東西的視覺重量都一樣，所以真正必填的那兩個 ——
+/// 名稱與金額 —— 沒有重量。分組依「你會不會動它」而不是依主題：依主題要
+/// 四張卡，而卡片的 padding 是有成本的，總高度會比平鋪更長，那是反方向。
+///
+/// 主卡不給小標：它是主角，不需要一個標題來宣告自己是主角。
+class _Card extends StatelessWidget {
+  final String? title;
+  final List<Widget> children;
+
+  const _Card({this.title, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpace.x4),
+      child: Card(
+        child: Padding(
+          // 底部只給 x1：每個 _Field 自己帶 bottom: x4，兩邊都給 16 的話
+          // 卡片底部會空出 32。
+          padding: const EdgeInsets.fromLTRB(
+            AppSpace.x4,
+            AppSpace.x4,
+            AppSpace.x4,
+            AppSpace.x1,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (title != null) ...[
+                Text(title!, style: text.titleSmall),
+                const SizedBox(height: AppSpace.x4),
+              ],
+              ...children,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 分類格子的一格。
+///
+/// 選中用實心 primaryDark 加白字，不是加邊框或換底色的淺色版：一排六格
+/// 裡面「哪一個被選了」要在半秒內看出來，而淺色差異在陽光下的手機上看不出來。
+class _CategoryTile extends StatelessWidget {
+  final CategoryMeta meta;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CategoryTile({
+    required this.meta,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = selected ? Colors.white : AppColors.primaryDark;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primaryDark : null,
+          border: selected
+              ? null
+              : Border.all(color: AppColors.lineStrong),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(meta.icon, size: 18, color: foreground),
+            const SizedBox(height: AppSpace.x1),
+            Text(
+              meta.label,
+              style: TextStyle(
+                fontSize: 11,
+                color: selected ? Colors.white : AppColors.muted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _Field extends StatelessWidget {
   final String label;
   final String? hint;
@@ -859,22 +1159,22 @@ class _Field extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: AppSpace.x4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: text.bodySmall),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpace.x2),
           child,
           if (error != null)
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: AppSpace.x2),
               child: Text(error!,
                   style: text.bodySmall?.copyWith(color: AppColors.danger)),
             )
           else if (hint != null)
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: AppSpace.x2),
               child: Text(hint!, style: text.bodySmall),
             ),
         ],

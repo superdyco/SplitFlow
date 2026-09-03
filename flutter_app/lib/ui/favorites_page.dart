@@ -6,6 +6,7 @@ import '../state/providers.dart';
 import 'confirm_dialog.dart';
 import 'report_card.dart';
 import 'report_page.dart';
+import 'ledger.dart';
 import 'theme.dart';
 
 /// 我的收藏。`src/pages/FavoritesPage.vue` 的 Flutter 版。
@@ -68,18 +69,16 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
             );
           }
 
-          return ListView.separated(
+          // 一組收藏一張卡。收藏上限是 100 筆且整批取回，跟探索頁同一個
+          // 取捨：惰性省下的只有 widget 建構。
+          return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            itemCount: list.length + (_error == null ? 0 : 1),
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              if (index == list.length) {
-                return Text(
-                  '移除失敗：$_error',
-                  style: text.bodySmall?.copyWith(color: AppColors.danger),
-                );
-              }
-
+            children: [
+              LedgerCard(
+                children: [
+                  for (var index = 0; index < list.length; index++) ...[
+                    if (index > 0) const LedgerDivider(),
+                    Builder(builder: (context) {
               final favorite = list[index];
               return ReportCard(
                 taskName: favorite.taskName,
@@ -103,7 +102,18 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
                   label: const Text('移除'),
                 ),
               );
-            },
+                    }),
+                  ],
+                ],
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  '移除失敗：$_error',
+                  style: text.bodySmall?.copyWith(color: AppColors.danger),
+                ),
+              ],
+            ],
           );
         },
       ),

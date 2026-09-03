@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WeatherChip from "@/components/expense/WeatherChip.vue";
 /**
  * 公開的旅費報告。**任何人都能開，不需要帳號。**
  *
@@ -264,7 +265,14 @@ onMounted(load);
         <strong class="section-title">每天怎麼過的</strong>
         <div v-for="day in timeline" :key="day.date" class="day">
           <div class="line">
-            <span class="name day-head">Day {{ day.day }} · {{ dayLabel(day.date) }}</span>
+            <span class="name day-head">
+              Day {{ day.day }} · {{ dayLabel(day.date) }}
+              <!--
+                舊報告沒有這個欄位，所以一定要 v-if 而不是假設它存在 ——
+                這次改動之前產生的報告要照樣打得開。
+              -->
+              <WeatherChip v-if="day.weather" :weather="day.weather" show-label />
+            </span>
             <span class="amount">{{ formatAmount(day.total, report.currency) }}</span>
           </div>
           <ol class="entries">
@@ -300,7 +308,7 @@ onMounted(load);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   margin-top: 4px;
   text-align: center;
 }
@@ -308,7 +316,7 @@ onMounted(load);
 .page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
   max-width: 560px;
   margin: 0 auto;
   padding: 24px 16px 48px;
@@ -327,8 +335,8 @@ onMounted(load);
   border: 0;
   background: none;
   padding: 0;
-  color: var(--color-primary);
-  font-size: 13px;
+  color: var(--color-primary-dark);
+  font-size: var(--text-control-sm);
   font-weight: 700;
 }
 
@@ -336,7 +344,7 @@ onMounted(load);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   /* .page 的 gap 是 16px，這裡再加 8px 讓主角與下一張卡拉開成 24px。 */
   margin-bottom: 8px;
   padding: 24px 18px;
@@ -346,7 +354,7 @@ onMounted(load);
 }
 
 .figure {
-  font-size: 46px;
+  font-size: var(--text-hero);
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
@@ -354,7 +362,7 @@ onMounted(load);
 .entry {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 /*
@@ -372,7 +380,7 @@ onMounted(load);
   inset: 0;
   width: 100%;
   height: 100%;
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-line);
 }
 
@@ -413,13 +421,13 @@ onMounted(load);
 .line {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .day {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .day-head {
@@ -433,7 +441,7 @@ onMounted(load);
 .entries {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 2px 0 0;
   padding: 2px 0 2px 12px;
   border-left: 2px solid var(--color-line);
@@ -480,6 +488,6 @@ onMounted(load);
 }
 
 .footer a {
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
 }
 </style>
