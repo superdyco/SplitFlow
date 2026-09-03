@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../domain/currency.dart';
 import '../domain/expense_actions.dart';
 import '../domain/expense_groups.dart';
 import '../domain/expense_markers.dart';
 import '../domain/member_name.dart';
 import '../domain/models.dart';
-import '../domain/currency.dart';
+import '../domain/offline_write.dart';
 import '../domain/report_actions.dart';
 import '../domain/settlement_summary.dart';
-
 import '../domain/task_status.dart';
 import '../state/providers.dart';
 import 'expense_day_group.dart';
@@ -21,6 +21,7 @@ import 'invite_sheet.dart';
 import 'ledger.dart';
 import 'members_tab.dart';
 import 'place_map.dart';
+import 'rename_dialog.dart';
 import 'report_share_page.dart';
 import 'settlement_page.dart';
 import 'theme.dart';
@@ -168,7 +169,35 @@ class _Loaded extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(task.name, style: text.titleMedium),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        task.name,
+                        style: text.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    // 條件跟這一頁其他寫入一樣（管理員且沒封存）——
+                    // 改名不需要另一套權限，規則那邊也是同一條。
+                    if (canInvite) ...[
+                      const SizedBox(width: AppSpace.x2),
+                      InkWell(
+                        onTap: () => _renameTask(context, ref, task),
+                        child: const Padding(
+                          padding: EdgeInsets.all(AppSpace.x1),
+                          child: Icon(
+                            Icons.edit_outlined,
+                            size: 16,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 Text(
                   '${task.defaultCurrency} · ${task.memberCount} 位成員 · '
                   '${task.expenseCount} 筆支出',
@@ -247,6 +276,40 @@ class _Loaded extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 改任務名稱。
+///
+/// 放在 widget 外面而不是 _Loaded 的方法裡：_Loaded 是 ConsumerWidget，
+/// 沒有 state 可以放「正在改名」的旗標。實務上這個寫入很快，而且對話框
+/// 關掉之後畫面自己會跟著 provider 更新。
+Future<void> _renameTask(
+  BuildContext context,
+  WidgetRef ref,
+  Task task,
+) async {
+  final next = await showRenameDialog(
+    context,
+    title: '改任務名稱',
+    initial: task.name,
+    maxLength: 40,
+    hint: '已經發出去的邀請連結仍然會顯示舊名字。',
+  );
+
+  // 沒填、沒改、或按了取消都不用動。
+  if (next == null || next.isEmpty || next == task.name) return;
+
+  try {
+    await settleWrite(
+      ref.read(taskRepositoryProvider).renameTask(task.id, next),
+    );
+    ref.invalidate(taskProvider(task.id));
+  } catch (err) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('改名失敗：$err')),
     );
   }
 }

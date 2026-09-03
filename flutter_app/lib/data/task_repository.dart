@@ -241,6 +241,21 @@ class TaskRepository {
     return membersRef(taskId).doc(uid).update({'nickname': nickname});
   }
 
+  /// 改任務名稱。
+  ///
+  /// 規則那邊不用改：updatesTaskAsAdmin 沒有 hasOnly，管理員本來就動得了
+  /// 這個欄位 —— 少的只是介面。
+  ///
+  /// **已經發出去的邀請連結會繼續顯示舊名字。** 邀請文件在建立時抄了一份
+  /// taskName，而規則寫著 allow update, delete: if false —— 那是刻意鎖死的。
+  /// 為了一個名字把邀請變成可寫不划算，而且加入之後看到的就是新名字。
+  Future<void> renameTask(String taskId, String name) {
+    return taskRef(taskId).update({
+      'name': name.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   /// 一個 batch 上限 500 筆寫入，留 50 筆餘裕給同批的計數器更新。
   static const int _batchLimit = 450;
 
