@@ -84,10 +84,10 @@ class ReportCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
 
-    return Card(
-      child: InkWell(
+    // 自己不再是一張卡 —— 探索頁與收藏頁把整份清單包在一張 LedgerCard 裡，
+    // 這裡只負責一列。
+    return InkWell(
         onTap: onOpen,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -139,7 +139,6 @@ class ReportCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
     );
   }
 }
