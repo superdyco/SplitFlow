@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WeatherChip from "@/components/expense/WeatherChip.vue";
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import type { Expense } from "@/types/expense";
@@ -72,7 +73,14 @@ const missingRate = computed(
         <RouterLink :to="target" class="stretch">{{ expense.title }}</RouterLink>
       </strong>
       <p class="tiny">{{ shownDate }} · {{ meta.label }} · {{ paidByName }} 先付 · {{ splitLabel }}</p>
-      <p v-if="expense.place" class="tiny place">📍 {{ expense.place.name }}</p>
+      <!--
+        天氣掛在地點這一行，不另開一欄。列上已經有分類圖示，再並排一個
+        天氣圖示是兩個圖示搶注意力 —— 而天氣本來就屬於地點，貼著它最自然。
+      -->
+      <p v-if="expense.place" class="tiny place">
+        📍 {{ expense.place.name }}
+        <WeatherChip v-if="expense.weather" :weather="expense.weather" />
+      </p>
       <!-- 只標示有沒有，不放縮圖：一天十筆就是十個網路請求，漫遊網路下會很難看。 -->
       <p v-if="expense.receipt" class="tiny">📎 有收據</p>
       <p v-if="expense.note" class="tiny note">📝 {{ expense.note }}</p>
