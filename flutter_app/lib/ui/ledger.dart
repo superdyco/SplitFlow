@@ -106,6 +106,12 @@ class LedgerRow extends StatelessWidget {
   final String title;
   final String? subtitle;
   final String? amount;
+
+  /// 金額底下的小字，通常是幣別代碼。
+  ///
+  /// 分開放而不是跟金額連寫：一整欄的「TWD 12,480」同字級的話，眼睛每一列
+  /// 都要先跳過三個字母才讀得到數字。
+  final String? amountNote;
   final Color? amountColor;
   final Widget? trailing;
   final VoidCallback? onTap;
@@ -116,6 +122,7 @@ class LedgerRow extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.amount,
+    this.amountNote,
     this.amountColor,
     this.trailing,
     this.onTap,
@@ -159,14 +166,29 @@ class LedgerRow extends StatelessWidget {
           if (amount != null)
             SizedBox(
               width: amountWidth,
-              child: Text(
-                amount!,
-                textAlign: TextAlign.right,
-                style: figure(
-                  size: 15,
-                  weight: FontWeight.w600,
-                  color: amountColor ?? AppColors.ink,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    amount!,
+                    textAlign: TextAlign.right,
+                    style: figure(
+                      size: 15,
+                      weight: FontWeight.w600,
+                      color: amountColor ?? AppColors.ink,
+                    ),
+                  ),
+                  if (amountNote != null)
+                    Text(
+                      amountNote!,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                ],
               ),
             ),
           if (trailing != null) ...[

@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import '../domain/currency.dart';
 import '../domain/models.dart';
 import '../domain/task_status.dart';
+import 'ledger.dart';
 import 'theme.dart';
 
-/// 任務列表的一張卡。`src/components/task/TaskCard.vue` 的 Flutter 版。
+/// 任務列表的一列。`src/components/task/TaskCard.vue` 的 Flutter 版。
+///
+/// 從「一張卡」變成「一列」：三趟旅程並排三張浮起來的卡，等於同一句
+/// 「這個比周圍重要」講了三次，於是一次也沒成立。
 
 const Map<TaskRole, String> _roleLabels = {
   TaskRole.owner: '擁有者',
@@ -24,7 +28,7 @@ class TaskCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   /// 封存／解除封存／刪除。null 代表這個人不能做（只有 owner 能），
-  /// 那時整排按鈕都不出現。
+  /// 那時整個選單都不出現。
   final VoidCallback? onArchive;
   final VoidCallback? onUnarchive;
   final VoidCallback? onDelete;
@@ -43,142 +47,71 @@ class TaskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final archived = taskStatusFrom(task.status) == TaskStatus.archived;
-    final text = Theme.of(context).textTheme;
 
-    return Opacity(
-      // 封存的淡一點，但不要淡到看不清 —— 它們仍然要能查。
-      opacity: archived ? 0.72 : 1,
-      child: Card(
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(task.name, style: text.titleMedium),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${task.startDate ?? '未設定'} - ${task.endDate ?? '未設定'}',
-                            style: text.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    _Pill(
-                      label: _roleLabels[role]!,
-                      background: AppColors.primarySoft,
-                      foreground: AppColors.primary,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text('${task.memberCount} 位成員', style: text.bodySmall),
-                    Text('${task.expenseCount} 筆支出', style: text.bodySmall),
-                    // 進行中不掛標籤 —— 沒消息就是好消息，每張卡貼一個
-                    // 「進行中」只是噪音。
-                    if (archived)
-                      _Pill(
-                        label: statusLabels[TaskStatus.archived]!,
-                        background: AppColors.line,
-                        foreground: AppColors.muted,
-                      ),
-                  ],
-                ),
-                if (myCost != null) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text('我的花費　', style: text.bodySmall),
-                      Text(
-                        '${task.defaultCurrency} '
-                        '${formatAmount(myCost!, task.defaultCurrency)}',
-                        style: figure(size: 16),
-                      ),
-                    ],
-                  ),
-                ],
-                // 只有 owner 拿得到這幾顆。放在卡片底部而不是右上角的
-                // 選單裡，是因為手機上那種三點選單很難按中，而這些操作
-                // 一輩子也按不到幾次 —— 不值得為了省一點空間讓它變難按。
-                if (onArchive != null || onUnarchive != null ||
-                    onDelete != null) ...[
-                  const Divider(height: 24),
-                  Row(
-                    children: [
-                      if (archived && onUnarchive != null)
-                        TextButton(
-                          onPressed: onUnarchive,
-                          child: const Text('解除封存'),
-                        )
-                      else if (!archived && onArchive != null)
-                        TextButton(
-                          onPressed: onArchive,
-                          child: const Text('封存'),
-                        ),
-                      const Spacer(),
-                      if (onDelete != null)
-                        TextButton(
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.danger,
-                          ),
-                          onPressed: onDelete,
-                          child: const Text('刪除'),
-                        ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
+    final dates =
+        '${task.startDate ?? '未設定'} – ${task.endDate ?? '未設定'}';
+
+    /*
+      角色、成員數、支出數併成一行副標，不再是藥丸。
+
+      跟網頁版同一個理由：它們是屬性不是狀態，而橘色藥丸在這個 app 裡
+      代表「可以按」。原本那顆角色藥丸還把 primary 當文字色印在 primarySoft
+      上 —— 那是 3.2:1，過不了 4.5:1 的門檻。上一輪的稽核說 Flutter 沒有
+      把 primary 當文字用的地方，漏掉的就是這裡。
+    */
+    final meta = '$dates · ${_roleLabels[role]!} · '
+        '${task.memberCount} 人 · ${task.expenseCount} 筆';
+
+    final row = LedgerRow(
+      title: task.name,
+      subtitle: archived
+          ? '$meta · ${statusLabels[TaskStatus.archived]!}'
+          : meta,
+      amount: myCost == null
+          ? null
+          : formatAmount(myCost!, task.defaultCurrency),
+      amountNote: myCost == null ? null : task.defaultCurrency,
+      trailing: _menu(archived),
+      onTap: onTap,
     );
+
+    // 封存的淡一點，但不要淡到看不清 —— 它們仍然要能查。
+    return archived ? Opacity(opacity: 0.72, child: row) : row;
   }
-}
 
-class _Pill extends StatelessWidget {
-  final String label;
-  final Color background;
-  final Color foreground;
+  /// 只有 owner 拿得到這個選單。
+  ///
+  /// 原本這幾顆是卡片底部的一整排 TextButton，理由寫的是「三點選單很難按中」。
+  /// 那個顧慮是對的，但它的前提是卡片 —— 一列裡放不下兩顆文字按鈕，而且列
+  /// 現在整列可以點進任務頁，按鈕疊在上面就是跟它搶同一塊像素。
+  ///
+  /// 所以改成選單，但把命中區撐到 44×44，讓「很難按中」不再成立。
+  Widget? _menu(bool archived) {
+    if (onArchive == null && onUnarchive == null && onDelete == null) {
+      return null;
+    }
 
-  const _Pill({
-    required this.label,
-    required this.background,
-    required this.foreground,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: foreground,
-        ),
-      ),
+    return PopupMenuButton<VoidCallback>(
+      icon: const Icon(Icons.more_vert, size: 20, color: AppColors.muted),
+      // 預設的命中區比圖示大不了多少，這是上面那段註解的重點。
+      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+      padding: EdgeInsets.zero,
+      splashRadius: 22,
+      tooltip: '任務選項',
+      onSelected: (action) => action(),
+      itemBuilder: (context) => [
+        if (archived && onUnarchive != null)
+          PopupMenuItem(value: onUnarchive, child: const Text('解除封存'))
+        else if (!archived && onArchive != null)
+          PopupMenuItem(value: onArchive, child: const Text('封存')),
+        // 網頁版的封存卡是不給刪除鈕的（先解除封存才能刪），Flutter 這邊
+        // 一直都給。那是行為差異不是視覺差異，這一輪不動它。
+        if (onDelete != null)
+          PopupMenuItem(
+            value: onDelete,
+            child: const Text('刪除', style: TextStyle(color: AppColors.danger)),
+          ),
+      ],
     );
   }
 }
