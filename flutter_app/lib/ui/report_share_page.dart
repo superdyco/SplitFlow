@@ -168,8 +168,11 @@ class _ReportSharePageState extends ConsumerState<ReportSharePage> {
             Text(widget.task.name, style: text.titleMedium),
             const SizedBox(height: 4),
             Text(
+              // 名稱現在會逐筆列出去，這句話以前寫「沒有支出名稱」——
+              // 那是產生報告前唯一會被讀到的說明，不能留著不準的版本。
               '產生一份公開連結，讓沒去的人知道這樣玩一趟大概要花多少錢。'
-              '裡面只有算好的數字 —— 沒有成員名字、沒有支出名稱，也沒有誰欠誰。',
+              '裡面是算好的數字，加上逐筆的時間、支出名稱與金額 —— '
+              '沒有成員名字，也沒有誰欠誰。',
               style: text.bodySmall,
             ),
             const SizedBox(height: 16),

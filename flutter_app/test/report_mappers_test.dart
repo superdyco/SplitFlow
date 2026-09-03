@@ -91,7 +91,7 @@ void main() {
             ReportEntry(
               time: '12:00',
               category: ExpenseCategory.food,
-              place: '大皇宮',
+              name: '午餐',
               amount: 10000,
             ),
           ],
@@ -108,13 +108,16 @@ void main() {
         weather 是後來加的，而它通過那道檢查：地點名稱與日期本來就已經在
         這份文件裡了，「那個地點那天下不下雨」是公開事實，不多洩漏任何東西。
 
-        entry 那條**沒有變**：天氣掛在「天」不掛在「筆」。同一天三筆支出
-        印三次一樣的天氣是噪音，公開文件也小一點。
+        entry 的 place 換成 name：地點整區列在「去過的地方」了，時間軸再列
+        一次是同一份資訊講兩遍。名稱是使用者自己打的字串，會跟著連結公開 ——
+        這是刻意的取捨，產生報告的畫面上有講。
+
+        天氣仍然掛在「天」不掛在「筆」：同一天三筆支出印三次一樣的天氣是噪音。
       */
       expect(day.keys.toList()..sort(),
           ['date', 'day', 'entries', 'total', 'weather']);
       expect(entry.keys.toList()..sort(),
-          ['amount', 'category', 'place', 'time']);
+          ['amount', 'category', 'name', 'time']);
     });
 
     test('分類存的是字串 —— 網頁版讀的是同一份文件', () {

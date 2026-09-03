@@ -6,10 +6,12 @@ import 'trip_summary.dart';
 /// 公開旅費報告的時間軸：一天一段，裡面照時間排的支出。
 /// `src/utils/reportTimeline.ts` 的 Dart 版。
 ///
-/// **這是要放進公開文件的資料，所以只放時間、分類、地點與金額** ——
-/// 沒有支出名稱、沒有 uid、沒有誰付的。分類與地點本來就已經公開在
-/// 「花在哪」與「去過的地方」兩區，時間軸只是把它們按當天的順序重排一次；
-/// 名稱則是自己人才看得懂的東西（「阿明的點心」），不該跟著連結傳出去。
+/// **這是要放進公開文件的資料，所以只放時間、分類、名稱與金額** ——
+/// 沒有 uid、沒有誰付的、沒有怎麼分的。
+///
+/// 名稱本來刻意不放，改放地點。但地點整區列在「去過的地方」了，時間軸再列
+/// 一次等於同一份資訊講兩遍。代價是**支出名稱會出現在公開連結上**，
+/// 產生報告的畫面上要講這件事。
 ///
 /// 金額同樣用 `baseAmountOf`，跟 tripSummary / categoryTotals / placeTotals
 /// 同一套規則：缺匯率的支出四邊都排除。不一致的話每日小計加起來不等於總額。
@@ -19,7 +21,11 @@ class ReportEntry {
   final String time;
   final ExpenseCategory category;
 
-  /// 地點名稱，沒有就是 null。不放 placeId 與座標，那是地圖那邊的事。
+  /// 支出名稱，使用者自己打的那一行。
+  final String name;
+
+  /// 地點名稱。**只有這個改動之前產生的報告有**，新報告不再寫入 ——
+  /// 地點已經整區在「去過的地方」了。留著是為了舊報告照樣打得開。
   final String? place;
 
   /// 主要幣別最小單位整數。
@@ -28,7 +34,8 @@ class ReportEntry {
   const ReportEntry({
     required this.time,
     required this.category,
-    required this.place,
+    required this.name,
+    this.place,
     required this.amount,
   });
 }
@@ -136,7 +143,7 @@ List<ReportDay> reportTimeline(
       ReportEntry(
         time: expenseTime(expense),
         category: expense.category,
-        place: expense.place?.name,
+        name: expense.title,
         amount: amount,
       ),
     ));

@@ -66,15 +66,31 @@ describe("reportTimeline", () => {
       "TWD"
     );
     expect(result[0].entries.map(entry => entry.amount)).toHaveLength(2);
-    // 兩筆金額一樣分不出來，改用地點驗順序。
+    // 兩筆金額一樣分不出來，改用名稱驗順序。
     const named = reportTimeline(
       [
-        expense({ createdAt: at(1, 20), place: { name: "晚上那家", address: null, lat: null, lng: null, placeId: null } }),
-        expense({ createdAt: at(1, 9), place: { name: "早上那家", address: null, lat: null, lng: null, placeId: null } })
+        expense({ createdAt: at(1, 20), title: "宵夜" }),
+        expense({ createdAt: at(1, 9), title: "早餐" })
       ],
       "TWD"
     );
-    expect(named[0].entries.map(entry => entry.place)).toEqual(["早上那家", "晚上那家"]);
+    expect(named[0].entries.map(entry => entry.name)).toEqual(["早餐", "宵夜"]);
+  });
+
+  // 地點整區列在「去過的地方」了，時間軸再列一次就只是同一份資訊講兩遍。
+  it("逐筆放的是支出名稱，不是地點", () => {
+    const result = reportTimeline(
+      [
+        expense({
+          title: "海南雞飯",
+          place: { name: "天天海南雞飯", address: null, lat: null, lng: null, placeId: null }
+        })
+      ],
+      "TWD"
+    );
+
+    expect(result[0].entries[0].name).toBe("海南雞飯");
+    expect(result[0].entries[0].place).toBeUndefined();
   });
 
   it("每天有小計，加起來就是那天的花費", () => {
@@ -176,9 +192,10 @@ describe("reportTimeline", () => {
     });
   });
 
-  it("只放公開得起的欄位 —— 沒有名稱、沒有 uid、沒有 id", () => {
-    // 這份資料會寫進任何人拿到連結都讀得到的文件裡，欄位跑進來就是外洩。
+  // 名稱是刻意放進來的（時間軸沒有它就只剩時間跟金額），但除此之外
+  // 這份資料會寫進任何人拿到連結都讀得到的文件裡，多一個欄位就是多一次外洩。
+  it("只放公開得起的欄位 —— 沒有 uid、沒有誰付的、沒有 id", () => {
     const [entry] = reportTimeline([expense({ title: "阿明的點心", time: "15:00" })], "TWD")[0].entries;
-    expect(Object.keys(entry).sort()).toEqual(["amount", "category", "place", "time"]);
+    expect(Object.keys(entry).sort()).toEqual(["amount", "category", "name", "time"]);
   });
 });

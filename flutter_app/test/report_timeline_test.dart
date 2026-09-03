@@ -178,9 +178,9 @@ void main() {
     });
   });
 
-  test('只放公開得起的欄位 —— 沒有名稱、沒有地址、沒有人', () {
+  test('逐筆放的是名稱 —— 沒有地址、沒有座標、沒有人', () {
     // 這份資料會寫進任何人拿到連結都讀得到的文件裡，欄位跑進來就是外洩。
-    // Dart 沒有 Object.keys，改成逐一斷言 ReportEntry 只帶得動這四個值。
+    // 名稱是刻意放進來的；地點整區在「去過的地方」，這裡不重複。
     final entry = reportTimeline([
       expense(
         title: '阿明的點心',
@@ -198,7 +198,8 @@ void main() {
     expect(entry.time, '15:00');
     expect(entry.category, ExpenseCategory.food);
     expect(entry.amount, 1000);
-    // 地點只留名字，座標與地址都不跟著出去。
-    expect(entry.place, '一蘭');
+    expect(entry.name, '阿明的點心');
+    // 地點不再逐筆寫出去 —— 它整區列在「去過的地方」。
+    expect(entry.place, isNull);
   });
 }

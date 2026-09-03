@@ -711,6 +711,18 @@ onMounted(async () => {
               {{ reportState.busy.value ? "產生中..." : "產生分享報告" }}
             </button>
 
+            <!--
+              報告的時間軸會逐筆列出支出名稱，而那個連結是設計上要到處轉傳的。
+              名稱是使用者自己打的，可能寫著人名（「阿明的點心」）—— 按下產生
+              之前要先知道這件事，事後才發現就已經傳出去了。
+
+              放在按鈕之後而不是之前：上面那串 v-if / v-else-if 是一條鏈，
+              中間插一個元素會把鏈斷掉（樣板編譯直接失敗）。
+            -->
+            <p v-if="expenseState.expenses.value.length" class="tiny muted">
+              報告會逐筆列出支出的時間、名稱與金額，不含成員、誰付的、怎麼分的。
+            </p>
+
             <p v-if="reportState.error.value" class="tiny warn">{{ reportState.error.value }}</p>
             <!--
               報告是成功的，只是沒有地圖 —— 用 muted 而不是 warn，

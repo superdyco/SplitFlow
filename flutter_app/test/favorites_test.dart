@@ -51,7 +51,7 @@ void main() {
             ReportEntry(
               time: '12:00',
               category: ExpenseCategory.food,
-              place: '大皇宮',
+              name: '午餐',
               amount: 10000,
             ),
           ],

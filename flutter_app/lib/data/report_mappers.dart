@@ -106,6 +106,8 @@ List<ReportEntry> _entries(dynamic value) {
         ReportEntry(
           time: (item['time'] as String?) ?? '',
           category: categoryFrom(item['category'] as String?),
+          // 名稱是新的，地點是舊報告才有的 —— 兩個都讀，畫面自己決定顯示哪個。
+          name: (item['name'] as String?) ?? '',
           place: _nonEmpty(item['place']),
           amount: (item['amount'] as num?)?.toInt() ?? 0,
         ),
@@ -185,7 +187,8 @@ Map<String, dynamic> reportToMap(TripReport report) {
               {
                 'time': entry.time,
                 'category': entry.category.name,
-                'place': entry.place,
+                // 只寫 name。舊報告的 place 讀得到，但不再產生新的。
+                'name': entry.name,
                 'amount': entry.amount,
               },
           ],
