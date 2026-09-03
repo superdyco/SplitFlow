@@ -7,6 +7,7 @@ import '../domain/models.dart';
 import '../domain/offline_write.dart';
 import '../state/providers.dart';
 import 'remove_member_dialog.dart';
+import 'ledger.dart';
 import 'theme.dart';
 
 /// 任務的成員分頁。`src/components/member/MemberRow.vue` 與 TaskPage 的
@@ -203,29 +204,36 @@ class _MembersTabState extends ConsumerState<MembersTab> {
                 style: text.bodyMedium?.copyWith(color: AppColors.danger)),
             const SizedBox(height: 12),
           ],
-          for (final member in list) ...[
-            _MemberCard(
-              member: member,
-              isSelf: member.uid == uid,
-              canManage: canManage,
-              busy: _busyUid == member.uid,
-              onPromote: () => _run(
-                member.uid,
-                () => ref
-                    .read(taskRepositoryProvider)
-                    .setMemberRole(widget.task.id, member.uid, 'admin'),
-              ),
-              onDemote: () => _run(
-                member.uid,
-                () => ref
-                    .read(taskRepositoryProvider)
-                    .setMemberRole(widget.task.id, member.uid, 'member'),
-              ),
-              onRemove: () => _remove(member),
-              onRename: () => _rename(member),
-            ),
-            const SizedBox(height: 10),
-          ],
+          // 一組成員一張卡，不是一人一張。這個 ListView 本來就是非惰性的
+          // （children 不是 itemBuilder），折起來不會多建任何東西。
+          LedgerCard(
+            children: [
+              for (var i = 0; i < list.length; i++) ...[
+                if (i > 0) const LedgerDivider(),
+                _MemberCard(
+                  member: list[i],
+                  isSelf: list[i].uid == uid,
+                  canManage: canManage,
+                  busy: _busyUid == list[i].uid,
+                  onPromote: () => _run(
+                    list[i].uid,
+                    () => ref
+                        .read(taskRepositoryProvider)
+                        .setMemberRole(widget.task.id, list[i].uid, 'admin'),
+                  ),
+                  onDemote: () => _run(
+                    list[i].uid,
+                    () => ref
+                        .read(taskRepositoryProvider)
+                        .setMemberRole(widget.task.id, list[i].uid, 'member'),
+                  ),
+                  onRemove: () => _remove(list[i]),
+                  onRename: () => _rename(list[i]),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: AppSpace.x3),
           if (canManage) ...[
             Card(
               child: Padding(
@@ -369,15 +377,19 @@ class _MemberCard extends StatelessWidget {
       _ => member.virtual ? '成員 · 無帳號' : '成員',
     };
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+    // 自己不再是一張卡 —— 外面那張 LedgerCard 是容器，這裡只負責一列。
+    return Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.x4,
+          vertical: AppSpace.x3,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 CircleAvatar(
+                  radius: 18,
                   backgroundColor:
                       member.active ? AppColors.primarySoft : AppColors.line,
                   child: Text(
@@ -385,8 +397,17 @@ class _MemberCard extends StatelessWidget {
                         ? '?'
                         : member.nickname.characters.first,
                     style: TextStyle(
-                      color:
-                          member.active ? AppColors.primary : AppColors.muted,
+                      /*
+                        primaryDeep 而不是 primary。這是**文字**印在
+                        primarySoft 上：primary 只有 3.2:1，primaryDark 是
+                        4.17，兩個都過不了 4.5。primaryDeep 約 6.6。
+
+                        上一輪的稽核說 Flutter 沒有把 primary 當文字用的
+                        地方，這是它漏掉的第二處。
+                      */
+                      color: member.active
+                          ? AppColors.primaryDeep
+                          : AppColors.muted,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -453,7 +474,6 @@ class _MemberCard extends StatelessWidget {
             ],
           ],
         ),
-      ),
     );
   }
 }

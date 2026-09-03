@@ -6,6 +6,7 @@ import '../domain/models.dart';
 import '../domain/settlement.dart';
 import '../domain/settlement_text.dart';
 import 'system_share.dart';
+import 'ledger.dart';
 import 'theme.dart';
 
 /// 結算紀錄。`src/components/settlement/SettlementHistory.vue` 的 Flutter 版。
@@ -140,18 +141,27 @@ class _SettlementHistoryState extends State<SettlementHistory> {
         ],
 
         const SizedBox(height: 8),
-        for (final snapshot in widget.snapshots)
-          _Entry(
-            snapshot: snapshot,
-            taskName: widget.taskName,
-            open: _openId == snapshot.id,
-            canManage: widget.canManage,
-            busy: widget.busy,
-            onToggle: () => setState(
-              () => _openId = _openId == snapshot.id ? null : snapshot.id,
-            ),
-            onRemove: () => widget.onRemove(snapshot),
-          ),
+        // 一組紀錄一張卡，不是一筆一張。每筆自己一張的時候，展開／收合
+        // 會讓整排卡片上下彈跳，看起來像列表重排了。
+        LedgerCard(
+          children: [
+            for (var i = 0; i < widget.snapshots.length; i++) ...[
+              if (i > 0) const LedgerDivider(),
+              _Entry(
+                snapshot: widget.snapshots[i],
+                taskName: widget.taskName,
+                open: _openId == widget.snapshots[i].id,
+                canManage: widget.canManage,
+                busy: widget.busy,
+                onToggle: () => setState(() {
+                  final id = widget.snapshots[i].id;
+                  _openId = _openId == id ? null : id;
+                }),
+                onRemove: () => widget.onRemove(widget.snapshots[i]),
+              ),
+            ],
+          ],
+        ),
       ],
     );
   }
@@ -227,8 +237,8 @@ class _Entry extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final data = snapshot.data;
 
-    return Card(
-      child: Column(
+    // 自己不再是一張卡 —— 外面那張 LedgerCard 是容器。
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
@@ -334,9 +344,7 @@ class _Entry extends StatelessWidget {
                             ),
                             Text(
                               formatAmount(transfer.amount, data.currency),
-                              style: text.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: figure(size: 14),
                             ),
                           ],
                         ),
@@ -356,7 +364,6 @@ class _Entry extends StatelessWidget {
               ),
             ),
         ],
-      ),
     );
   }
 }
