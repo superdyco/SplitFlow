@@ -129,6 +129,19 @@ class _CreateTaskPageState extends ConsumerState<CreateTaskPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
+          /*
+            欄位放進卡片裡，跟支出表單一致。原本它們直接落在頁面底色上，
+            所以「這是一組要填的東西」與「這是一段說明文字」看起來一樣重。
+
+            用 Card + Padding 而不是 LedgerCard：LedgerCard 是給列表用的
+            容器，沒有內距，欄位會貼到邊。
+          */
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpace.x4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
           Text('任務名稱', style: text.bodySmall),
           const SizedBox(height: 6),
           TextField(
@@ -185,6 +198,10 @@ class _CreateTaskPageState extends ConsumerState<CreateTaskPage> {
                 style: text.bodySmall?.copyWith(color: AppColors.danger),
               ),
             ),
+                ],
+              ),
+            ),
+          ),
           if (_error != null) ...[
             const SizedBox(height: 16),
             Text(
