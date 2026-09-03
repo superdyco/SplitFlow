@@ -503,16 +503,27 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     children: [
                       _Field(
                         label: '分類',
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
+                        /*
+                          四欄格子而不是一排 chip。六個分類的 chip 在 390px
+                          寬度下會換行成兩排長短不一的膠囊，最後兩個常常掉到
+                          第二排的左邊，看起來像另一組東西。
+
+                          格子等寬，六個剛好兩列，而且每一格 66px 高，
+                          比 chip 的命中區大得多。
+                        */
+                        child: GridView.count(
+                          crossAxisCount: 4,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          mainAxisSpacing: AppSpace.x2,
+                          crossAxisSpacing: AppSpace.x2,
+                          childAspectRatio: 1.25,
                           children: [
                             for (final meta in expenseCategories)
-                              ChoiceChip(
-                                avatar: Icon(meta.icon, size: 16),
-                                label: Text(meta.label),
+                              _CategoryTile(
+                                meta: meta,
                                 selected: _category == meta.value,
-                                onSelected: (_) =>
+                                onTap: () =>
                                     setState(() => _category = meta.value),
                               ),
                           ],
@@ -542,11 +553,19 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         error: amountErr,
                         child: Row(
                           children: [
+                            // 金額是這一頁存在的理由，所以它是這一頁最大的
+                            // 字。不另外開一張卡：_Card 的註解已經論證過
+                            // 「依主題分卡會讓總高變長」，那跟密度是反向的。
                             Expanded(
                               child: TextField(
                                 controller: _amount,
                                 keyboardType: const TextInputType.numberWithOptions(
                                   decimal: true,
+                                ),
+                                style: figure(size: 32),
+                                decoration: const InputDecoration(
+                                  hintText: '0',
+                                  isDense: true,
                                 ),
                                 onChanged: (_) => setState(() {}),
                               ),
@@ -872,11 +891,37 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       ),
                       const SizedBox(height: AppSpace.x2),
                     ],
-                    FilledButton(
-                      onPressed: (_saving || !_canSubmit(task, selectable))
-                          ? null
-                          : () => _submit(task, selectable),
-                      child: Text(_saving ? '儲存中...' : '儲存'),
+                    Row(
+                      children: [
+                        /*
+                          跨幣別時把換算後的合計放在送出鈕旁邊。那是按下去
+                          之後真正會被記進帳裡的數字，而它原本只出現在卷軸
+                          上方的匯率欄位裡 —— 按鈕在畫面底部，看不到它。
+                        */
+                        if (base != null) ...[
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('合計', style: text.bodySmall),
+                              Text(
+                                '${task.defaultCurrency} '
+                                '${formatAmount(base, task.defaultCurrency)}',
+                                style: figure(size: 16, weight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: AppSpace.x3),
+                        ],
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: (_saving || !_canSubmit(task, selectable))
+                                ? null
+                                : () => _submit(task, selectable),
+                            child: Text(_saving ? '儲存中...' : '儲存'),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -961,6 +1006,55 @@ class _Card extends StatelessWidget {
               ...children,
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 分類格子的一格。
+///
+/// 選中用實心 primaryDark 加白字，不是加邊框或換底色的淺色版：一排六格
+/// 裡面「哪一個被選了」要在半秒內看出來，而淺色差異在陽光下的手機上看不出來。
+class _CategoryTile extends StatelessWidget {
+  final CategoryMeta meta;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CategoryTile({
+    required this.meta,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = selected ? Colors.white : AppColors.primaryDark;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primaryDark : null,
+          border: selected
+              ? null
+              : Border.all(color: AppColors.lineStrong),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(meta.icon, size: 18, color: foreground),
+            const SizedBox(height: AppSpace.x1),
+            Text(
+              meta.label,
+              style: TextStyle(
+                fontSize: 11,
+                color: selected ? Colors.white : AppColors.muted,
+              ),
+            ),
+          ],
         ),
       ),
     );
