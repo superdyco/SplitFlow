@@ -170,6 +170,39 @@ async function main() {
     );
   }
   table("整體", overall);
+
+  /*
+    逐日與逐版本的走勢。
+
+    上面每一張表回答的都是「現在卡在哪一段」，但「**又**變慢了」是另一種問題
+    —— 它問的是「什麼時候開始的」，而把七天的樣本混在一起算 p50 正好會把那個
+    轉折抹平。分開列就看得出來是某一天起跳（資料長大、Firestore 那邊出事）
+    還是某一版起跳（我們自己改壞的）。
+
+    version 是 build 時記下的 git short SHA（見 vite.config.js 的 buildVersion），
+    所以某一版突然變慢的話，`git log` 直接查得到那一版動了什麼。
+
+    只列總計不列分段：這一區是拿來定位「哪一天、哪一版」的，定位到了再回頭
+    看上面的分段表。兩件事混在一張表裡誰都讀不下去。
+  */
+  function trend(title, key) {
+    const buckets = new Map();
+    for (const sample of samples) {
+      const value = String(sample[key] ?? "（沒有記錄）");
+      if (!buckets.has(value)) buckets.set(value, []);
+      buckets.get(value).push(sample.total);
+    }
+    table(
+      title,
+      [...buckets.entries()]
+        .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+        .map(([label, values]) => [label, summarize(values)])
+    );
+  }
+
+  trend("逐日走勢（總計）", "day");
+  trend("逐版本走勢（總計）", "version");
+
   if (!coldSamples.length) {
     console.log("");
     console.log("  （沒有冷啟動樣本。要看的話得把 App 從多工完全滑掉再開。）");
