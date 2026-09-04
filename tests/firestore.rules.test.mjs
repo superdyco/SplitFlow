@@ -832,11 +832,14 @@ async function main() {
     await assertSucceeds(getDoc(doc(as(OTHER), "tasks", TASK, "members", OTHER)));
   });
 
-  await test("被移除的人可以用邀請連結重新加入", async () => {
+  // 重新加入現在走 joinTask callable（Admin SDK 寫，繞過規則）。規則層不再
+  // 有任何自助入口 —— 有的話就等於「知道 taskId 就能進來」，因為規則檢查不了
+  // 「他知道邀請碼」。
+  await test("被移除的人不能自己把自己加回任務", async () => {
     await seed();
     await removeFromTask(OTHER);
     const db = as(OTHER);
-    await assertSucceeds(
+    await assertFails(
       runTransaction(db, async tx => {
         const memberRef = doc(db, "tasks", TASK, "members", OTHER);
         await tx.get(memberRef);
@@ -848,6 +851,31 @@ async function main() {
         });
       })
     );
+  });
+
+  /*
+    這條是那個洞的迴歸測試。
+
+    舊版規則有一條 updatesSelfMembershipOnly()，只檢查「我原本不在
+    memberIds、寫完之後在」。它檢查不了「他知道邀請碼」—— 秘密不在寫入
+    內容裡 —— 所以任何登入者只要拿到 taskId 就能加入任何任務，然後讀光
+    所有支出。taskId 不難拿：公開報告的 collection group 查詢回來的
+    doc.ref.path 上就有。
+  */
+  await test("外人不能只憑 taskId 把自己加進任務", async () => {
+    await seed();
+    await assertFails(
+      updateDoc(doc(as(OUTSIDER), "tasks", TASK), {
+        memberIds: arrayUnion(OUTSIDER),
+        memberCount: increment(1),
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
+  await test("外人加不進去，也就讀不到任何支出", async () => {
+    await seed();
+    await assertFails(getDocs(collection(as(OUTSIDER), "tasks", TASK, "expenses")));
   });
 
   await test("成員可以改自己在任務裡的暱稱（個人設定改名要同步過來）", async () => {
@@ -1612,6 +1640,102 @@ async function main() {
         createdAt: serverTimestamp()
       })
     );
+  });
+
+  /*
+    邀請文件是 get 而不是 read。
+
+    read 同時給 get 與 list，而「拿到碼才看得到」只需要 get。舊版寫成 read，
+    於是 where("active","==",true) 這種查詢就能把整個集合撈出來 —— 一份
+    所有旅程的 taskId、名稱與發起人 uid 清單，連登入都不必。那把 128-bit
+    的邀請碼在這種查詢面前完全沒有作用。
+  */
+  await test("未登入者不能列舉整個邀請集合", async () => {
+    await seed();
+    await assertFails(getDocs(query(collection(anon(), "invites"), where("active", "==", true))));
+  });
+
+  await test("登入者也不能列舉整個邀請集合", async () => {
+    await seed();
+    await assertFails(getDocs(collection(as(MEMBER), "invites")));
+  });
+
+  /*
+    偽造邀請是繞過 joinTask 的路：任何人往 /invites 寫一份指向別人 taskId
+    的文件，callable 就會照著它把人加進去。所以建立邀請必須是那個任務的
+    owner。（callable 那邊也拿 task.inviteCode 對過一次，兩道都留著。）
+  */
+  await test("不能替別人的任務偽造邀請", async () => {
+    await seed();
+    await assertFails(
+      setDoc(doc(as(OUTSIDER), "invites", "forgedcode"), {
+        taskId: TASK,
+        taskName: "曼谷旅行",
+        defaultCurrency: "TWD",
+        startDate: null,
+        endDate: null,
+        createdBy: OUTSIDER,
+        active: true,
+        createdAt: serverTimestamp()
+      })
+    );
+  });
+
+  // 成員也不行 —— 他讀得到 taskId，但發不發邀請是 owner 的決定。
+  await test("一般成員不能替所屬任務另外發邀請", async () => {
+    await seed();
+    await assertFails(
+      setDoc(doc(as(MEMBER), "invites", "membercode"), {
+        taskId: TASK,
+        createdBy: MEMBER,
+        active: true,
+        createdAt: serverTimestamp()
+      })
+    );
+  });
+
+  /*
+    建立任務的那個 batch 一定要照樣過。任務、owner 的成員文件、邀請文件
+    是同一批寫入，所以邀請那條規則得用 taskAfterData —— 用 taskData 的話
+    get() 那當下還讀不到任務，會把「建立任務」整個擋死。
+  */
+  await test("建立任務時可以在同一個 batch 裡建立邀請", async () => {
+    await seed();
+    const db = as(OUTSIDER);
+    const batch = writeBatch(db);
+    batch.set(doc(db, "tasks", "task2"), {
+      name: "新任務",
+      ownerId: OUTSIDER,
+      adminIds: [OUTSIDER],
+      memberIds: [OUTSIDER],
+      defaultCurrency: "TWD",
+      startDate: null,
+      endDate: null,
+      status: "active",
+      inviteCode: "task2code",
+      memberCount: 1,
+      expenseCount: 0,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    batch.set(doc(db, "tasks", "task2", "members", OUTSIDER), {
+      uid: OUTSIDER,
+      nickname: OUTSIDER,
+      role: "owner",
+      joinedAt: serverTimestamp(),
+      active: true
+    });
+    batch.set(doc(db, "invites", "task2code"), {
+      taskId: "task2",
+      taskName: "新任務",
+      defaultCurrency: "TWD",
+      startDate: null,
+      endDate: null,
+      createdBy: OUTSIDER,
+      active: true,
+      createdAt: serverTimestamp()
+    });
+    await assertSucceeds(batch.commit());
   });
 
   // ---------------------------------------------------------------- 探索與收藏

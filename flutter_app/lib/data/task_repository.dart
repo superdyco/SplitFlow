@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../domain/member_footprint.dart';
 import '../domain/models.dart';
@@ -312,41 +313,22 @@ class TaskRepository {
     await batch.commit();
   }
 
-  /// 用邀請連結加入。
+  /// 用邀請碼加入任務。
   ///
-  /// 走 transaction 而不是 batch：要先讀成員文件才知道是「第一次加入」還是
-  /// 「被移除過又回來」，而那個讀取必須跟後面的寫入在同一個原子操作裡 ——
-  /// 不然兩個人同時點連結會把 memberCount 加錯。
-  Future<void> joinTask(String taskId, UserProfile profile) {
-    return db.runTransaction((transaction) async {
-      final memberDoc = membersRef(taskId).doc(profile.uid);
-      final snap = await transaction.get(memberDoc);
-      final existing = snap.data();
-
-      // 已經是有效成員就什麼都不用做，重複點連結不該把人數加兩次。
-      if (existing != null && existing['active'] != false) return;
-
-      if (existing != null) {
-        // 被移除過的人重新加入：沿用原本的文件，保住角色與加入時間。
-        transaction.update(memberDoc, {
-          'active': true,
-          'nickname': profile.nickname,
-        });
-      } else {
-        transaction.set(memberDoc, {
-          'uid': profile.uid,
-          'nickname': profile.nickname,
-          'role': 'member',
-          'joinedAt': FieldValue.serverTimestamp(),
-          'active': true,
-        });
-      }
-
-      transaction.update(taskRef(taskId), {
-        'memberIds': FieldValue.arrayUnion([profile.uid]),
-        'memberCount': FieldValue.increment(1),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+  /// **只送邀請碼，taskId 由伺服器從邀請文件推出來。** 這裡以前是一個
+  /// client 端 transaction，直接把自己寫進 `task.memberIds` —— 而 Security
+  /// Rules 沒有辦法檢查「他知道邀請碼」（規則只看得到這次寫入的內容，秘密
+  /// 不在裡面），所以任何登入者只要拿到 taskId 就能加入任何任務。
+  ///
+  /// 回傳加入後該去的 taskId。重複點同一個連結不是錯誤 —— 使用者要的是進到
+  /// 那個任務，伺服器會直接回它。
+  Future<String> joinTask(String inviteCode) async {
+    // region 要跟函式一致，不然會打到 us-central1 然後找不到函式。
+    final call = FirebaseFunctions.instanceFor(region: 'asia-east1')
+        .httpsCallable('joinTask');
+    final result = await call.call<Map<String, dynamic>>({
+      'inviteCode': inviteCode,
     });
+    return (result.data['taskId'] as String?) ?? '';
   }
 }

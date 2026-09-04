@@ -85,15 +85,15 @@ async function join() {
   joining.value = true;
   error.value = null;
   try {
-    await joinTask(invite.value.taskId, userStore.profile);
-    await router.push(`/tasks/${invite.value.taskId}`);
+    const taskId = await joinTask(inviteCode.value);
+    await router.push(`/tasks/${taskId}`);
   } catch (err) {
-    // 封存的任務規則會擋掉 members 的 create，錯誤碼跟一般權限不足一樣，
-    // 但使用者需要知道的是「這個任務結束了」而不是「你沒有權限」。
-    error.value =
-      (err as { code?: string }).code === "permission-denied"
-        ? "這個任務已封存或已結束，無法加入。請聯絡發起人。"
-        : firebaseErrorMessage(err);
+    // callable 的錯誤碼帶著它自己的訊息（連結失效、任務已封存、還沒設暱稱），
+    // 那些話比任何通用文案都準確，直接顯示。剩下的（網路、內部錯誤）才退回
+    // 共用的對照表。
+    const code = (err as { code?: string }).code ?? "";
+    const known = code.endsWith("not-found") || code.endsWith("failed-precondition");
+    error.value = known ? (err as Error).message : firebaseErrorMessage(err);
   } finally {
     joining.value = false;
   }

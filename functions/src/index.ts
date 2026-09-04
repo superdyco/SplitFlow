@@ -15,6 +15,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
+import { getStorage } from "firebase-admin/storage";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
@@ -23,6 +24,8 @@ import { expenseNotification } from "./message.js";
 import { recipientIds } from "./recipients.js";
 import { readWeather, weatherUrl, type WeatherResult } from "./weather.js";
 import { pickSuccessor, type SuccessorCandidate } from "./successor.js";
+import { joinDecision } from "./join.js";
+import { canDeleteReceipt } from "./receipt.js";
 
 initializeApp();
 
@@ -277,6 +280,164 @@ export const deleteAccount = onCall({ region: REGION }, async request => {
 
   logger.info("帳號已刪除", { uid, deletedTasks, transferredTasks, leftTasks });
   return { deletedTasks, transferredTasks, leftTasks };
+});
+
+/** 邀請碼是 16 個隨機位元組的十六進位字串（見 `createInviteCode`）。 */
+const INVITE_CODE = /^[0-9a-f]{32}$/;
+
+/**
+ * 用邀請碼加入任務。
+ *
+ * **為什麼這件事非得在伺服器端做**：Security Rules 只看得到「這次寫入的
+ * 內容」，而邀請碼是一個不在寫入內容裡的秘密。規則寫得出「他把自己加進了
+ * memberIds」，寫不出「他知道邀請碼」—— 舊版就是這樣，結果是任何登入者
+ * 只要拿到 taskId（公開報告的路徑上就有）就能把自己加進任何一個任務，
+ * 然後讀光所有支出。
+ *
+ * 判斷本身在 `joinDecision`，這裡只負責讀三份文件跟照著答案寫回去。
+ *
+ * 用 transaction 而不是 batch：要不要建立 member 文件、人數要不要加一，
+ * 都得先讀了才知道，而兩次讀之間有人動了同一份文件的話答案就錯了。
+ */
+export const joinTask = onCall({ region: REGION }, async request => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "請先登入");
+
+  const inviteCode = request.data?.inviteCode;
+  // 先擋格式再去讀 Firestore：這是一支公開的 callable，不該讓任意字串
+  // 變成一次文件讀取。
+  if (typeof inviteCode !== "string" || !INVITE_CODE.test(inviteCode)) {
+    throw new HttpsError("not-found", "這個邀請連結不存在或已停用");
+  }
+
+  const inviteSnap = await db.doc(`invites/${inviteCode}`).get();
+  const invite = inviteSnap.data();
+  const taskId = typeof invite?.taskId === "string" ? invite.taskId : "";
+  if (!taskId) throw new HttpsError("not-found", "這個邀請連結不存在或已停用");
+
+  /*
+    暱稱從 users/{uid} 讀，不從參數拿。它不是安全邊界（本人本來就改得動
+    自己的個人資料），但少一個參數就少一個「手機傳過來的跟個人設定不一樣」
+    的分岔。兩邊的加入畫面都會先把沒設暱稱的人導去 onboarding，所以這裡
+    讀不到名字是流程壞了，不是正常路徑。
+  */
+  const profileSnap = await db.doc(`users/${uid}`).get();
+  const nickname = (profileSnap.data()?.nickname as string | undefined) ?? "";
+  if (!nickname) throw new HttpsError("failed-precondition", "請先設定暱稱");
+
+  const taskRef = db.doc(`tasks/${taskId}`);
+  const memberRef = taskRef.collection("members").doc(uid);
+
+  const decision = await db.runTransaction(async tx => {
+    const [taskSnap, memberSnap] = await tx.getAll(taskRef, memberRef);
+    const result = joinDecision({
+      inviteCode,
+      invite: invite ?? null,
+      taskId,
+      task: taskSnap.data() ?? null,
+      member: memberSnap.data() ?? null,
+      uid
+    });
+
+    if (result.kind !== "join") return result;
+
+    if (result.isNew) {
+      tx.set(memberRef, {
+        uid,
+        nickname,
+        role: "member",
+        joinedAt: FieldValue.serverTimestamp(),
+        active: true
+      });
+    } else {
+      // 沿用舊文件保住角色與 joinedAt —— joinedAt 的順序不是裝飾，
+      // 結算的餘數是照它分的。
+      tx.update(memberRef, { active: true, nickname });
+    }
+
+    tx.update(taskRef, {
+      memberIds: FieldValue.arrayUnion(uid),
+      ...(result.countsUp ? { memberCount: FieldValue.increment(1) } : {}),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    return result;
+  });
+
+  if (decision.kind === "invalid") {
+    throw new HttpsError("not-found", "這個邀請連結不存在或已停用");
+  }
+  if (decision.kind === "inactive-task") {
+    throw new HttpsError("failed-precondition", "這個任務已封存或已結束，無法加入。請聯絡發起人。");
+  }
+
+  // already 也回成功：重複點連結的人要的是「進到那個任務」，不是一則錯誤。
+  return { taskId, joined: decision.kind === "join" };
+});
+
+/** Firestore 自動產生的 id 是 20 字元；合成的虛擬成員 id 不會出現在這裡。 */
+const DOC_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * 刪掉一張收據照片。
+ *
+ * **為什麼這件事非得在伺服器端做**：Storage 規則讀不到 Firestore，所以它
+ * 寫得出「這個人登入了」，寫不出「這個人動得了這筆支出」。舊版就是
+ * `allow delete: if request.auth != null` —— 同一個任務裡的一般成員刪不掉
+ * 別人的支出，卻刪得掉那筆支出的照片，比 Firestore 那邊的 canManageExpense
+ * 鬆得多。現在 Storage 那條是 `if false`，只有這裡刪得動。
+ *
+ * 判斷本身在 `canDeleteReceipt`。
+ *
+ * 兩端的呼叫者都把這支的錯誤吞掉（收據刪不掉不該讓使用者的編輯失敗，孤兒
+ * 檔案是既有的取捨），所以這裡拒絕的代價是一個沒人看到的孤兒檔案，不是一個
+ * 卡住的流程。
+ */
+export const deleteReceipt = onCall({ region: REGION }, async request => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "請先登入");
+
+  const { taskId, expenseId } = request.data ?? {};
+  // 先擋格式再去讀 Firestore：這是一支公開的 callable，不該讓任意字串
+  // 變成兩次文件讀取。
+  if (
+    typeof taskId !== "string" ||
+    typeof expenseId !== "string" ||
+    !DOC_ID.test(taskId) ||
+    !DOC_ID.test(expenseId)
+  ) {
+    throw new HttpsError("invalid-argument", "需要任務與支出 id");
+  }
+
+  const [taskSnap, expenseSnap] = await db.getAll(
+    db.doc(`tasks/${taskId}`),
+    db.doc(`tasks/${taskId}/expenses/${expenseId}`)
+  );
+
+  const verdict = canDeleteReceipt({
+    task: taskSnap.data() ?? null,
+    expense: expenseSnap.data() ?? null,
+    uid
+  });
+
+  if (verdict.kind === "denied") throw new HttpsError("permission-denied", "沒有權限");
+  if (verdict.kind === "not-yours") {
+    throw new HttpsError("permission-denied", "只有記帳的人、先付的人或管理員能刪這張收據");
+  }
+  if (verdict.kind === "inactive-task") {
+    throw new HttpsError("failed-precondition", "這個任務已封存，帳目與照片都留著查");
+  }
+
+  // 路徑在伺服器端組。收參數的話，這支函式就變成一個「通過任一支出的檢查
+  // 就能刪任何物件」的萬用刪除器。跟 utils/receiptPolicy.ts 的 receiptPath()
+  // 必須一致。
+  const path = `tasks/${taskId}/expenses/${expenseId}/receipt.jpg`;
+
+  // 檔案本來就不在也算成功 —— 呼叫端要的是「這張圖沒了」，而重試、離線補刪
+  // 都會走到這條路。
+  await getStorage().bucket().file(path).delete({ ignoreNotFound: true });
+
+  return { deleted: true };
 });
 
 /**

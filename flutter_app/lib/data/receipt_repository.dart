@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../domain/debug_log.dart';
@@ -53,15 +54,29 @@ class ReceiptRepository {
 
   /// 刪除 Storage 上的收據。
   ///
+  /// **走 callable 而不是直接 delete。** Storage 規則讀不到 Firestore，
+  /// 所以它寫得出「這個人登入了」，寫不出「這個人動得了這筆支出」——
+  /// 舊版因此比 Firestore 那邊的 canManageExpense 鬆得多：同一個任務裡的
+  /// 一般成員刪不掉別人的支出，卻刪得掉那筆支出的照片。現在 storage.rules
+  /// 那條是 `if false`。
+  ///
+  /// 只送 id，路徑由伺服器端組：收路徑的話這支函式就變成萬用刪除器。
+  ///
   /// 失敗就算了 —— 留下孤兒檔案是設計上接受的取捨（跟網頁版一致）。
-  /// 檔案本來就不存在、或現在離線，都不該讓使用者的編輯因此失敗。
+  /// 檔案本來就不存在、現在離線、或這個人動不了這筆支出，都不該讓
+  /// 使用者的編輯因此失敗。
   Future<void> delete(String taskId, String expenseId) async {
-    final path = receiptPath(taskId, expenseId);
-    _urlCache.remove(path);
+    _urlCache.remove(receiptPath(taskId, expenseId));
     try {
-      await _storage.ref(path).delete();
+      // region 要跟函式一致，不然會打到 us-central1 然後找不到函式。
+      final call = FirebaseFunctions.instanceFor(region: 'asia-east1')
+          .httpsCallable('deleteReceipt');
+      await call.call<Map<String, dynamic>>({
+        'taskId': taskId,
+        'expenseId': expenseId,
+      });
     } catch (err) {
-      // 見上面。留下紀錄是因為「Storage 一直刪不掉」跟「這張圖本來就不在」
+      // 見上面。留下紀錄是因為「一直刪不掉」跟「這張圖本來就不在」
       // 在畫面上長得一模一樣，而前者會慢慢累積孤兒檔案。
       logError('storage', err);
     }

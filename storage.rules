@@ -19,7 +19,19 @@ service firebase.storage {
         && request.resource.size <= 2 * 1024 * 1024
         && request.resource.contentType == 'image/jpeg';
 
-      allow delete: if request.auth != null;
+      /*
+        刪除只走 `deleteReceipt` callable（Admin SDK 繞過這裡）。
+
+        這裡寫不出正確的條件：Storage 規則讀不到 Firestore，所以它寫得出
+        「這個人登入了」，寫不出「這個人動得了這筆支出」。舊版就是
+        `if request.auth != null` —— 比 Firestore 那邊的 canManageExpense
+        鬆得多：同一個任務裡的一般成員刪不掉別人的支出，卻刪得掉那筆支出
+        的照片。
+
+        讀取那條留著 auth 檢查是因為它的替代方案（每張圖發一次簽名 URL）
+        代價完全不同；刪除是低頻操作，多一次 callable 沒有人感覺得到。
+      */
+      allow delete: if false;
     }
 
     // 旅費報告的地圖。這是整份規則裡唯一公開讀取的路徑 ——

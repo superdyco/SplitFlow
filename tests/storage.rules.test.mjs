@@ -76,8 +76,18 @@ async function main() {
     await assertSucceeds(uploadBytes(ref(as(MEMBER), PATH), jpeg(2048), JPEG));
   });
 
-  await test("移除收據時刪得掉", async () => {
-    await assertSucceeds(deleteObject(ref(as(MEMBER), PATH)));
+  /*
+    刪除整條關掉了，改走 deleteReceipt callable（Admin SDK 繞過規則）。
+
+    這裡寫不出正確的條件：Storage 規則讀不到 Firestore，所以它寫得出
+    「這個人登入了」，寫不出「這個人動得了這筆支出」。舊版的
+    `if request.auth != null` 因此比 Firestore 那邊的 canManageExpense 鬆得多
+    —— 同一個任務裡的一般成員刪不掉別人的支出，卻刪得掉那筆支出的照片。
+
+    誰刪得掉的判斷在 functions/src/receipt.ts，那裡有它自己的測試。
+  */
+  await test("client 不能直接刪收據 —— 刪除只走 callable", async () => {
+    await assertFails(deleteObject(ref(as(MEMBER), PATH)));
   });
 
   await test("規則沒開的路徑一律擋住", async () => {

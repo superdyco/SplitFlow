@@ -40,17 +40,17 @@ service cloud.firestore {
         && request.resource.data.status == "active";
     }
 
-    function updatesSelfMembershipOnly() {
-      let changed = request.resource.data.diff(resource.data).changedKeys();
-      return signedIn()
-        && changed.hasOnly(["memberIds", "memberCount", "updatedAt"])
-        && request.auth.uid in request.resource.data.memberIds
-        && !(request.auth.uid in resource.data.memberIds)
-        && request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.adminIds == resource.data.adminIds
-        && request.resource.data.memberCount == resource.data.memberCount + 1;
-    }
+    /*
+      這裡曾經有一條 `updatesSelfMembershipOnly()`，讓人把自己加進 memberIds。
 
+      它是個洞，而且是規則層修不好的那種：規則只看得到「這次寫入的內容」，
+      而邀請碼是一個**不在寫入內容裡的秘密**。那條規則寫得出「他把自己加進了
+      memberIds」，寫不出「他知道邀請碼」—— 少了後者，任何登入者只要拿到
+      taskId 就能加入任何任務再讀光所有支出，而 taskId 在公開報告的路徑上
+      （見底下的 collection group 那條）就有。
+
+      現在加入走 `joinTask` callable，它用 Admin SDK 寫、繞過這裡。
+    */
     function updatesExpenseCountOnly() {
       let changed = request.resource.data.diff(resource.data).changedKeys();
       return isCurrentTaskMember()
@@ -133,7 +133,6 @@ service cloud.firestore {
       allow read: if isCurrentTaskMember();
       // changesStatusAsOwner 刻意不加 taskIsActive —— 加了就解除不了封存。
       allow update: if updatesTaskAsAdmin(taskId)
-        || updatesSelfMembershipOnly()
         || (updatesExpenseCountOnly() && taskIsActive(taskId))
         || changesStatusAsOwner();
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
@@ -155,17 +154,6 @@ service cloud.firestore {
               resource.data.get("virtual", false) == false
               || request.resource.data.role == "member"
             );
-        }
-
-        // 被移除過的人重新用邀請連結加入時，自己把 active 改回 true，角色不能自己升。
-        function rejoinsSelf() {
-          return isSelf(uid)
-            && resource.data.active == false
-            && request.resource.data.active == true
-            && request.resource.data.role == resource.data.role
-            && request.resource.data.uid == resource.data.uid
-            && request.resource.data.diff(resource.data).changedKeys().hasOnly(["active", "nickname"])
-            && uid in taskAfterData(taskId).memberIds;
         }
 
         /*
@@ -228,7 +216,15 @@ service cloud.firestore {
               || taskAfterData(taskId).ownerId == request.auth.uid
             )
           ) || createsVirtualMember();
-        allow update: if managesMemberAsAdmin() || rejoinsSelf() || renamesSelf();
+        /*
+          重新加入沒有規則 —— 那條路整條搬到 `joinTask` callable 了。
+
+          舊版這裡有一條 `rejoinsSelf()`，讓被移除的人自己把 active 改回
+          true。它本身沒問題，但它要求 uid 出現在任務的 memberIds 裡，而唯一
+          能把自己放進去的路（updatesSelfMembershipOnly）已經因為是個洞而
+          刪掉了 —— 留著就是一條永遠不會通過、卻看起來像自助入口的規則。
+        */
+        allow update: if managesMemberAsAdmin() || renamesSelf();
 
         /*
           真實刪除。軟刪（active: false）留給「他確實參與過，但不該再看到
@@ -542,11 +538,28 @@ service cloud.firestore {
         && resource.data.active == true;
     }
 
+    /*
+      邀請連結。**get 而不是 read** —— `read` 同時給 get 與 list，而
+      「拿到碼才看得到」的語義只需要 get。舊版寫成 read，於是
+      `where("active","==",true)` 這種查詢就能把整個集合撈出來：一份
+      所有旅程的 taskId、名稱與發起人 uid 清單，連登入都不必。
+
+      建立的人必須是那個任務的 owner。少了這條，任何登入者都能偽造一份
+      指向別人 taskId 的邀請文件，再拿它去呼叫 joinTask —— 把整個伺服器端
+      驗證繞過去。（callable 那邊也拿 task.inviteCode 對過一次；兩道都留著，
+      因為這兩個檔案會分開被修改。）
+
+      用 taskAfterData 而不是 taskData：邀請文件跟任務在同一個 batch 裡
+      建立，那當下 get() 還讀不到任務。
+    */
     match /invites/{inviteCode} {
-      allow read: if resource.data.active == true;
+      allow get: if resource.data.active == true;
+      allow list: if false;
       allow create: if signedIn()
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.active == true;
+        && request.resource.data.active == true
+        && request.resource.data.taskId is string
+        && taskAfterData(request.resource.data.taskId).ownerId == request.auth.uid;
       // 邀請文件建立後就不會再變動，沒有停用或重新產生連結的功能。
       allow update, delete: if false;
     }

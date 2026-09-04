@@ -8,15 +8,14 @@ import {
   increment,
   orderBy,
   query,
-  runTransaction,
   serverTimestamp,
   updateDoc,
   where,
   writeBatch
 } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { app, db } from "@/firebase/config";
 import type { AssignableRole, TaskMember } from "@/types/member";
-import type { UserProfile } from "@/types/user";
 import { generateVirtualMemberId } from "@/utils/virtualMember";
 import type { MemberFootprint } from "@/utils/memberFootprint";
 import { deleteReceipt } from "@/services/receiptService";
@@ -32,34 +31,21 @@ export async function listTaskMembers(taskId: string): Promise<TaskMember[]> {
   return snap.docs.map(item => item.data() as TaskMember);
 }
 
-export async function joinTask(taskId: string, profile: UserProfile): Promise<void> {
-  await runTransaction(db, async transaction => {
-    const taskRef = doc(db, "tasks", taskId);
-    const memberRef = doc(db, "tasks", taskId, "members", profile.uid);
-    const memberSnap = await transaction.get(memberRef);
-    const existing = memberSnap.exists() ? (memberSnap.data() as TaskMember) : null;
-
-    if (existing?.active) return;
-
-    if (existing) {
-      // 被移除過的成員重新用邀請連結加入，沿用原本的 member 文件保住角色與加入時間。
-      transaction.update(memberRef, { active: true, nickname: profile.nickname });
-    } else {
-      transaction.set(memberRef, {
-        uid: profile.uid,
-        nickname: profile.nickname,
-        role: "member",
-        joinedAt: serverTimestamp(),
-        active: true
-      });
-    }
-
-    transaction.update(taskRef, {
-      memberIds: arrayUnion(profile.uid),
-      memberCount: increment(1),
-      updatedAt: serverTimestamp()
-    });
-  });
+/**
+ * 用邀請碼加入任務。
+ *
+ * **只送邀請碼，taskId 由伺服器從邀請文件推出來。** 這支函式以前是一個
+ * client 端 transaction，直接把自己寫進 `task.memberIds` —— 而 Security
+ * Rules 沒有辦法檢查「他知道邀請碼」（規則只看得到這次寫入的內容，秘密
+ * 不在裡面），所以任何登入者只要拿到 taskId 就能加入任何任務。
+ *
+ * 回傳加入後該去的 taskId。重複點同一個連結不是錯誤 —— 使用者要的是進到
+ * 那個任務，伺服器會直接回它。
+ */
+export async function joinTask(inviteCode: string): Promise<string> {
+  const call = httpsCallable(getFunctions(app, "asia-east1"), "joinTask");
+  const result = await call({ inviteCode });
+  return (result.data as { taskId: string }).taskId;
 }
 
 /**

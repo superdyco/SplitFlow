@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -85,16 +86,17 @@ class _JoinTaskPageState extends ConsumerState<JoinTaskPage> {
     });
 
     try {
-      await ref.read(taskRepositoryProvider).joinTask(_taskId, profile);
+      await ref.read(taskRepositoryProvider).joinTask(widget.inviteCode);
       ref.invalidate(tasksProvider);
       if (mounted) _openTask();
+    } on FirebaseFunctionsException catch (err) {
+      if (!mounted) return;
+      // callable 的訊息帶著它自己的理由（連結失效、任務已封存、還沒設暱稱），
+      // 那些話比任何通用文案都準確，直接顯示。
+      setState(() => _error = err.message ?? '加入失敗：${err.code}');
     } on FirebaseException catch (err) {
       if (!mounted) return;
-      setState(() {
-        _error = err.code == 'permission-denied'
-            ? '這個任務已封存或已結束，無法加入。請聯絡發起人。'
-            : '加入失敗：${err.message ?? err.code}';
-      });
+      setState(() => _error = '加入失敗：${err.message ?? err.code}');
     } catch (err) {
       if (mounted) setState(() => _error = '加入失敗：$err');
     } finally {
