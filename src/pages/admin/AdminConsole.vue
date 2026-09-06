@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import AdminOverviewPage from "@/pages/admin/AdminOverviewPage.vue";
 import AdminUsersPage from "@/pages/admin/AdminUsersPage.vue";
+import AdminTasksPage from "@/pages/admin/AdminTasksPage.vue";
 import AdminAuditPage from "@/pages/admin/AdminAuditPage.vue";
 
 /**
@@ -22,6 +23,7 @@ const route = useRoute();
 const SECTIONS = [
   { id: "", label: "總覽", to: "/admin" },
   { id: "users", label: "使用者", to: "/admin/users" },
+  { id: "tasks", label: "任務", to: "/admin/tasks" },
   { id: "audit", label: "稽核日誌", to: "/admin/audit" }
 ] as const;
 
@@ -33,6 +35,7 @@ const section = computed(() => {
 
 const VIEWS = {
   users: AdminUsersPage,
+  tasks: AdminTasksPage,
   audit: AdminAuditPage
 } as const;
 

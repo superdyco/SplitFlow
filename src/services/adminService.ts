@@ -164,3 +164,102 @@ export async function fetchAudit(params: {
   const result = await callable<typeof params, AuditResult>("adminAudit")(params);
   return result.data;
 }
+
+/* ------------------------------------------------------------------ 任務 */
+
+export type TaskFilter = "active" | "archived" | "deleted" | "all";
+
+export interface AdminTaskRow {
+  id: string;
+  name: string;
+  status: string;
+  ownerId: string;
+  memberCount: number;
+  expenseCount: number;
+  currency: string;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface AdminTasksResult {
+  rows: AdminTaskRow[];
+  /** uid → 暱稱。任務文件裡只有 uid，列表要顯示名字。 */
+  owners: Record<string, string>;
+  cursor: string | null;
+  searched: boolean;
+}
+
+export interface AdminTaskDetail {
+  task: AdminTaskRow;
+  ownerName: string;
+  members: Array<{
+    uid: string;
+    nickname: string;
+    role: string;
+    virtual: boolean;
+    active: boolean;
+  }>;
+  money: {
+    total: number;
+    currency: string;
+    perMember: number | null;
+    categories: Array<{ category: string; amount: number; percent: number }>;
+    /** 沒有換算過的舊支出。總額不含這些 —— 畫面要說出來。 */
+    unconverted: number;
+  };
+  /** 只有張數。管理者看不到照片，連縮圖都沒有。 */
+  receiptCount: number;
+}
+
+export async function fetchTasks(params: {
+  query?: string;
+  filter?: TaskFilter;
+  cursor?: string | null;
+}): Promise<AdminTasksResult> {
+  const result = await callable<typeof params, AdminTasksResult>("adminTasks")(params);
+  return result.data;
+}
+
+/** 會在稽核日誌留下一筆。 */
+export async function fetchTask(taskId: string): Promise<AdminTaskDetail> {
+  const result = await callable<{ taskId: string }, AdminTaskDetail>("adminTask")({ taskId });
+  return result.data;
+}
+
+/* ------------------------------------------------------------------ 三個處置 */
+
+/**
+ * 這三支是整個後台唯一會改到資料的地方。
+ *
+ * 三支都必填理由，三支都寫日誌，三支都通知當事人 —— 那三件事在後端的同一個
+ * 包裝裡，不是各自記得做。
+ */
+
+export async function disableUser(
+  uid: string,
+  reason: string
+): Promise<{ effectiveAt: string }> {
+  const result = await callable<{ uid: string; reason: string }, { effectiveAt: string }>(
+    "adminDisableUser"
+  )({ uid, reason });
+  return result.data;
+}
+
+export async function archiveTask(taskId: string, reason: string): Promise<void> {
+  await callable<{ taskId: string; reason: string }, unknown>("adminArchiveTask")({
+    taskId,
+    reason
+  });
+}
+
+export async function revokeReport(
+  taskId: string,
+  reportId: string,
+  reason: string
+): Promise<void> {
+  await callable<{ taskId: string; reportId: string; reason: string }, unknown>(
+    "adminRevokeReport"
+  )({ taskId, reportId, reason });
+}

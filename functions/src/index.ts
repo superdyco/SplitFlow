@@ -499,7 +499,12 @@ export {
   adminOverview,
   adminUsers,
   adminUser,
+  adminTasks,
+  adminTask,
   adminAudit,
+  adminRevokeReport,
+  adminDisableUser,
+  adminArchiveTask,
   aggregateDaily,
   adminBackfill
 } from "./admin.js";

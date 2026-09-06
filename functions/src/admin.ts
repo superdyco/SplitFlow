@@ -12,8 +12,15 @@
  * （`scripts/set-admin.mjs`）。系統裡沒有任何一條路讓登入中的帳號把自己
  * 升成管理者。
  */
-import { FieldPath, getFirestore, Timestamp, type Firestore } from "firebase-admin/firestore";
+import {
+  AggregateField,
+  FieldPath,
+  getFirestore,
+  Timestamp,
+  type Firestore
+} from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import { getMessaging } from "firebase-admin/messaging";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
@@ -22,11 +29,14 @@ import { DENIED_CODE, DENIED_MESSAGE, isAdmin } from "./admin/guard.js";
 import { dayBounds, dayKeys, latestCompletedDay, parseRange, TIME_ZONE } from "./admin/range.js";
 import {
   auditEntry,
+  disableEffectiveAt,
   parseAuditFilter,
   type AdminAction,
   type TargetType
 } from "./admin/audit.js";
+import { EXPENSE_CATEGORIES, type ExpenseCategory } from "./admin/categories.js";
 import { decodeCursor, encodeCursor, parseLimit } from "./admin/paging.js";
+import { categorySlices, parseTaskFilter } from "./admin/tasks.js";
 import {
   classifySearch,
   FILTER_BLIND_SPOT,
@@ -709,3 +719,441 @@ async function monthlyCounts(): Promise<{ views: number; acts: number; denied: n
   const [views, acts, denied] = await Promise.all([of("view"), of("act"), of("denied")]);
   return { views, acts, denied };
 }
+
+/* ------------------------------------------------------------------ 任務 */
+
+interface TaskRow {
+  id: string;
+  name: string;
+  status: string;
+  ownerId: string;
+  memberCount: number;
+  expenseCount: number;
+  currency: string;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+function toTaskRow(doc: FirebaseFirestore.DocumentSnapshot): TaskRow {
+  return {
+    id: doc.id,
+    name: (doc.get("name") as string) ?? "",
+    status: (doc.get("status") as string) ?? "active",
+    ownerId: (doc.get("ownerId") as string) ?? "",
+    memberCount: (doc.get("memberCount") as number) ?? 0,
+    expenseCount: (doc.get("expenseCount") as number) ?? 0,
+    currency: (doc.get("defaultCurrency") as string) ?? "",
+    startDate: (doc.get("startDate") as string) ?? null,
+    endDate: (doc.get("endDate") as string) ?? null,
+    createdAt: iso(doc.get("createdAt")),
+    updatedAt: iso(doc.get("updatedAt"))
+  };
+}
+
+/** 一次把一批 uid 換成暱稱。列表要顯示擁有者是誰，而任務文件裡只有 uid。 */
+async function nicknamesOf(uids: string[]): Promise<Record<string, string>> {
+  const unique = [...new Set(uids.filter(Boolean))];
+  if (unique.length === 0) return {};
+
+  const docs = await db().getAll(...unique.map(uid => db().collection("users").doc(uid)));
+  const names: Record<string, string> = {};
+  for (const doc of docs) {
+    if (doc.exists) names[doc.id] = (doc.get("nickname") as string) ?? "";
+  }
+  return names;
+}
+
+/** 任務列表。跟使用者列表一樣不寫日誌 —— 列表是瀏覽。 */
+export const adminTasks = onCall({ region: REGION }, async request => {
+  await requireAdmin(request, "view.task");
+
+  const data = (request.data ?? {}) as {
+    query?: unknown;
+    filter?: unknown;
+    cursor?: unknown;
+    limit?: unknown;
+  };
+
+  const limit = parseLimit(data.limit);
+  const raw = typeof data.query === "string" ? data.query.trim() : "";
+
+  if (raw) {
+    const rows = await searchTasks(raw, limit);
+    const names = await nicknamesOf(rows.map(row => row.ownerId));
+    return { rows, owners: names, cursor: null, searched: true };
+  }
+
+  const filter = parseTaskFilter(data.filter ?? "active");
+  if (!filter) throw new HttpsError("invalid-argument", "不認得的篩選");
+
+  let query: FirebaseFirestore.Query = db().collection("tasks");
+  if (filter !== "all") query = query.where("status", "==", filter);
+  query = query.orderBy("updatedAt", "desc").orderBy(FieldPath.documentId(), "desc");
+
+  if (data.cursor !== undefined && data.cursor !== null) {
+    const cursor = decodeCursor(data.cursor);
+    if (!cursor) throw new HttpsError("invalid-argument", "翻頁位置不正確，請重新整理");
+    query = query.startAfter(new Date(cursor.value), cursor.id);
+  }
+
+  const snap = await query.limit(limit + 1).get();
+  const docs = snap.docs.slice(0, limit);
+  const hasMore = snap.docs.length > limit;
+  const rows = docs.map(toTaskRow);
+
+  const last = docs[docs.length - 1];
+  const lastAt = last?.get("updatedAt");
+
+  return {
+    rows,
+    owners: await nicknamesOf(rows.map(row => row.ownerId)),
+    cursor:
+      hasMore && last && lastAt instanceof Timestamp
+        ? encodeCursor({ value: lastAt.toMillis(), id: last.id })
+        : null,
+    searched: false
+  };
+});
+
+/**
+ * 任務搜尋。
+ *
+ * 跟使用者那邊同一個限制：Firestore 沒有全文搜尋，所以是**名稱前綴**或
+ * 完整 ID。搜「曼谷」找得到「曼谷五日」，搜「五日」找不到。
+ */
+async function searchTasks(raw: string, limit: number): Promise<TaskRow[]> {
+  const tasks = db().collection("tasks");
+
+  // 任務 ID 是 Firestore 自動產生的 20 字元。長度對得上就當成 ID 先試一次。
+  if (/^[A-Za-z0-9]{20}$/.test(raw)) {
+    const doc = await tasks.doc(raw).get();
+    if (doc.exists) return [toTaskRow(doc)];
+  }
+
+  const snap = await tasks.orderBy("name").startAt(raw).endAt(prefixEnd(raw)).limit(limit).get();
+  return snap.docs.map(toTaskRow);
+}
+
+/**
+ * 任務詳情。**這裡會寫稽核日誌。**
+ *
+ * 金額是後端加總完才回傳的 —— **單筆支出的文件不離開伺服器**。這不是「前端
+ * 不顯示」，是 callable 根本不回；前者只要有人開 DevTools 就破功了。
+ */
+export const adminTask = onCall({ region: REGION }, async request => {
+  const caller = await requireAdmin(request, "view.task");
+
+  const taskId = (request.data as { taskId?: unknown } | undefined)?.taskId;
+  if (typeof taskId !== "string" || !taskId) {
+    throw new HttpsError("invalid-argument", "缺少 taskId");
+  }
+
+  const taskDoc = await db().collection("tasks").doc(taskId).get();
+  if (!taskDoc.exists) throw new HttpsError("not-found", "找不到這個任務");
+
+  const task = toTaskRow(taskDoc);
+  const expenses = taskDoc.ref.collection("expenses");
+
+  const [membersSnap, totals, unconverted, receipts, owners] = await Promise.all([
+    taskDoc.ref.collection("members").limit(50).get(),
+    /*
+      各分類的加總。sum 聚合跟 count 一樣是伺服器算完才回一個數字，
+      支出文件本身不會被讀出來 —— 隱私邊界靠的就是這件事。
+    */
+    Promise.all(
+      EXPENSE_CATEGORIES.map(category =>
+        expenses
+          .where("category", "==", category)
+          .aggregate({ total: AggregateField.sum("baseAmount") })
+          .get()
+          .then(snap => [category, (snap.data().total as number) ?? 0] as const)
+      )
+    ),
+    /*
+      沒有換算過的舊資料。`baseAmount` 是後來才加的欄位，之前的支出是 null，
+      而 sum 聚合會直接跳過非數值 —— 也就是總額會少算，而且不會有任何症狀。
+      算出來讓畫面說得出「總額不含這 N 筆」。
+    */
+    countOf(expenses.where("baseAmount", "==", null)),
+    countOf(expenses.where("receipt", "!=", null)),
+    nicknamesOf([task.ownerId])
+  ]);
+
+  const amounts = Object.fromEntries(totals) as Record<ExpenseCategory, number>;
+  const total = totals.reduce((sum, [, value]) => sum + value, 0);
+
+  const members = membersSnap.docs.map(doc => ({
+    uid: doc.id,
+    nickname: (doc.get("nickname") as string) ?? "",
+    role: (doc.get("role") as string) ?? "member",
+    virtual: doc.get("virtual") === true,
+    active: doc.get("active") !== false
+  }));
+
+  await writeAudit({
+    action: "view.task",
+    adminUid: caller.uid,
+    adminEmail: caller.email,
+    targetType: "task",
+    targetId: taskId,
+    targetLabel: task.name || taskId,
+    ip: caller.ip,
+    userAgent: caller.userAgent
+  });
+
+  return {
+    task,
+    ownerName: owners[task.ownerId] ?? "",
+    members,
+    money: {
+      total,
+      currency: task.currency,
+      /* 每人平均。成員數是 0 的話回 null 而不是 0 —— 那是不可能發生的資料，
+         但除以 0 得到的 Infinity 會被印在畫面上。 */
+      perMember: task.memberCount > 0 ? Math.round(total / task.memberCount) : null,
+      categories: categorySlices(amounts, EXPENSE_CATEGORIES),
+      unconverted
+    },
+    /*
+      收據只給張數。管理者看不到照片，連縮圖都沒有 —— 這個數字存在的意義
+      正是讓那條線看得見：我們數得出來，但不給看。
+    */
+    receiptCount: receipts
+  };
+});
+
+/* ------------------------------------------------------------------ 三個處置 */
+
+/**
+ * 通知被處置的人。
+ *
+ * 為什麼不跟 `onExpenseCreated` 共用發送邏輯：那一段是多人、要分批、還要
+ * 清死 token，而且**沒有測試**。為了省下這裡的二十幾行去動它，換來的是
+ * 「使用者每天在用的那個通知」有可能壞掉。這裡只送給一個人，簡單得多。
+ *
+ * 跟那邊一樣的原則：**寧可不推播，也不要讓例外冒出去。** 處置本身已經做完
+ * 也寫進日誌了，通知沒送到不該讓整支函式失敗 —— 那會讓管理者以為處置沒生效
+ * 而再按一次。
+ */
+async function notifyUser(uid: string, title: string, body: string): Promise<void> {
+  try {
+    const snap = await db().collection(`users/${uid}/tokens`).get();
+    const tokens = snap.docs.map(doc => doc.id);
+    if (tokens.length === 0) return;
+
+    const response = await getMessaging().sendEachForMulticast({
+      tokens,
+      notification: { title, body }
+    });
+
+    // 死 token 不清會一直累積，每次都白送一次。
+    const stale = response.responses
+      .map((result, index) => {
+        const code = result.error?.code;
+        return !result.success &&
+          (code === "messaging/registration-token-not-registered" ||
+            code === "messaging/invalid-registration-token")
+          ? tokens[index]
+          : null;
+      })
+      .filter((token): token is string => token !== null);
+
+    await Promise.all(stale.map(token => db().doc(`users/${uid}/tokens/${token}`).delete()));
+  } catch (err) {
+    logger.warn("處置通知送不出去", { uid, err: String(err) });
+  }
+}
+
+interface ActionOutcome {
+  /** 寫進日誌的對象名稱。取當下的名字，之後改名了日誌才說得出當時動的是誰。 */
+  label: string;
+  /** 要通知誰。null 代表這次處置沒有明確的當事人。 */
+  notify: { uid: string; title: string; body: string } | null;
+  /** 回給前端的額外資訊，例如停用的生效時間。 */
+  extra?: Record<string, unknown>;
+}
+
+/**
+ * 三個處置共用的骨架。
+ *
+ * 抽出來不是為了少打字，是為了讓「驗身分 → 檢查理由 → 做事 → 寫日誌 →
+ * 通知」這個順序**不可能被漏掉一步**。三支各寫一份的話，漏掉的那一份不會
+ * 噴錯，只會安靜地留下一個沒有紀錄的處置。
+ *
+ * 理由的檢查在 `writeAudit` 裡（`auditEntry` 對 `act.*` 強制要求），所以
+ * 一支處置就算忘了驗理由，也會在寫日誌那一步被擋下來 —— 而且是在做完事
+ * 之前。順序是刻意的。
+ */
+async function adminAction(
+  request: CallableRequest,
+  action: AdminAction,
+  targetType: TargetType,
+  targetId: string,
+  run: () => Promise<ActionOutcome>
+): Promise<Record<string, unknown>> {
+  const caller = await requireAdmin(request, action);
+  const reason = (request.data as { reason?: unknown } | undefined)?.reason;
+
+  /*
+    先驗理由再動手。auditEntry 是純函式，這裡先跑一次拿它的判斷 ——
+    不先驗的話，理由沒填的情況會是「事情做完了、日誌寫不進去」，
+    那正是最不該發生的組合。
+  */
+  const dryRun = auditEntry({
+    action,
+    adminUid: caller.uid,
+    adminEmail: caller.email,
+    targetType,
+    targetId,
+    targetLabel: "",
+    reason,
+    ip: caller.ip,
+    userAgent: caller.userAgent,
+    at: new Date()
+  });
+  if (!dryRun.ok) {
+    throw new HttpsError(
+      "invalid-argument",
+      dryRun.problem === "reason-too-long" ? "理由太長了" : "這個動作需要填寫理由"
+    );
+  }
+
+  const outcome = await run();
+
+  await writeAudit({
+    action,
+    adminUid: caller.uid,
+    adminEmail: caller.email,
+    targetType,
+    targetId,
+    targetLabel: outcome.label,
+    reason,
+    ip: caller.ip,
+    userAgent: caller.userAgent
+  });
+
+  if (outcome.notify) {
+    await notifyUser(outcome.notify.uid, outcome.notify.title, outcome.notify.body);
+  }
+
+  return { ok: true, ...(outcome.extra ?? {}) };
+}
+
+/**
+ * 撤下公開報告。
+ *
+ * 連結失效、從探索頁移除。**任務本身、支出與分攤完全不動**，成員照常使用。
+ * 發布者可以修好之後自己重新分享 —— 這不是永久封鎖。
+ */
+export const adminRevokeReport = onCall({ region: REGION }, async request => {
+  const data = (request.data ?? {}) as { taskId?: unknown; reportId?: unknown };
+  const { taskId, reportId } = data;
+  if (typeof taskId !== "string" || typeof reportId !== "string" || !taskId || !reportId) {
+    throw new HttpsError("invalid-argument", "缺少報告位置");
+  }
+
+  return adminAction(request, "act.revokeReport", "report", `${taskId}/${reportId}`, async () => {
+    const ref = db().collection("tasks").doc(taskId).collection("reports").doc(reportId);
+    const doc = await ref.get();
+    if (!doc.exists) throw new HttpsError("not-found", "找不到這份報告");
+
+    await ref.update({ active: false, listed: false, updatedAt: new Date() });
+
+    const task = await db().collection("tasks").doc(taskId).get();
+    const name = (task.get("name") as string) ?? taskId;
+    const ownerId = (task.get("ownerId") as string) ?? "";
+
+    return {
+      label: name,
+      notify: ownerId
+        ? {
+            uid: ownerId,
+            title: "旅費報告已停止分享",
+            body: `「${name}」的公開報告被平台撤下。修正後可以重新分享。`
+          }
+        : null
+    };
+  });
+});
+
+/**
+ * 停用帳號。
+ *
+ * **不是立刻生效。** `disabled` 擋的是換發新憑證，對方手上那張 ID token 最長
+ * 還能用 1 小時，這段時間他仍然讀得到、也寫得進他已加入的任務。
+ * `revokeRefreshTokens` 救不了這一小時 —— 它作廢的是 refresh token，不是
+ * 已經發出去的 ID token。
+ *
+ * 回傳 `effectiveAt` 讓對話框說得出確切幾點，而不是一句會被忽略的「可能有
+ * 延遲」。這個限制被接受了，但不能只活在文件裡。
+ */
+export const adminDisableUser = onCall({ region: REGION }, async request => {
+  const uid = (request.data as { uid?: unknown } | undefined)?.uid;
+  if (typeof uid !== "string" || !uid) throw new HttpsError("invalid-argument", "缺少 uid");
+
+  return adminAction(request, "act.disableUser", "user", uid, async () => {
+    const doc = await db().collection("users").doc(uid).get();
+    if (!doc.exists) throw new HttpsError("not-found", "找不到這個帳號");
+
+    const at = new Date();
+    await getAuth().updateUser(uid, { disabled: true });
+    await getAuth().revokeRefreshTokens(uid);
+
+    const nickname = (doc.get("nickname") as string) ?? "";
+
+    return {
+      label: nickname || (doc.get("email") as string) || uid,
+      /*
+        停用的人收不到什麼好處，但他該知道發生了什麼、以及可以找誰。
+        通知在停用之後才送 —— token 還在，這一則送得出去。
+      */
+      notify: {
+        uid,
+        title: "帳號已被停用",
+        body: "你的帳號已被平台停用，暫時無法登入。已記錄的帳目都還在。"
+      },
+      extra: { effectiveAt: disableEffectiveAt(at).toISOString() }
+    };
+  });
+});
+
+/**
+ * 強制封存任務。
+ *
+ * 封存後成員仍查得到帳，但不能再新增或修改。**擁有者可以自己解除封存** ——
+ * 規則裡的 `changesStatusAsOwner` 刻意不檢查任務是否還在進行中，就是為了
+ * 留這條路。
+ */
+export const adminArchiveTask = onCall({ region: REGION }, async request => {
+  const taskId = (request.data as { taskId?: unknown } | undefined)?.taskId;
+  if (typeof taskId !== "string" || !taskId) {
+    throw new HttpsError("invalid-argument", "缺少 taskId");
+  }
+
+  return adminAction(request, "act.archiveTask", "task", taskId, async () => {
+    const ref = db().collection("tasks").doc(taskId);
+    const doc = await ref.get();
+    if (!doc.exists) throw new HttpsError("not-found", "找不到這個任務");
+    if (doc.get("status") === "archived") {
+      throw new HttpsError("failed-precondition", "這個任務已經是封存狀態");
+    }
+
+    await ref.update({ status: "archived", updatedAt: new Date() });
+
+    const name = (doc.get("name") as string) ?? taskId;
+    const ownerId = (doc.get("ownerId") as string) ?? "";
+
+    return {
+      label: name,
+      notify: ownerId
+        ? {
+            uid: ownerId,
+            title: "任務已被封存",
+            body: `「${name}」被平台封存，帳目仍可查詢。你可以自己解除封存。`
+          }
+        : null
+    };
+  });
+});

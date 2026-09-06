@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import {
+  disableUser,
   fetchUser,
   fetchUsers,
   type AdminUserDetail,
@@ -11,6 +12,7 @@ import {
 import LoadingState from "@/components/common/LoadingState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
+import AdminActionDialog from "@/pages/admin/AdminActionDialog.vue";
 
 const FILTERS: Array<{ value: UserFilter; label: string }> = [
   { value: "all", label: "全部" },
@@ -103,6 +105,30 @@ async function select(row: AdminUserRow) {
     detailError.value = err instanceof Error ? err.message : String(err);
   } finally {
     detailLoading.value = false;
+  }
+}
+
+const dialogOpen = ref(false);
+const acting = ref(false);
+const actionError = ref<string | null>(null);
+/** 停用之後真正生效的時間。後端算的 —— 畫面不該自己去加一小時。 */
+const effectiveAt = ref<string | null>(null);
+
+async function confirmDisable(reason: string) {
+  const uid = detail.value?.profile.uid;
+  if (!uid) return;
+  acting.value = true;
+  actionError.value = null;
+  try {
+    const result = await disableUser(uid, reason);
+    effectiveAt.value = result.effectiveAt;
+    dialogOpen.value = false;
+    // 重讀詳情：停用狀態來自 Firebase Auth，不重讀的話標籤不會變。
+    await fetchUser(uid).then(next => (detail.value = next));
+  } catch (err) {
+    actionError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    acting.value = false;
   }
 }
 
@@ -304,10 +330,43 @@ function whenSeen(row: AdminUserRow): string {
                 要看內容得由任務擁有者自己匯出。
               </p>
             </div>
+
+            <p v-if="effectiveAt" class="tiny done">
+              已停用。他手上那張憑證要到 {{ effectiveAt.slice(0, 16).replace("T", " ") }} 才會失效。
+            </p>
+
+            <div v-else-if="!detail.disabled" class="danger">
+              <button type="button" class="btn btn-danger" @click="dialogOpen = true">
+                停用這個帳號
+              </button>
+              <!--
+                按下去之前唯一看得到的地方。完整的說明在對話框裡，但那句
+                「最長 1 小時」在這裡就要出現 —— 不然按下去才知道就晚了。
+              -->
+              <p class="tiny">
+                停用只擋住登入，不刪資料，他已記的支出與分攤都留在任務裡。
+                <strong class="lag">最長 1 小時後才會真的擋住。</strong>
+              </p>
+            </div>
           </template>
         </div>
       </div>
     </section>
+
+    <AdminActionDialog
+      :open="dialogOpen"
+      :title="`停用「${detail?.profile.nickname || detail?.profile.email || ''}」的帳號`"
+      message="他將無法再登入。已經記過的支出、分攤與付款全部留在任務裡，其他成員的帳不受影響。"
+      :warning="{
+        title: '不是立刻生效，最長還有 1 小時',
+        body: '停用擋的是換發新憑證。他手上那張最長還能用 1 小時，這段時間仍然讀得到、也寫得進他已加入的任務。這是 Firebase 換發 token 的機制，關不掉。真的緊急就先撤下他的公開報告、封存出問題的任務。'
+      }"
+      confirm-label="確認停用"
+      :busy="acting"
+      :error="actionError"
+      @cancel="dialogOpen = false"
+      @confirm="confirmDisable"
+    />
   </main>
 </template>
 
@@ -563,5 +622,28 @@ function whenSeen(row: AdminUserRow): string {
 
 .masked p {
   margin: var(--space-2) 0 0;
+}
+
+.danger {
+  border-top: 1px solid var(--color-line);
+  padding-top: var(--space-4);
+}
+
+.danger .tiny {
+  margin: var(--space-2) 0 0;
+}
+
+.lag {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.done {
+  margin: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  border: 1px solid var(--color-danger-line);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-ink);
 }
 </style>

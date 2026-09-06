@@ -63,6 +63,21 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "//": "後台的任務列表：狀態的四個分頁，照最後活動排序。",
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
