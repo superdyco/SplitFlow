@@ -138,7 +138,12 @@ export const router = createRouter({
     */
     { path: "/favorites", component: FavoritesPage, meta: { requiresAuth: true, requiresProfile: true } },
     { path: "/explore", component: ExplorePage, meta: { requiresAuth: true, requiresProfile: true } },
-    { path: "/admin", component: AdminGate, meta: { public: true } },
+    /*
+      整個 /admin 底下走同一條路由。不用巢狀路由是因為那樣子頁面的 chunk
+      會在門確認身分**之前**就被抓下來 —— 而「不是管理者的人連下載都不會
+      發生」正是這道門的重點。哪一頁由 AdminConsole 自己看網址決定。
+    */
+    { path: "/admin/:section*", component: AdminGate, meta: { public: true } },
     /*
       萬用路由要排在最後。沒有它的話，打錯的網址會渲染一片空白 ——
       而「一片空白」跟「這個網址存在但你看不到」在畫面上是同一件事，

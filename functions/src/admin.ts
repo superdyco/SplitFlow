@@ -12,7 +12,8 @@
  * （`scripts/set-admin.mjs`）。系統裡沒有任何一條路讓登入中的帳號把自己
  * 升成管理者。
  */
-import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { FieldPath, getFirestore, Timestamp, type Firestore } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
@@ -20,6 +21,16 @@ import { logger } from "firebase-functions";
 import { DENIED_CODE, DENIED_MESSAGE, isAdmin } from "./admin/guard.js";
 import { dayBounds, dayKeys, latestCompletedDay, parseRange, TIME_ZONE } from "./admin/range.js";
 import { auditEntry, type AdminAction, type TargetType } from "./admin/audit.js";
+import {
+  classifySearch,
+  decodeCursor,
+  encodeCursor,
+  FILTER_BLIND_SPOT,
+  listPlan,
+  parseFilter,
+  parseLimit,
+  prefixEnd
+} from "./admin/users.js";
 import {
   dailyDoc,
   latestDoc,
@@ -393,5 +404,215 @@ export const adminBackfill = onCall({ region: REGION, timeoutSeconds: 540 }, asy
     days,
     // 呼叫端要把這件事講給使用者聽，不要讓補出來的 0 被當成「那天沒有人來」。
     warning: "活躍人數與平台分佈補不回來，這幾天的 dau 一律是 0"
+  };
+});
+
+/* ------------------------------------------------------------------ 使用者 */
+
+/**
+ * 列表回傳的一列。
+ *
+ * **只有 users 文件裡就有的東西。** 設計稿的列表上還有「參與幾個任務、記過
+ * 幾筆支出」，那兩個數字在 users 文件裡沒有 —— 要每一列各發兩趟查詢，一頁
+ * 25 個人就是 50 趟。它們搬到詳情面板去了，那裡一次只看一個人。
+ */
+interface UserRow {
+  uid: string;
+  nickname: string;
+  email: string;
+  provider: string;
+  createdAt: string | null;
+  lastSeenAt: string | null;
+  lastPlatform: string | null;
+}
+
+const iso = (value: unknown): string | null =>
+  value instanceof Timestamp ? value.toDate().toISOString() : null;
+
+function toRow(doc: FirebaseFirestore.DocumentSnapshot): UserRow {
+  return {
+    uid: doc.id,
+    nickname: (doc.get("nickname") as string) ?? "",
+    email: (doc.get("email") as string) ?? "",
+    provider: (doc.get("provider") as string) ?? "unknown",
+    createdAt: iso(doc.get("createdAt")),
+    lastSeenAt: iso(doc.get("lastSeenAt")),
+    lastPlatform: (doc.get("lastPlatform") as string) ?? null
+  };
+}
+
+/**
+ * 使用者列表。
+ *
+ * 不寫稽核日誌 —— 列表是瀏覽，詳情才是「看了某個人的資料」。全部都記的話，
+ * 日誌會被翻頁塞滿，而真正該被看見的那幾筆會沉下去。
+ */
+export const adminUsers = onCall({ region: REGION }, async request => {
+  await requireAdmin(request, "view.user");
+
+  const data = (request.data ?? {}) as {
+    query?: unknown;
+    filter?: unknown;
+    cursor?: unknown;
+    limit?: unknown;
+  };
+
+  const search = typeof data.query === "string" ? classifySearch(data.query) : null;
+  const limit = parseLimit(data.limit);
+
+  if (search) {
+    return { rows: await searchUsers(search, limit), cursor: null, searched: true, blindSpot: null };
+  }
+
+  const filter = parseFilter(data.filter ?? "all");
+  if (!filter) throw new HttpsError("invalid-argument", "不認得的篩選");
+
+  const plan = listPlan(filter);
+  let query: FirebaseFirestore.Query = db().collection("users");
+
+  if (plan.since) {
+    const at = new Date(Date.now() - plan.since.daysAgo * 86_400_000);
+    query = query.where(plan.field, plan.since.compare, at);
+  }
+
+  /*
+    第二排序鍵是文件 ID。少了它，同一毫秒註冊的兩個人在翻頁邊界會互相蓋掉，
+    其中一個永遠出不來 —— 而種子資料與批次匯入很容易造出同一毫秒的一批人。
+  */
+  query = query.orderBy(plan.field, plan.direction).orderBy(FieldPath.documentId(), plan.direction);
+
+  if (data.cursor !== undefined && data.cursor !== null) {
+    const cursor = decodeCursor(data.cursor);
+    // 解不開就報錯，不要默默從頭開始 —— 那會讓使用者按下一頁看到第一頁，
+    // 然後以為那就是全部。
+    if (!cursor) throw new HttpsError("invalid-argument", "翻頁位置不正確，請重新整理");
+    query = query.startAfter(new Date(cursor.value), cursor.id);
+  }
+
+  // 多抓一筆，用來判斷還有沒有下一頁。比再發一次 count 便宜。
+  const snap = await query.limit(limit + 1).get();
+  const docs = snap.docs.slice(0, limit);
+  const hasMore = snap.docs.length > limit;
+
+  const last = docs[docs.length - 1];
+  const lastValue = last?.get(plan.field);
+
+  return {
+    rows: docs.map(toRow),
+    cursor:
+      hasMore && last && lastValue instanceof Timestamp
+        ? encodeCursor({ value: lastValue.toMillis(), id: last.id })
+        : null,
+    searched: false,
+    /*
+      範圍查詢只掃有那個欄位的文件。沒有 lastSeenAt 的帳號不會出現在任何
+      一個活躍篩選裡，包含「30 天沒來」—— 而那正是最該被看到的一群。
+    */
+    blindSpot: plan.since ? FILTER_BLIND_SPOT : null
+  };
+});
+
+/**
+ * 搜尋。
+ *
+ * Firestore 沒有全文搜尋，所以三種都是精確或前綴比對 ——
+ * **搜「小美」找不到「陳小美」**。畫面上要寫清楚，不然使用者會以為
+ * 那個人不存在。
+ */
+async function searchUsers(
+  search: { kind: string; value: string },
+  limit: number
+): Promise<UserRow[]> {
+  const users = db().collection("users");
+
+  if (search.kind === "uid") {
+    const doc = await users.doc(search.value).get();
+    return doc.exists ? [toRow(doc)] : [];
+  }
+
+  if (search.kind === "email") {
+    const snap = await users.where("email", "==", search.value).limit(limit).get();
+    return snap.docs.map(toRow);
+  }
+
+  const snap = await users
+    .orderBy("nickname")
+    .startAt(search.value)
+    .endAt(prefixEnd(search.value))
+    .limit(limit)
+    .get();
+  return snap.docs.map(toRow);
+}
+
+/**
+ * 單一使用者的詳情。**這裡會寫稽核日誌。**
+ *
+ * 日誌先寫再回資料，不是背景寫 —— 允許「看得到但沒紀錄」等於承認這份
+ * 日誌可以有缺口。
+ */
+export const adminUser = onCall({ region: REGION }, async request => {
+  const caller = await requireAdmin(request, "view.user");
+
+  const uid = (request.data as { uid?: unknown } | undefined)?.uid;
+  if (typeof uid !== "string" || !uid) throw new HttpsError("invalid-argument", "缺少 uid");
+
+  const doc = await db().collection("users").doc(uid).get();
+  if (!doc.exists) throw new HttpsError("not-found", "找不到這個帳號");
+
+  const profile = toRow(doc);
+  const memberOf = db().collection("tasks").where("memberIds", "array-contains", uid);
+
+  const [tasksSnap, taskCount, ownedCount, expenseCount, authRecord] = await Promise.all([
+    // 參與的任務只給前 10 個。完整清單不是後台要回答的問題。
+    memberOf.orderBy("updatedAt", "desc").limit(10).get(),
+    countOf(memberOf),
+    // 「他自己建的有幾個」要獨立算。從上面那 10 筆數的話，任務超過 10 個的人
+    // 會得到一個永遠不超過 10 的數字，而且看起來完全正常。
+    countOf(db().collection("tasks").where("ownerId", "==", uid)),
+    countOf(db().collectionGroup("expenses").where("createdBy", "==", uid)),
+    /*
+      停用狀態在 Firebase Auth，不在 Firestore —— 所以這裡多讀一次 Auth。
+      也因為這樣，列表沒辦法用「已停用」篩選：Firestore 查詢看不到這個旗標。
+    */
+    getAuth()
+      .getUser(uid)
+      .catch(() => null)
+  ]);
+
+  const tasks = tasksSnap.docs.map(task => {
+    const admins = (task.get("adminIds") as string[] | undefined) ?? [];
+    return {
+      id: task.id,
+      name: (task.get("name") as string) ?? "",
+      status: (task.get("status") as string) ?? "active",
+      role: task.get("ownerId") === uid ? "owner" : admins.includes(uid) ? "admin" : "member",
+      memberCount: (task.get("memberCount") as number) ?? 0,
+      expenseCount: (task.get("expenseCount") as number) ?? 0,
+      updatedAt: iso(task.get("updatedAt"))
+    };
+  });
+
+  await writeAudit({
+    action: "view.user",
+    adminUid: caller.uid,
+    adminEmail: caller.email,
+    targetType: "user",
+    targetId: uid,
+    // 存當下的暱稱而不是指標：之後改名了，日誌要說得出當時看的是誰。
+    targetLabel: profile.nickname || profile.email || uid,
+    ip: caller.ip,
+    userAgent: caller.userAgent
+  });
+
+  return {
+    profile,
+    disabled: authRecord?.disabled ?? null,
+    lastSignInAt: authRecord?.metadata.lastSignInTime ?? null,
+    counts: {
+      tasks: taskCount,
+      owned: ownedCount,
+      expenses: expenseCount
+    },
+    tasks
   };
 });

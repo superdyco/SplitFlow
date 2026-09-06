@@ -33,6 +33,21 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "//": "後台的使用者詳情：他參與的任務，照最後活動排序。array-contains 加上排序這個組合不會自動建立。",
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "memberIds",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -40,6 +55,25 @@
       "//": "跨所有任務數當天新增的支出。自動建立的單欄位索引只有 collection 範圍，collection group 要自己開 —— 少了它，那個 count 會直接失敗。",
       "collectionGroup": "expenses",
       "fieldPath": "createdAt",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "//": "後台的使用者詳情：這個人跨所有任務記過幾筆支出。跟 createdAt 一樣，collection group 範圍要自己開。",
+      "collectionGroup": "expenses",
+      "fieldPath": "createdBy",
       "indexes": [
         {
           "order": "ASCENDING",

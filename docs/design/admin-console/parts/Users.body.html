@@ -7,23 +7,27 @@
     <div style="display:flex;align-items:center;gap:12px">
       <div style="position:relative">
         <svg style="position:absolute;left:14px;top:12px;color:#8a8078" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
-        <input class="input" style="width:280px;padding-left:38px" placeholder="搜尋暱稱、Email 或 UID" />
+        <input class="input" style="width:280px;padding-left:38px" placeholder="暱稱開頭、完整 Email 或 UID" />
       </div>
       <div class="seg">
         <button class="seg-item active">全部</button>
         <button class="seg-item">近 7 日活躍</button>
-        <button class="seg-item">未建立任務</button>
-        <button class="seg-item">已停用</button>
+        <button class="seg-item">30 天沒來</button>
       </div>
     </div>
   </div>
+
+  <p class="tiny" style="margin:0;padding:12px 16px;border-radius:14px;background:#fbfaf8;border:1px solid #ede7e0">
+    搜尋是<strong style="font-weight:800">前綴</strong>比對：搜「陳」找得到「陳小美」，搜「小美」找不到。Email 與 UID 要完整。
+    「參與幾個任務、記過幾筆支出」只在右邊的詳情算 —— 那兩個數字不在帳號資料裡，列表上每一列都算的話一頁就是 50 趟查詢。
+  </p>
 
   <div class="split-r">
     <div class="card">
       <table class="tbl">
         <thead>
           <tr>
-            <th>使用者</th><th>登入方式</th><th class="r">任務</th><th class="r">支出</th><th class="r">最後活動</th>
+            <th>使用者</th><th>登入方式</th><th class="r">註冊日</th><th class="r">最後開啟</th>
           </tr>
         </thead>
         <tbody>
@@ -37,8 +41,8 @@
                 </div>
               </div>
             </td>
-            <td class="sub">Google</td><td class="r">6</td><td class="r">312</td>
-            <td class="r sub">3 分鐘前</td>
+            <td class="sub">Google</td><td class="r sub num">2025-11-03</td>
+            <td class="r sub num">今天 · 網頁版</td>
           </tr>
           <tr>
             <td>
@@ -50,7 +54,7 @@
                 </div>
               </div>
             </td>
-            <td class="sub">Google</td><td class="r">4</td><td class="r">208</td><td class="r sub">1 小時前</td>
+            <td class="sub">Google</td><td class="r sub num">2025-12-14</td><td class="r sub num">今天 · Android</td>
           </tr>
           <tr>
             <td>
@@ -62,7 +66,7 @@
                 </div>
               </div>
             </td>
-            <td class="sub">Email</td><td class="r">3</td><td class="r">176</td><td class="r sub">2 小時前</td>
+            <td class="sub">Email</td><td class="r sub num">2026-01-08</td><td class="r sub num">今天 · 網頁版</td>
           </tr>
           <tr>
             <td>
@@ -74,7 +78,7 @@
                 </div>
               </div>
             </td>
-            <td class="sub">Apple</td><td class="r">5</td><td class="r">143</td><td class="r sub">今天 09:12</td>
+            <td class="sub">Apple</td><td class="r sub num">2026-02-21</td><td class="r sub num">今天 · iPhone</td>
           </tr>
           <tr>
             <td>
@@ -86,7 +90,7 @@
                 </div>
               </div>
             </td>
-            <td class="sub">Google</td><td class="r">2</td><td class="r">96</td><td class="r sub">昨天</td>
+            <td class="sub">Google</td><td class="r sub num">2026-03-30</td><td class="r sub num">昨天 · Android</td>
           </tr>
           <tr>
             <td>
@@ -98,7 +102,7 @@
                 </div>
               </div>
             </td>
-            <td class="sub">—</td><td class="r">1</td><td class="r">0</td><td class="r sub">—</td>
+            <td class="sub">—</td><td class="r sub num">—</td><td class="r sub">沒有紀錄</td>
           </tr>
           <tr>
             <td>
@@ -110,7 +114,7 @@
                 </div>
               </div>
             </td>
-            <td class="sub">Email</td><td class="r">0</td><td class="r">0</td><td class="r sub">08-21</td>
+            <td class="sub">Email</td><td class="r sub num">2026-08-21</td><td class="r sub">沒有紀錄</td>
           </tr>
           <tr>
             <td>
@@ -122,8 +126,8 @@
                 </div>
               </div>
             </td>
-            <td class="sub">Email</td><td class="r">37</td><td class="r">0</td>
-            <td class="r"><span class="pill warn">已停用</span></td>
+            <td class="sub">Email</td><td class="r sub num">2026-08-02</td>
+            <td class="r sub num">08-04 · 網頁版</td>
           </tr>
         </tbody>
       </table>

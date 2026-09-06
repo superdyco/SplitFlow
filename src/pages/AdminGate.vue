@@ -26,7 +26,7 @@ import LoadingState from "@/components/common/LoadingState.vue";
  */
 const state = ref<"checking" | "denied" | "ok">("checking");
 
-const Console = defineAsyncComponent(() => import("@/pages/admin/AdminOverviewPage.vue"));
+const Console = defineAsyncComponent(() => import("@/pages/admin/AdminConsole.vue"));
 
 isPlatformAdmin().then(ok => {
   state.value = ok ? "ok" : "denied";

@@ -1,0 +1,567 @@
+<script setup lang="ts">
+import { ref, watch } from "vue";
+import {
+  fetchUser,
+  fetchUsers,
+  type AdminUserDetail,
+  type AdminUserRow,
+  type AdminUsersResult,
+  type UserFilter
+} from "@/services/adminService";
+import LoadingState from "@/components/common/LoadingState.vue";
+import ErrorState from "@/components/common/ErrorState.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
+
+const FILTERS: Array<{ value: UserFilter; label: string }> = [
+  { value: "all", label: "全部" },
+  { value: "active7", label: "近 7 日活躍" },
+  { value: "idle30", label: "30 天沒來" }
+];
+
+const filter = ref<UserFilter>("all");
+const search = ref("");
+/** 已經送出去的那個搜尋字串。輸入中的字不該每打一個字就查一次。 */
+const submitted = ref("");
+
+const list = ref<AdminUsersResult | null>(null);
+const listError = ref<string | null>(null);
+const listLoading = ref(true);
+
+/**
+ * 翻過的每一頁的游標。
+ *
+ * Firestore 的游標是單向的，回上一頁只能靠自己記著來時路。這個堆疊就是
+ * 那條路 —— 換篩選或換搜尋時要清掉，不然「上一頁」會回到另一個查詢的位置。
+ */
+const trail = ref<Array<string | null>>([null]);
+const page = ref(0);
+
+const selected = ref<string | null>(null);
+const detail = ref<AdminUserDetail | null>(null);
+const detailError = ref<string | null>(null);
+const detailLoading = ref(false);
+
+async function loadList() {
+  listLoading.value = true;
+  listError.value = null;
+  try {
+    list.value = await fetchUsers({
+      query: submitted.value || undefined,
+      filter: filter.value,
+      cursor: trail.value[page.value]
+    });
+  } catch (err) {
+    listError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    listLoading.value = false;
+  }
+}
+
+function reset() {
+  trail.value = [null];
+  page.value = 0;
+  selected.value = null;
+  detail.value = null;
+  void loadList();
+}
+
+watch(filter, reset);
+
+function submitSearch() {
+  submitted.value = search.value.trim();
+  reset();
+}
+
+function clearSearch() {
+  search.value = "";
+  submitted.value = "";
+  reset();
+}
+
+function next() {
+  const cursor = list.value?.cursor;
+  if (!cursor) return;
+  trail.value = [...trail.value.slice(0, page.value + 1), cursor];
+  page.value += 1;
+  void loadList();
+}
+
+function prev() {
+  if (page.value === 0) return;
+  page.value -= 1;
+  void loadList();
+}
+
+async function select(row: AdminUserRow) {
+  selected.value = row.uid;
+  detail.value = null;
+  detailError.value = null;
+  detailLoading.value = true;
+  try {
+    detail.value = await fetchUser(row.uid);
+  } catch (err) {
+    detailError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    detailLoading.value = false;
+  }
+}
+
+loadList();
+
+const ROLE_LABELS: Record<string, string> = {
+  owner: "擁有者",
+  admin: "管理員",
+  member: "成員"
+};
+
+const PLATFORM_LABELS: Record<string, string> = {
+  web: "網頁版",
+  android: "Android",
+  ios: "iPhone"
+};
+
+function day(value: string | null): string {
+  return value ? value.slice(0, 10) : "—";
+}
+
+function whenSeen(row: AdminUserRow): string {
+  if (!row.lastSeenAt) return "沒有紀錄";
+  const platform = row.lastPlatform ? PLATFORM_LABELS[row.lastPlatform] ?? row.lastPlatform : null;
+  return platform ? `${day(row.lastSeenAt)} · ${platform}` : day(row.lastSeenAt);
+}
+</script>
+
+<template>
+  <main class="page">
+    <section class="console">
+      <header class="topbar">
+        <div>
+          <h1 class="title">使用者</h1>
+          <p class="tiny">點一列看詳情。看詳情會在稽核日誌留下一筆。</p>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <form class="search" @submit.prevent="submitSearch">
+          <input
+            v-model="search"
+            class="input"
+            type="search"
+            placeholder="暱稱開頭、完整 Email 或 UID"
+            aria-label="搜尋使用者"
+          />
+          <button type="submit" class="btn btn-sm">搜尋</button>
+          <button v-if="submitted" type="button" class="btn btn-sm" @click="clearSearch">
+            清除
+          </button>
+        </form>
+
+        <div class="seg" role="group" aria-label="篩選">
+          <button
+            v-for="item in FILTERS"
+            :key="item.value"
+            type="button"
+            class="seg-item"
+            :class="{ active: filter === item.value }"
+            :disabled="!!submitted"
+            @click="filter = item.value"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+      </div>
+
+      <!--
+        Firestore 沒有全文搜尋。不講的話，搜「小美」找不到「陳小美」會被
+        當成「這個人不存在」，而那是一個會讓人做出錯誤結論的沉默失敗。
+      -->
+      <p v-if="submitted" class="tiny note">
+        搜尋是<strong>前綴</strong>比對：搜「陳」找得到「陳小美」，搜「小美」找不到。
+        Email 與 UID 要完整。
+      </p>
+      <p v-else-if="list?.blindSpot" class="tiny note">{{ list.blindSpot }}</p>
+
+      <div class="split">
+        <div class="card list">
+          <LoadingState v-if="listLoading && !list" title="讀取中" message="正在查詢" />
+          <ErrorState
+            v-else-if="listError"
+            :message="listError"
+            retryable
+            :retrying="listLoading"
+            @retry="loadList"
+          />
+          <EmptyState
+            v-else-if="list && list.rows.length === 0"
+            title="沒有符合的帳號"
+            :message="submitted ? '換一個開頭或用完整的 Email 試試。' : '這個篩選目前沒有人。'"
+          />
+
+          <template v-else-if="list">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>使用者</th>
+                  <th>登入方式</th>
+                  <th>註冊日</th>
+                  <th>最後開啟</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in list.rows"
+                  :key="row.uid"
+                  class="row"
+                  :class="{ sel: selected === row.uid }"
+                  tabindex="0"
+                  @click="select(row)"
+                  @keydown.enter="select(row)"
+                >
+                  <td>
+                    <div class="who">
+                      <span class="avatar sm">{{ (row.nickname || "?").charAt(0) }}</span>
+                      <div>
+                        <div class="name">{{ row.nickname || "（沒有暱稱）" }}</div>
+                        <div class="tiny">{{ row.email || "—" }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="tiny">{{ row.provider }}</td>
+                  <td class="tiny num">{{ day(row.createdAt) }}</td>
+                  <td class="tiny num">{{ whenSeen(row) }}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div v-if="!list.searched" class="pager">
+              <p class="tiny">第 {{ page + 1 }} 頁</p>
+              <div class="pager-btns">
+                <button type="button" class="btn btn-sm" :disabled="page === 0" @click="prev">
+                  上一頁
+                </button>
+                <button type="button" class="btn btn-sm" :disabled="!list.cursor" @click="next">
+                  下一頁
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="card detail">
+          <EmptyState
+            v-if="!selected"
+            title="選一個人"
+            message="左邊點一列，這裡會顯示他的統計與參與的任務。"
+          />
+          <LoadingState v-else-if="detailLoading" title="讀取中" message="正在整理" />
+          <ErrorState v-else-if="detailError" :message="detailError" />
+
+          <template v-else-if="detail">
+            <div class="who big">
+              <span class="avatar">{{ (detail.profile.nickname || "?").charAt(0) }}</span>
+              <div>
+                <div class="section-title">{{ detail.profile.nickname || "（沒有暱稱）" }}</div>
+                <div class="tiny">{{ detail.profile.email || "—" }}</div>
+              </div>
+              <span v-if="detail.disabled" class="pill danger">已停用</span>
+            </div>
+
+            <dl class="meta">
+              <div><dt>UID</dt><dd class="mono">{{ detail.profile.uid }}</dd></div>
+              <div><dt>登入方式</dt><dd>{{ detail.profile.provider }}</dd></div>
+              <div><dt>註冊日</dt><dd class="num">{{ day(detail.profile.createdAt) }}</dd></div>
+              <div><dt>最後開啟</dt><dd class="num">{{ whenSeen(detail.profile) }}</dd></div>
+            </dl>
+
+            <div class="counts">
+              <div><span class="label">參與任務</span><strong>{{ detail.counts.tasks }}</strong></div>
+              <div><span class="label">其中他建立</span><strong>{{ detail.counts.owned }}</strong></div>
+              <div><span class="label">記過的支出</span><strong>{{ detail.counts.expenses }}</strong></div>
+            </div>
+
+            <div v-if="detail.tasks.length" class="tasks">
+              <h3 class="card-head">參與的任務</h3>
+              <ul>
+                <li v-for="task in detail.tasks" :key="task.id">
+                  <span class="name">{{ task.name }}</span>
+                  <span class="pill">{{ ROLE_LABELS[task.role] ?? task.role }}</span>
+                  <span class="tiny num">{{ task.expenseCount }} 筆</span>
+                </li>
+              </ul>
+              <p v-if="detail.counts.tasks > detail.tasks.length" class="tiny">
+                只列最近 10 個，他總共參與 {{ detail.counts.tasks }} 個。
+              </p>
+            </div>
+
+            <!--
+              這一塊是這個後台的規格，不是提醒。看得到錢的總量、看不到單筆的
+              內容 —— 而那條線只有寫出來才存在。
+            -->
+            <div class="masked">
+              <strong>看不到的部分</strong>
+              <p class="tiny">
+                支出的名稱、地點、備註與收據照片不對管理者開放，這裡只到「筆數」為止。
+                要看內容得由任務擁有者自己匯出。
+              </p>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+  </main>
+</template>
+
+<style scoped>
+.console {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.search .input {
+  width: 300px;
+  min-height: 40px;
+}
+
+.note {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.tbl {
+  width: 100%;
+  /* separate 而不是 collapse：選中那一列要收圓角，而 collapse 會讓
+     td 的 border-radius 完全失效，底色就變成一個方角色塊。 */
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.tbl th {
+  text-align: left;
+  padding: 0 var(--space-3) var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-muted);
+  font-size: var(--text-tiny);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tbl td {
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+  border-bottom: 1px solid var(--color-line);
+  vertical-align: middle;
+}
+
+.tbl th:first-child,
+.tbl td:first-child {
+  padding-left: var(--space-2);
+}
+
+.tbl tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tbl tbody tr {
+  cursor: pointer;
+}
+
+.tbl tbody tr:hover td {
+  background: var(--color-surface);
+}
+
+.tbl tbody tr.sel td {
+  background: var(--color-primary-soft);
+}
+
+.tbl tbody tr.sel td:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.tbl tbody tr.sel td:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.tbl tbody tr:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.who.big {
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.avatar.sm {
+  width: 30px;
+  height: 30px;
+  font-size: var(--text-tiny);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
+}
+
+.name {
+  font-weight: 800;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-tiny);
+  word-break: break-all;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+
+.pager-btns {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.pill {
+  flex: none;
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  background: var(--color-track);
+  color: var(--color-ink);
+  font-size: var(--text-tiny);
+  font-weight: 700;
+}
+
+.pill.danger {
+  margin-left: auto;
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.meta dt {
+  color: var(--color-muted);
+  font-size: var(--text-tiny);
+  font-weight: 700;
+}
+
+.meta dd {
+  margin: var(--space-text) 0 0;
+  font-size: var(--text-control-sm);
+  font-weight: 700;
+}
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.counts strong {
+  display: block;
+  margin-top: var(--space-text);
+  font-size: var(--text-section);
+  font-variant-numeric: tabular-nums;
+}
+
+.tasks ul {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+
+.tasks li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.tasks li:last-child {
+  border-bottom: 0;
+}
+
+.tasks li .name {
+  font-size: var(--text-control-sm);
+}
+
+.tasks li .num {
+  margin-left: auto;
+}
+
+.masked {
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  padding: var(--space-4);
+}
+
+.masked strong {
+  font-size: var(--text-control-sm);
+}
+
+.masked p {
+  margin: var(--space-2) 0 0;
+}
+</style>

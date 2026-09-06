@@ -58,12 +58,76 @@ export async function isPlatformAdmin(): Promise<boolean> {
   }
 }
 
+/** region 要跟函式一致，不然會打到 us-central1 然後找不到函式。 */
+function callable<Req, Res>(name: string) {
+  return httpsCallable<Req, Res>(getFunctions(app, "asia-east1"), name);
+}
+
 export async function fetchOverview(range: AdminRange): Promise<AdminOverview> {
-  // region 要跟函式一致，不然會打到 us-central1 然後找不到函式。
-  const call = httpsCallable<{ range: AdminRange }, AdminOverview>(
-    getFunctions(app, "asia-east1"),
-    "adminOverview"
-  );
-  const result = await call({ range });
+  const result = await callable<{ range: AdminRange }, AdminOverview>("adminOverview")({ range });
+  return result.data;
+}
+
+/* ------------------------------------------------------------------ 使用者 */
+
+export type UserFilter = "all" | "active7" | "idle30";
+
+export interface AdminUserRow {
+  uid: string;
+  nickname: string;
+  email: string;
+  provider: string;
+  createdAt: string | null;
+  lastSeenAt: string | null;
+  lastPlatform: string | null;
+}
+
+export interface AdminUsersResult {
+  rows: AdminUserRow[];
+  /** null 代表沒有下一頁了。 */
+  cursor: string | null;
+  /** 搜尋模式不分頁 —— 前綴比對本來就只會回一小把。 */
+  searched: boolean;
+  /** 篩選看不到誰。有值的時候要顯示出來。 */
+  blindSpot: string | null;
+}
+
+export interface AdminUserTask {
+  id: string;
+  name: string;
+  status: string;
+  role: "owner" | "admin" | "member";
+  memberCount: number;
+  expenseCount: number;
+  updatedAt: string | null;
+}
+
+export interface AdminUserDetail {
+  profile: AdminUserRow;
+  /** 來自 Firebase Auth，不是 Firestore。讀不到時是 null。 */
+  disabled: boolean | null;
+  lastSignInAt: string | null;
+  counts: { tasks: number; owned: number; expenses: number };
+  /** 只有前 10 個。 */
+  tasks: AdminUserTask[];
+}
+
+export async function fetchUsers(params: {
+  query?: string;
+  filter?: UserFilter;
+  cursor?: string | null;
+}): Promise<AdminUsersResult> {
+  const result = await callable<typeof params, AdminUsersResult>("adminUsers")(params);
+  return result.data;
+}
+
+/**
+ * 單一使用者的詳情。
+ *
+ * **這一支會在稽核日誌留下一筆。** 不是副作用是規格 —— 這個後台看得到全部
+ * 使用者的資料，所以「看了誰」跟「動了什麼」一樣該留痕。
+ */
+export async function fetchUser(uid: string): Promise<AdminUserDetail> {
+  const result = await callable<{ uid: string }, AdminUserDetail>("adminUser")({ uid });
   return result.data;
 }
