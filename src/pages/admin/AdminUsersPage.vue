@@ -67,7 +67,7 @@ function reset() {
   void loadList();
 }
 
-watch(filter, reset);
+watch(filter, reset, { immediate: true });
 
 function submitSearch() {
   submitted.value = search.value.trim();
@@ -131,8 +131,6 @@ async function confirmDisable(reason: string) {
     acting.value = false;
   }
 }
-
-loadList();
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "擁有者",

@@ -43,11 +43,14 @@ async function load() {
   }
 }
 
-watch(filter, () => {
+function reset() {
   trail.value = [null];
   page.value = 0;
   void load();
-});
+}
+
+// immediate: true —— 初次載入跟換篩選走同一個入口，不會有「忘了發車」的版本。
+watch(filter, reset, { immediate: true });
 
 function next() {
   const cursor = data.value?.cursor;
@@ -78,8 +81,6 @@ async function confirmRevoke(reason: string) {
     acting.value = false;
   }
 }
-
-load();
 
 const money = (amount: number, currency: string) =>
   `${currency} ${(amount / 100).toLocaleString("zh-TW", { maximumFractionDigits: 0 })}`;

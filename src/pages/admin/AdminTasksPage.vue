@@ -94,7 +94,13 @@ function reset() {
   void loadList();
 }
 
-watch(filter, reset);
+/*
+  `immediate: true` 讓初次載入跟換篩選走同一個入口。
+
+  分成「watch 換篩選」加「另外呼叫一次」的話，忘了後者就是畫面永遠停在
+  讀取中 —— 而那看起來像後端很慢，不像前端沒發車。這一頁就是這樣壞的。
+*/
+watch(filter, reset, { immediate: true });
 
 function submitSearch() {
   submitted.value = search.value.trim();

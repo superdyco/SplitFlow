@@ -43,11 +43,14 @@ async function load() {
   }
 }
 
-watch(filter, () => {
+function reset() {
   trail.value = [null];
   page.value = 0;
   void load();
-});
+}
+
+// immediate: true —— 初次載入跟換篩選走同一個入口，不會有「忘了發車」的版本。
+watch(filter, reset, { immediate: true });
 
 function next() {
   const cursor = data.value?.cursor;
@@ -62,8 +65,6 @@ function prev() {
   page.value -= 1;
   void load();
 }
-
-load();
 
 function when(value: string | null): string {
   if (!value) return "—";
