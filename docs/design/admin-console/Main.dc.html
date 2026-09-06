@@ -1,0 +1,315 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800;900&display=swap');
+:root{
+  --bg:#f2f0ec;--surface:#fbfaf8;--card:#ffffff;--ink:#1a1613;--muted:#6f665e;--soft:#8a8078;
+  --line:#ede7e0;--lineS:#e2dcd4;--pri:#e8590c;--priD:#c2410c;--priDeep:#9a3412;--priSoft:#fff0e4;
+  --b1:#e8590c;--b2:#f0a072;--b3:#f7d3bd;
+  --danger:#d63939;--dangerLine:#f3d2ce;--dangerSoft:#fff5f5;--dangerQuiet:#b8837c;
+  --ok:#0e9f6e;--okSoft:#e6f6ef;--track:#f0ebe4;
+  --rest:0 1px 2px rgba(26,22,19,.045);--pop:0 18px 44px -30px rgba(26,22,19,.5);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+  font-family:"Noto Sans TC",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px}
+a{color:var(--priD);text-decoration:none}
+a:hover{color:var(--priDeep)}
+.app{display:flex;min-height:1100px}
+
+/* ---- 左側導覽 ---- */
+.side{width:232px;flex:none;background:var(--surface);border-right:1px solid var(--line);
+  padding:24px 16px;display:flex;flex-direction:column;gap:24px}
+.mark{display:flex;align-items:center;gap:12px;padding:0 4px}
+.mark-sq{width:38px;height:38px;flex:none;border-radius:14px;background:var(--pri);color:#fff;
+  font-weight:900;font-size:17px;display:flex;align-items:center;justify-content:center}
+.mark-name{font-weight:900;line-height:1.2}
+.mark-sub{font-size:12px;font-weight:700;color:var(--muted);line-height:1.4}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:10px;
+  color:var(--muted);font-weight:700;font-size:14px}
+.nav-item svg{flex:none;color:var(--soft)}
+.nav-item.active{background:var(--card);color:var(--ink);box-shadow:var(--rest)}
+.nav-item.active svg{color:var(--priD)}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:10px}
+.ro{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;border-radius:999px;
+  padding:5px 10px;background:var(--track);color:var(--muted);font-size:12px;font-weight:700}
+.who{display:flex;align-items:center;gap:10px;padding:0 4px}
+.who-av{width:32px;height:32px;flex:none;border-radius:50%;background:var(--ink);color:#fff;
+  font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center}
+
+/* ---- 主區 ---- */
+.main{flex-grow:1;min-width:0;padding:32px;display:flex;flex-direction:column;gap:24px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.h1{margin:0;font-size:30px;font-weight:900;line-height:1.15}
+.tiny{margin:0;color:var(--muted);font-size:12px;line-height:1.7}
+.seg{display:inline-flex;flex:none;gap:4px;padding:4px;border-radius:14px;background:var(--track)}
+.seg-item{border:0;border-radius:10px;background:transparent;padding:6px 12px;color:var(--muted);
+  font-size:12px;font-weight:700;font-family:inherit}
+.seg-item.active{background:var(--card);color:var(--ink);box-shadow:var(--rest)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;
+  box-shadow:var(--rest)}
+.card.tight{padding:16px}
+.card-head{margin:0;font-size:17px;font-weight:800}
+.label{color:var(--muted);font-size:12px;font-weight:700}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.split{display:grid;grid-template-columns:720px minmax(0,1fr);gap:24px}
+.split-r{display:grid;grid-template-columns:minmax(0,1fr) 408px;gap:24px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---- 統計磚 ---- */
+.tile-v{margin:2px 0 0;font-size:34px;font-weight:900;line-height:1.1;font-variant-numeric:tabular-nums}
+.delta{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--ok)}
+.delta.flat{color:var(--muted)}
+
+/* ---- 表格 ---- */
+.tbl{width:100%;border-collapse:separate;border-spacing:0}
+.tbl th:first-child,.tbl td:first-child{padding-left:10px}
+.tbl th:last-child,.tbl td:last-child{padding-right:10px}
+/* 選中／需要注意的一列。整列一塊底色，兩端收圓角 —— 所以上面是 separate 不是
+   collapse：collapse 會讓 td 的圓角完全失效，底色就變成一個方角色塊。 */
+.tbl tr.sel td{background:var(--priSoft)}
+.tbl tr.warnrow td{background:var(--dangerSoft)}
+.tbl tr.sel td:first-child,.tbl tr.warnrow td:first-child{border-radius:10px 0 0 10px}
+.tbl tr.sel td:last-child,.tbl tr.warnrow td:last-child{border-radius:0 10px 10px 0}
+.tbl th{text-align:left;padding:0 12px 10px 0;border-bottom:1px solid var(--line);
+  font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
+.tbl td{padding:11px 12px 11px 0;border-bottom:1px solid var(--line);font-size:14px;font-weight:600;
+  vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .r{text-align:right;font-variant-numeric:tabular-nums}
+.av{width:30px;height:30px;flex:none;border-radius:50%;background:var(--priSoft);color:var(--priD);
+  font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center}
+.row{display:flex;align-items:center;gap:10px}
+.sub{color:var(--muted);font-size:12px;font-weight:600}
+
+/* ---- 標籤 ---- */
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 10px;
+  font-size:12px;font-weight:700;background:var(--track);color:var(--ink);white-space:nowrap}
+.pill.ok{background:var(--okSoft);color:var(--ok)}
+.pill.warn{background:var(--dangerSoft);color:var(--danger)}
+.pill.mute{background:var(--track);color:var(--muted)}
+
+/* ---- 按鈕 ---- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;
+  border-radius:14px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:0 16px;
+  font-size:14px;font-weight:700;font-family:inherit}
+.btn:hover{border-color:var(--lineS)}
+.btn-danger{border-color:var(--dangerLine);color:var(--danger)}
+.btn-danger:hover{background:var(--dangerSoft)}
+.btn-primary{border-color:var(--priD);background:var(--priD);color:#fff}
+.btn-sm{min-height:32px;padding:0 12px;font-size:13px;border-radius:10px}
+
+/* ---- 輸入 ---- */
+.input{width:100%;min-height:40px;border:1px solid var(--line);border-radius:14px;
+  background:var(--surface);color:var(--ink);padding:0 14px;font-weight:600;font-family:inherit;
+  font-size:14px}
+.input::placeholder{color:var(--soft);font-weight:600}
+
+/* ---- 隱私遮罩 ---- */
+.masked{border:1px dashed var(--lineS);border-radius:14px;background:var(--bg);padding:16px;
+  display:flex;gap:12px;align-items:flex-start}
+.masked svg{flex:none;color:var(--soft);margin-top:1px}
+
+/* ---- 佔比條 ---- */
+.bar{display:flex;gap:2px;height:12px;border-radius:999px;overflow:hidden;background:var(--track)}
+.bar > span{display:block;height:100%}
+  </style>
+</helmet>
+<div class="app">
+<aside class="side">
+  <div class="mark">
+    <div class="mark-sq">分</div>
+    <div>
+      <div class="mark-name">簡單分帳</div>
+      <div class="mark-sub">管理後台</div>
+    </div>
+  </div>
+  <nav class="nav">
+    <a class="nav-item active" data-nav="總覽" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="8" rx="1.5"></rect><rect x="14" y="3" width="7" height="5" rx="1.5"></rect><rect x="14" y="11" width="7" height="10" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect></svg>總覽</a>
+    <a class="nav-item" data-nav="使用者" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"></path><path d="M16 5.4A3.2 3.2 0 0 1 16 11"></path><path d="M18 14.8c2 .8 3 2.7 3 5.2"></path></svg>使用者</a>
+    <a class="nav-item" data-nav="任務" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2l2 2.4h7.8A2.5 2.5 0 0 1 21 9.9v7.6A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"></path></svg>任務</a>
+    <a class="nav-item" data-nav="公開報告" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.4 2.6 3.6 5.6 3.6 9s-1.2 6.4-3.6 9c-2.4-2.6-3.6-5.6-3.6-9S9.6 5.6 12 3z"></path></svg>公開報告</a>
+    <a class="nav-item" data-nav="系統健康" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12.5h3.8l2-5.5 3.2 11 2.4-7 1.6 3h4.5"></path></svg>系統健康</a>
+    <a class="nav-item" data-nav="稽核日誌" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"></path><path d="M14 3v5h5"></path><path d="M9 13h6"></path><path d="M9 17h4"></path></svg>稽核日誌</a>
+  </nav>
+  <div class="side-foot">
+    <span class="ro"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>唯讀模式</span>
+    <div class="who">
+      <div class="who-av">D</div>
+      <div>
+        <div style="font-weight:800;font-size:13px">dyco</div>
+        <div class="sub" style="font-size:11px">平台管理者</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="head">
+    <div>
+      <h1 class="h1">總覽</h1>
+      <p class="tiny" style="margin-top:4px">2026-08-07 至 2026-09-05 · 讀每日彙總，不掃全表</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div class="seg">
+        <button class="seg-item">7 天</button>
+        <button class="seg-item active">30 天</button>
+        <button class="seg-item">90 天</button>
+      </div>
+      <p class="tiny">最後彙總 09-06 04:02</p>
+    </div>
+  </div>
+
+  <div class="grid4">
+    <div class="card tight">
+      <div class="label">使用者總數</div>
+      <div class="tile-v">1,284</div>
+      <div class="delta" style="margin-top:4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"></path><path d="M6 11l6-6 6 6"></path></svg>本週 +38</div>
+    </div>
+    <div class="card tight">
+      <div class="label">進行中任務</div>
+      <div class="tile-v">216</div>
+      <div class="delta" style="margin-top:4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"></path><path d="M6 11l6-6 6 6"></path></svg>本週 +12 · 另有 431 已封存</div>
+    </div>
+    <div class="card tight">
+      <div class="label">本週活躍使用者</div>
+      <div class="tile-v">402</div>
+      <div class="delta flat" style="margin-top:4px">佔全部使用者 31%</div>
+    </div>
+    <div class="card tight">
+      <div class="label">累計支出筆數</div>
+      <div class="tile-v">47,930</div>
+      <div class="delta" style="margin-top:4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"></path><path d="M6 11l6-6 6 6"></path></svg>本週 +1,842</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="card">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+        <h2 class="card-head">每日活躍使用者</h2>
+        <p class="tiny">當天有開啟任何任務的帳號數</p>
+      </div>
+      <svg width="672" height="216" viewBox="0 0 672 216" role="img" aria-label="每日活躍使用者近 30 天折線圖，由 118 上升至 186" style="margin-top:12px;display:block">
+        <g transform="translate(36,10)">
+          <line x1="0" y1="0" x2="630" y2="0" stroke="#ede7e0" stroke-width="1"></line>
+          <line x1="0" y1="45" x2="630" y2="45" stroke="#ede7e0" stroke-width="1"></line>
+          <line x1="0" y1="90" x2="630" y2="90" stroke="#ede7e0" stroke-width="1"></line>
+          <line x1="0" y1="135" x2="630" y2="135" stroke="#ede7e0" stroke-width="1"></line>
+          <line x1="0" y1="180" x2="630" y2="180" stroke="#e2dcd4" stroke-width="1"></line>
+          <text x="-8" y="4" text-anchor="end" font-size="11" font-weight="700" fill="#6f665e">200</text>
+          <text x="-8" y="94" text-anchor="end" font-size="11" font-weight="700" fill="#6f665e">100</text>
+          <text x="-8" y="184" text-anchor="end" font-size="11" font-weight="700" fill="#6f665e">0</text>
+          <path d="M0,180 L0,73.8 L21.7,68.4 L43.4,62.1 L65.2,65.7 L86.9,52.2 L108.6,40.5 L130.3,45.9 L152.1,55.8 L173.8,49.5 L195.5,44.1 L217.2,47.7 L239,34.2 L260.7,26.1 L282.4,30.6 L304.1,43.2 L325.9,37.8 L347.6,32.4 L369.3,36.9 L391,24.3 L412.8,17.1 L434.5,21.6 L456.2,33.3 L477.9,27.9 L499.7,22.5 L521.4,25.2 L543.1,14.4 L564.8,6.3 L586.6,10.8 L608.3,20.7 L630,12.6 L630,180 Z" fill="#e8590c" fill-opacity="0.1"></path>
+          <polyline points="0,73.8 21.7,68.4 43.4,62.1 65.2,65.7 86.9,52.2 108.6,40.5 130.3,45.9 152.1,55.8 173.8,49.5 195.5,44.1 217.2,47.7 239,34.2 260.7,26.1 282.4,30.6 304.1,43.2 325.9,37.8 347.6,32.4 369.3,36.9 391,24.3 412.8,17.1 434.5,21.6 456.2,33.3 477.9,27.9 499.7,22.5 521.4,25.2 543.1,14.4 564.8,6.3 586.6,10.8 608.3,20.7 630,12.6" fill="none" stroke="#c2410c" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+          <circle cx="630" cy="12.6" r="4.5" fill="#c2410c" stroke="#ffffff" stroke-width="2"></circle>
+          <text x="620" y="8" text-anchor="end" font-size="12" font-weight="800" fill="#1a1613">186</text>
+          <text x="0" y="200" font-size="11" font-weight="700" fill="#6f665e">08-07</text>
+          <text x="152.1" y="200" text-anchor="middle" font-size="11" font-weight="700" fill="#6f665e">08-14</text>
+          <text x="304.1" y="200" text-anchor="middle" font-size="11" font-weight="700" fill="#6f665e">08-21</text>
+          <text x="456.2" y="200" text-anchor="middle" font-size="11" font-weight="700" fill="#6f665e">08-28</text>
+          <text x="630" y="200" text-anchor="end" font-size="11" font-weight="700" fill="#6f665e">09-05</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column;gap:20px">
+      <div>
+        <h2 class="card-head">使用裝置</h2>
+        <p class="tiny" style="margin-top:2px">本週活躍使用者的最後一次登入</p>
+        <div class="bar" style="margin-top:14px">
+          <span style="width:57%;background:#e8590c"></span>
+          <span style="width:38%;background:#f0a072"></span>
+          <span style="width:5%;background:#f7d3bd"></span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="width:10px;height:10px;flex:none;border-radius:3px;background:#e8590c"></span>
+            <span style="font-weight:700;font-size:13px">網頁版</span>
+            <span class="num" style="margin-left:auto;font-weight:800;font-size:13px">229</span>
+            <span class="sub num" style="width:38px;text-align:right">57%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="width:10px;height:10px;flex:none;border-radius:3px;background:#f0a072"></span>
+            <span style="font-weight:700;font-size:13px">Android App</span>
+            <span class="num" style="margin-left:auto;font-weight:800;font-size:13px">152</span>
+            <span class="sub num" style="width:38px;text-align:right">38%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="width:10px;height:10px;flex:none;border-radius:3px;background:#f7d3bd"></span>
+            <span style="font-weight:700;font-size:13px">兩者都用</span>
+            <span class="num" style="margin-left:auto;font-weight:800;font-size:13px">21</span>
+            <span class="sub num" style="width:38px;text-align:right">5%</span>
+          </div>
+        </div>
+      </div>
+      <div style="border-top:1px solid #ede7e0;padding-top:18px">
+        <h2 class="card-head">建立任務後有真的在用</h2>
+        <p class="tiny" style="margin-top:2px">建立任務後 7 天內記了 3 筆以上支出</p>
+        <div style="display:flex;align-items:baseline;gap:10px;margin-top:10px">
+          <span class="num" style="font-size:34px;font-weight:900;line-height:1.1">64%</span>
+          <span class="sub">上月 61%</span>
+        </div>
+        <p class="tiny" style="margin-top:6px">本月新建的 78 個任務中有 50 個</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="card">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px">
+        <h2 class="card-head">最活躍的任務</h2>
+        <a href="#" style="font-size:13px;font-weight:700">看全部任務</a>
+      </div>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>任務</th><th>擁有者</th><th class="r">成員</th><th class="r">支出</th>
+            <th class="r">總額</th><th class="r">最後活動</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="font-weight:800">曼谷五日</td><td class="sub">Kim</td><td class="r">6</td><td class="r">184</td><td class="r num">TWD 96,420</td><td class="r sub">3 分鐘前</td></tr>
+          <tr><td style="font-weight:800">東京跨年</td><td class="sub">Ariel</td><td class="r">8</td><td class="r">151</td><td class="r num">JPY 412,300</td><td class="r sub">1 小時前</td></tr>
+          <tr><td style="font-weight:800">大安合租</td><td class="sub">阿哲</td><td class="r">4</td><td class="r">143</td><td class="r num">TWD 58,900</td><td class="r sub">2 小時前</td></tr>
+          <tr><td style="font-weight:800">越南自駕</td><td class="sub">Sunny</td><td class="r">5</td><td class="r">128</td><td class="r num">VND 18,240,000</td><td class="r sub">今天 09:12</td></tr>
+          <tr><td style="font-weight:800">週五桌遊團</td><td class="sub">Nate</td><td class="r">7</td><td class="r">96</td><td class="r num">TWD 12,480</td><td class="r sub">昨天</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2 class="card-head">需要看一下</h2>
+      <div style="display:flex;flex-direction:column;gap:0;margin-top:12px">
+        <a href="#" style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #ede7e0;color:inherit">
+          <span class="pill warn">3</span>
+          <span style="font-weight:700;font-size:14px">被檢舉的公開報告</span>
+          <svg style="margin-left:auto;color:#8a8078" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
+        </a>
+        <a href="#" style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #ede7e0;color:inherit">
+          <span class="pill">12</span>
+          <span style="font-weight:700;font-size:14px">收據連續上傳失敗的帳號</span>
+          <svg style="margin-left:auto;color:#8a8078" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
+        </a>
+        <a href="#" style="display:flex;align-items:center;gap:12px;padding:12px 0;color:inherit">
+          <span class="pill">5</span>
+          <span style="font-weight:700;font-size:14px">單日建立超過 20 個任務的帳號</span>
+          <svg style="margin-left:auto;color:#8a8078" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
+        </a>
+      </div>
+      <p class="tiny" style="margin-top:14px">這三條是規則挑出來的，不是判定。<br />要不要處置由你決定。</p>
+    </div>
+  </div>
+</main>
+</div>
+</x-dc>
+</body>
+</html>

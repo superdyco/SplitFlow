@@ -1,0 +1,197 @@
+<main class="main">
+  <div class="head">
+    <div>
+      <h1 class="h1">使用者</h1>
+      <p class="tiny" style="margin-top:4px">共 1,284 人 · 近 7 日活躍 402 人</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="position:relative">
+        <svg style="position:absolute;left:14px;top:12px;color:#8a8078" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <input class="input" style="width:280px;padding-left:38px" placeholder="搜尋暱稱、Email 或 UID" />
+      </div>
+      <div class="seg">
+        <button class="seg-item active">全部</button>
+        <button class="seg-item">近 7 日活躍</button>
+        <button class="seg-item">未建立任務</button>
+        <button class="seg-item">已停用</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="split-r">
+    <div class="card">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>使用者</th><th>登入方式</th><th class="r">任務</th><th class="r">支出</th><th class="r">最後活動</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="sel">
+            <td>
+              <div class="row">
+                <div class="av">K</div>
+                <div>
+                  <div style="font-weight:800">Kim</div>
+                  <div class="sub">kim@example.com</div>
+                </div>
+              </div>
+            </td>
+            <td class="sub">Google</td><td class="r">6</td><td class="r">312</td>
+            <td class="r sub">3 分鐘前</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="row">
+                <div class="av">A</div>
+                <div>
+                  <div style="font-weight:800">Ariel</div>
+                  <div class="sub">ariel.h@example.com</div>
+                </div>
+              </div>
+            </td>
+            <td class="sub">Google</td><td class="r">4</td><td class="r">208</td><td class="r sub">1 小時前</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="row">
+                <div class="av">哲</div>
+                <div>
+                  <div style="font-weight:800">阿哲</div>
+                  <div class="sub">che.wang@example.com</div>
+                </div>
+              </div>
+            </td>
+            <td class="sub">Email</td><td class="r">3</td><td class="r">176</td><td class="r sub">2 小時前</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="row">
+                <div class="av">S</div>
+                <div>
+                  <div style="font-weight:800">Sunny</div>
+                  <div class="sub">sunny@example.com</div>
+                </div>
+              </div>
+            </td>
+            <td class="sub">Apple</td><td class="r">5</td><td class="r">143</td><td class="r sub">今天 09:12</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="row">
+                <div class="av">N</div>
+                <div>
+                  <div style="font-weight:800">Nate</div>
+                  <div class="sub">nate.lin@example.com</div>
+                </div>
+              </div>
+            </td>
+            <td class="sub">Google</td><td class="r">2</td><td class="r">96</td><td class="r sub">昨天</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="row">
+                <div class="av" style="background:#f0ebe4;color:#8a8078">媽</div>
+                <div>
+                  <div style="font-weight:800;color:#6f665e">陳媽媽</div>
+                  <div class="sub">虛擬成員 · 沒有帳號</div>
+                </div>
+              </div>
+            </td>
+            <td class="sub">—</td><td class="r">1</td><td class="r">0</td><td class="r sub">—</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="row">
+                <div class="av">J</div>
+                <div>
+                  <div style="font-weight:800">Jamie</div>
+                  <div class="sub">jamie.t@example.com</div>
+                </div>
+              </div>
+            </td>
+            <td class="sub">Email</td><td class="r">0</td><td class="r">0</td><td class="r sub">08-21</td>
+          </tr>
+          <tr>
+            <td>
+              <div class="row">
+                <div class="av" style="background:#fff5f5;color:#b8837c">W</div>
+                <div>
+                  <div style="font-weight:800;color:#6f665e">winnerbot</div>
+                  <div class="sub">bulk-signup-04@example.com</div>
+                </div>
+              </div>
+            </td>
+            <td class="sub">Email</td><td class="r">37</td><td class="r">0</td>
+            <td class="r"><span class="pill warn">已停用</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #ede7e0">
+        <p class="tiny">顯示 1–8，共 1,284 人</p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" disabled style="color:#8a8078">上一頁</button>
+          <button class="btn btn-sm">下一頁</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column;gap:20px;align-self:flex-start">
+      <div class="row" style="gap:14px">
+        <div class="av" style="width:48px;height:48px;font-size:19px">K</div>
+        <div style="min-width:0">
+          <div style="font-size:20px;font-weight:900;line-height:1.2">Kim</div>
+          <div class="sub">kim@example.com</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+        <div><div class="label">UID</div><div style="font-weight:700;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:2px">7Qb2…kD9x</div></div>
+        <div><div class="label">登入方式</div><div style="font-weight:700;font-size:13px;margin-top:2px">Google</div></div>
+        <div><div class="label">註冊日</div><div style="font-weight:700;font-size:13px;margin-top:2px">2025-11-03</div></div>
+        <div><div class="label">最後活動</div><div style="font-weight:700;font-size:13px;margin-top:2px">今天 14:38 · 網頁版</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:16px 0;border-top:1px solid #ede7e0;border-bottom:1px solid #ede7e0">
+        <div><div class="label">參與任務</div><div class="num" style="font-size:20px;font-weight:900;margin-top:2px">6</div></div>
+        <div><div class="label">其中他建立</div><div class="num" style="font-size:20px;font-weight:900;margin-top:2px">2</div></div>
+        <div><div class="label">記過的支出</div><div class="num" style="font-size:20px;font-weight:900;margin-top:2px">312</div></div>
+      </div>
+
+      <div>
+        <h3 class="card-head" style="font-size:14px">參與的任務</h3>
+        <div style="display:flex;flex-direction:column;margin-top:8px">
+          <a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #ede7e0;color:inherit">
+            <span style="font-weight:700;font-size:13px">曼谷五日</span>
+            <span class="pill mute" style="font-size:11px;padding:3px 8px">擁有者</span>
+            <span class="sub num" style="margin-left:auto">184 筆</span>
+          </a>
+          <a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #ede7e0;color:inherit">
+            <span style="font-weight:700;font-size:13px">東京跨年</span>
+            <span class="pill mute" style="font-size:11px;padding:3px 8px">管理員</span>
+            <span class="sub num" style="margin-left:auto">62 筆</span>
+          </a>
+          <a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 0;color:inherit">
+            <span style="font-weight:700;font-size:13px">大安合租</span>
+            <span class="pill mute" style="font-size:11px;padding:3px 8px">成員</span>
+            <span class="sub num" style="margin-left:auto">41 筆</span>
+          </a>
+        </div>
+        <a href="#" style="display:inline-block;margin-top:10px;font-size:13px;font-weight:700">看其餘 3 個任務</a>
+      </div>
+
+      <div class="masked">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"></path><path d="M4 4l16 16"></path></svg>
+        <div>
+          <div style="font-weight:800;font-size:13px">看不到的部分</div>
+          <p class="tiny" style="margin-top:4px">支出的名稱、地點、備註與收據照片不對管理者開放，這裡只到「筆數」為止。要看內容得由任務擁有者自己匯出。</p>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #ede7e0;padding-top:16px">
+        <button class="btn btn-danger">停用這個帳號</button>
+        <p class="tiny" style="margin-top:8px">停用只擋住登入，不刪資料，他已記的支出與分攤都留在任務裡。<span style="color:#d63939;font-weight:700">最長 1 小時後才會真的擋住</span> —— 按下去會再說明一次。會寫進稽核日誌。</p>
+      </div>
+    </div>
+  </div>
+</main>

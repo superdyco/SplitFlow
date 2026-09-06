@@ -1,0 +1,174 @@
+<main class="main">
+  <div class="head">
+    <div>
+      <h1 class="h1">任務</h1>
+      <p class="tiny" style="margin-top:4px">進行中 216 · 已封存 431 · 已刪除 58</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="position:relative">
+        <svg style="position:absolute;left:14px;top:12px;color:#8a8078" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <input class="input" style="width:240px;padding-left:38px" placeholder="搜尋任務名稱或 ID" />
+      </div>
+      <div class="seg">
+        <button class="seg-item active">進行中</button>
+        <button class="seg-item">已封存</button>
+        <button class="seg-item">已刪除</button>
+        <button class="seg-item">全部</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="split-r">
+    <div class="card">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>任務</th><th>擁有者</th><th class="r">成員</th><th class="r">支出</th><th class="r">總額</th><th class="r">最後活動</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="sel">
+            <td>
+              <div style="font-weight:800">曼谷五日</div>
+              <div class="sub">2026-08-14 – 08-19</div>
+            </td>
+            <td class="sub">Kim</td><td class="r">6</td><td class="r">184</td>
+            <td class="r num">TWD 96,420</td>
+            <td class="r sub">3 分鐘前</td>
+          </tr>
+          <tr>
+            <td>
+              <div style="font-weight:800">東京跨年</div>
+              <div class="sub">2025-12-28 – 2026-01-03</div>
+            </td>
+            <td class="sub">Ariel</td><td class="r">8</td><td class="r">151</td>
+            <td class="r num">JPY 412,300</td><td class="r sub">1 小時前</td>
+          </tr>
+          <tr>
+            <td>
+              <div style="font-weight:800">大安合租</div>
+              <div class="sub">未設定期間</div>
+            </td>
+            <td class="sub">阿哲</td><td class="r">4</td><td class="r">143</td>
+            <td class="r num">TWD 58,900</td><td class="r sub">2 小時前</td>
+          </tr>
+          <tr>
+            <td>
+              <div style="font-weight:800">越南自駕</div>
+              <div class="sub">2026-09-02 – 09-11</div>
+            </td>
+            <td class="sub">Sunny</td><td class="r">5</td><td class="r">128</td>
+            <td class="r num">VND 18,240,000</td><td class="r sub">今天 09:12</td>
+          </tr>
+          <tr>
+            <td>
+              <div style="font-weight:800">週五桌遊團</div>
+              <div class="sub">未設定期間</div>
+            </td>
+            <td class="sub">Nate</td><td class="r">7</td><td class="r">96</td>
+            <td class="r num">TWD 12,480</td><td class="r sub">昨天</td>
+          </tr>
+          <tr>
+            <td>
+              <div style="font-weight:800;color:#6f665e">墾丁三日</div>
+              <div class="sub">2026-06-20 – 06-22 · 已封存</div>
+            </td>
+            <td class="sub">Jamie</td><td class="r">4</td><td class="r">71</td>
+            <td class="r num">TWD 31,050</td><td class="r sub">06-24</td>
+          </tr>
+          <tr>
+            <td>
+              <div style="font-weight:800;color:#6f665e">未命名任務</div>
+              <div class="sub">建立後 30 天沒有任何支出</div>
+            </td>
+            <td class="sub">winnerbot</td><td class="r">1</td><td class="r">0</td>
+            <td class="r sub">—</td><td class="r sub">08-04</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #ede7e0">
+        <p class="tiny">顯示 1–7，共 216 個進行中任務</p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" disabled style="color:#8a8078">上一頁</button>
+          <button class="btn btn-sm">下一頁</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column;gap:20px;align-self:flex-start">
+      <div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div style="font-size:20px;font-weight:900;line-height:1.2">曼谷五日</div>
+          <span class="pill ok">進行中</span>
+        </div>
+        <p class="tiny" style="margin-top:4px">Kim 建立於 2026-08-09 · 2026-08-14 – 08-19</p>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:16px 0;border-top:1px solid #ede7e0;border-bottom:1px solid #ede7e0">
+        <div><div class="label">支出筆數</div><div class="num" style="font-size:20px;font-weight:900;margin-top:2px">184</div></div>
+        <div><div class="label">總額（主要幣別）</div><div class="num" style="font-size:20px;font-weight:900;margin-top:2px">TWD 96,420</div></div>
+        <div><div class="label">每人平均分攤</div><div class="num" style="font-size:20px;font-weight:900;margin-top:2px">TWD 16,070</div></div>
+        <div><div class="label">用到的幣別</div><div style="font-size:20px;font-weight:900;margin-top:2px">THB · TWD</div></div>
+      </div>
+
+      <div>
+        <h3 class="card-head" style="font-size:14px">花在哪裡</h3>
+        <div class="bar" style="margin-top:12px">
+          <span style="width:41%;background:#e8590c"></span>
+          <span style="width:27%;background:#f0a072"></span>
+          <span style="width:19%;background:#f7d3bd"></span>
+          <span style="width:13%;background:#e2dcd4"></span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px">
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:#e8590c"></span>餐飲 41%</span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:#f0a072"></span>住宿 27%</span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:#f7d3bd"></span>交通 19%</span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:#e2dcd4"></span>其他 13%</span>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #ede7e0;padding-top:16px">
+        <h3 class="card-head" style="font-size:14px">成員 6 人</h3>
+        <div style="display:flex;flex-direction:column;margin-top:8px">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #ede7e0">
+            <div class="av" style="width:26px;height:26px;font-size:12px">K</div>
+            <span style="font-weight:700;font-size:13px">Kim</span>
+            <span class="pill mute" style="font-size:11px;padding:3px 8px">擁有者</span>
+            <span class="sub num" style="margin-left:auto">記了 84 筆</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #ede7e0">
+            <div class="av" style="width:26px;height:26px;font-size:12px">A</div>
+            <span style="font-weight:700;font-size:13px">Ariel</span>
+            <span class="pill mute" style="font-size:11px;padding:3px 8px">管理員</span>
+            <span class="sub num" style="margin-left:auto">記了 52 筆</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #ede7e0">
+            <div class="av" style="width:26px;height:26px;font-size:12px">S</div>
+            <span style="font-weight:700;font-size:13px">Sunny</span>
+            <span class="sub num" style="margin-left:auto">記了 31 筆</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 0">
+            <div class="av" style="width:26px;height:26px;font-size:12px;background:#f0ebe4;color:#8a8078">媽</div>
+            <span style="font-weight:700;font-size:13px;color:#6f665e">陳媽媽</span>
+            <span class="pill mute" style="font-size:11px;padding:3px 8px">虛擬成員</span>
+            <span class="sub num" style="margin-left:auto">記了 0 筆</span>
+          </div>
+        </div>
+        <a href="#" style="display:inline-block;margin-top:10px;font-size:13px;font-weight:700">看其餘 2 位</a>
+      </div>
+
+      <div class="masked">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"></path><path d="M4 4l16 16"></path></svg>
+        <div>
+          <div style="font-weight:800;font-size:13px">184 筆支出的內容不開放</div>
+          <p class="tiny" style="margin-top:4px">上面的金額是後端算好的加總。單筆支出的名稱、地點、備註，以及這個任務裡的 63 張收據照片，管理後台一律讀不到。</p>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #ede7e0;padding-top:16px">
+        <button class="btn btn-danger">強制封存這個任務</button>
+        <p class="tiny" style="margin-top:8px">封存後成員仍查得到帳，但不能再新增或修改。擁有者可以自己解除。會寫進稽核日誌。</p>
+      </div>
+    </div>
+  </div>
+</main>

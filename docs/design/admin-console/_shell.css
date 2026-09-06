@@ -1,0 +1,114 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800;900&display=swap');
+:root{
+  --bg:#f2f0ec;--surface:#fbfaf8;--card:#ffffff;--ink:#1a1613;--muted:#6f665e;--soft:#8a8078;
+  --line:#ede7e0;--lineS:#e2dcd4;--pri:#e8590c;--priD:#c2410c;--priDeep:#9a3412;--priSoft:#fff0e4;
+  --b1:#e8590c;--b2:#f0a072;--b3:#f7d3bd;
+  --danger:#d63939;--dangerLine:#f3d2ce;--dangerSoft:#fff5f5;--dangerQuiet:#b8837c;
+  --ok:#0e9f6e;--okSoft:#e6f6ef;--track:#f0ebe4;
+  --rest:0 1px 2px rgba(26,22,19,.045);--pop:0 18px 44px -30px rgba(26,22,19,.5);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+  font-family:"Noto Sans TC",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px}
+a{color:var(--priD);text-decoration:none}
+a:hover{color:var(--priDeep)}
+.app{display:flex;min-height:1100px}
+
+/* ---- 左側導覽 ---- */
+.side{width:232px;flex:none;background:var(--surface);border-right:1px solid var(--line);
+  padding:24px 16px;display:flex;flex-direction:column;gap:24px}
+.mark{display:flex;align-items:center;gap:12px;padding:0 4px}
+.mark-sq{width:38px;height:38px;flex:none;border-radius:14px;background:var(--pri);color:#fff;
+  font-weight:900;font-size:17px;display:flex;align-items:center;justify-content:center}
+.mark-name{font-weight:900;line-height:1.2}
+.mark-sub{font-size:12px;font-weight:700;color:var(--muted);line-height:1.4}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:10px;
+  color:var(--muted);font-weight:700;font-size:14px}
+.nav-item svg{flex:none;color:var(--soft)}
+.nav-item.active{background:var(--card);color:var(--ink);box-shadow:var(--rest)}
+.nav-item.active svg{color:var(--priD)}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:10px}
+.ro{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;border-radius:999px;
+  padding:5px 10px;background:var(--track);color:var(--muted);font-size:12px;font-weight:700}
+.who{display:flex;align-items:center;gap:10px;padding:0 4px}
+.who-av{width:32px;height:32px;flex:none;border-radius:50%;background:var(--ink);color:#fff;
+  font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center}
+
+/* ---- 主區 ---- */
+.main{flex-grow:1;min-width:0;padding:32px;display:flex;flex-direction:column;gap:24px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.h1{margin:0;font-size:30px;font-weight:900;line-height:1.15}
+.tiny{margin:0;color:var(--muted);font-size:12px;line-height:1.7}
+.seg{display:inline-flex;flex:none;gap:4px;padding:4px;border-radius:14px;background:var(--track)}
+.seg-item{border:0;border-radius:10px;background:transparent;padding:6px 12px;color:var(--muted);
+  font-size:12px;font-weight:700;font-family:inherit}
+.seg-item.active{background:var(--card);color:var(--ink);box-shadow:var(--rest)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;
+  box-shadow:var(--rest)}
+.card.tight{padding:16px}
+.card-head{margin:0;font-size:17px;font-weight:800}
+.label{color:var(--muted);font-size:12px;font-weight:700}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.split{display:grid;grid-template-columns:720px minmax(0,1fr);gap:24px}
+.split-r{display:grid;grid-template-columns:minmax(0,1fr) 408px;gap:24px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---- 統計磚 ---- */
+.tile-v{margin:2px 0 0;font-size:34px;font-weight:900;line-height:1.1;font-variant-numeric:tabular-nums}
+.delta{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--ok)}
+.delta.flat{color:var(--muted)}
+
+/* ---- 表格 ---- */
+.tbl{width:100%;border-collapse:separate;border-spacing:0}
+.tbl th:first-child,.tbl td:first-child{padding-left:10px}
+.tbl th:last-child,.tbl td:last-child{padding-right:10px}
+/* 選中／需要注意的一列。整列一塊底色，兩端收圓角 —— 所以上面是 separate 不是
+   collapse：collapse 會讓 td 的圓角完全失效，底色就變成一個方角色塊。 */
+.tbl tr.sel td{background:var(--priSoft)}
+.tbl tr.warnrow td{background:var(--dangerSoft)}
+.tbl tr.sel td:first-child,.tbl tr.warnrow td:first-child{border-radius:10px 0 0 10px}
+.tbl tr.sel td:last-child,.tbl tr.warnrow td:last-child{border-radius:0 10px 10px 0}
+.tbl th{text-align:left;padding:0 12px 10px 0;border-bottom:1px solid var(--line);
+  font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
+.tbl td{padding:11px 12px 11px 0;border-bottom:1px solid var(--line);font-size:14px;font-weight:600;
+  vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .r{text-align:right;font-variant-numeric:tabular-nums}
+.av{width:30px;height:30px;flex:none;border-radius:50%;background:var(--priSoft);color:var(--priD);
+  font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center}
+.row{display:flex;align-items:center;gap:10px}
+.sub{color:var(--muted);font-size:12px;font-weight:600}
+
+/* ---- 標籤 ---- */
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 10px;
+  font-size:12px;font-weight:700;background:var(--track);color:var(--ink);white-space:nowrap}
+.pill.ok{background:var(--okSoft);color:var(--ok)}
+.pill.warn{background:var(--dangerSoft);color:var(--danger)}
+.pill.mute{background:var(--track);color:var(--muted)}
+
+/* ---- 按鈕 ---- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;
+  border-radius:14px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:0 16px;
+  font-size:14px;font-weight:700;font-family:inherit}
+.btn:hover{border-color:var(--lineS)}
+.btn-danger{border-color:var(--dangerLine);color:var(--danger)}
+.btn-danger:hover{background:var(--dangerSoft)}
+.btn-primary{border-color:var(--priD);background:var(--priD);color:#fff}
+.btn-sm{min-height:32px;padding:0 12px;font-size:13px;border-radius:10px}
+
+/* ---- 輸入 ---- */
+.input{width:100%;min-height:40px;border:1px solid var(--line);border-radius:14px;
+  background:var(--surface);color:var(--ink);padding:0 14px;font-weight:600;font-family:inherit;
+  font-size:14px}
+.input::placeholder{color:var(--soft);font-weight:600}
+
+/* ---- 隱私遮罩 ---- */
+.masked{border:1px dashed var(--lineS);border-radius:14px;background:var(--bg);padding:16px;
+  display:flex;gap:12px;align-items:flex-start}
+.masked svg{flex:none;color:var(--soft);margin-top:1px}
+
+/* ---- 佔比條 ---- */
+.bar{display:flex;gap:2px;height:12px;border-radius:999px;overflow:hidden;background:var(--track)}
+.bar > span{display:block;height:100%}

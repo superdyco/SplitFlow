@@ -12,7 +12,8 @@
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-splitflow \"node tests/firestore.rules.test.mjs && node tests/storage.rules.test.mjs\"",
     "deploy": "npm run build && firebase deploy --only hosting,firestore:rules,firestore:indexes,storage",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
-    "deploy:functions": "firebase deploy --only functions"
+    "deploy:functions": "firebase deploy --only functions",
+    "set-admin": "node scripts/set-admin.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "^5.2.4",

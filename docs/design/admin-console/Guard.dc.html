@@ -1,0 +1,245 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800;900&display=swap');
+:root{
+  --bg:#f2f0ec;--surface:#fbfaf8;--card:#ffffff;--ink:#1a1613;--muted:#6f665e;--soft:#8a8078;
+  --line:#ede7e0;--lineS:#e2dcd4;--pri:#e8590c;--priD:#c2410c;--priDeep:#9a3412;--priSoft:#fff0e4;
+  --b1:#e8590c;--b2:#f0a072;--b3:#f7d3bd;
+  --danger:#d63939;--dangerLine:#f3d2ce;--dangerSoft:#fff5f5;--dangerQuiet:#b8837c;
+  --ok:#0e9f6e;--okSoft:#e6f6ef;--track:#f0ebe4;
+  --rest:0 1px 2px rgba(26,22,19,.045);--pop:0 18px 44px -30px rgba(26,22,19,.5);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+  font-family:"Noto Sans TC",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px}
+a{color:var(--priD);text-decoration:none}
+a:hover{color:var(--priDeep)}
+.app{display:flex;min-height:1100px}
+
+/* ---- 左側導覽 ---- */
+.side{width:232px;flex:none;background:var(--surface);border-right:1px solid var(--line);
+  padding:24px 16px;display:flex;flex-direction:column;gap:24px}
+.mark{display:flex;align-items:center;gap:12px;padding:0 4px}
+.mark-sq{width:38px;height:38px;flex:none;border-radius:14px;background:var(--pri);color:#fff;
+  font-weight:900;font-size:17px;display:flex;align-items:center;justify-content:center}
+.mark-name{font-weight:900;line-height:1.2}
+.mark-sub{font-size:12px;font-weight:700;color:var(--muted);line-height:1.4}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:10px;
+  color:var(--muted);font-weight:700;font-size:14px}
+.nav-item svg{flex:none;color:var(--soft)}
+.nav-item.active{background:var(--card);color:var(--ink);box-shadow:var(--rest)}
+.nav-item.active svg{color:var(--priD)}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:10px}
+.ro{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;border-radius:999px;
+  padding:5px 10px;background:var(--track);color:var(--muted);font-size:12px;font-weight:700}
+.who{display:flex;align-items:center;gap:10px;padding:0 4px}
+.who-av{width:32px;height:32px;flex:none;border-radius:50%;background:var(--ink);color:#fff;
+  font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center}
+
+/* ---- 主區 ---- */
+.main{flex-grow:1;min-width:0;padding:32px;display:flex;flex-direction:column;gap:24px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.h1{margin:0;font-size:30px;font-weight:900;line-height:1.15}
+.tiny{margin:0;color:var(--muted);font-size:12px;line-height:1.7}
+.seg{display:inline-flex;flex:none;gap:4px;padding:4px;border-radius:14px;background:var(--track)}
+.seg-item{border:0;border-radius:10px;background:transparent;padding:6px 12px;color:var(--muted);
+  font-size:12px;font-weight:700;font-family:inherit}
+.seg-item.active{background:var(--card);color:var(--ink);box-shadow:var(--rest)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;
+  box-shadow:var(--rest)}
+.card.tight{padding:16px}
+.card-head{margin:0;font-size:17px;font-weight:800}
+.label{color:var(--muted);font-size:12px;font-weight:700}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.split{display:grid;grid-template-columns:720px minmax(0,1fr);gap:24px}
+.split-r{display:grid;grid-template-columns:minmax(0,1fr) 408px;gap:24px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---- 統計磚 ---- */
+.tile-v{margin:2px 0 0;font-size:34px;font-weight:900;line-height:1.1;font-variant-numeric:tabular-nums}
+.delta{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--ok)}
+.delta.flat{color:var(--muted)}
+
+/* ---- 表格 ---- */
+.tbl{width:100%;border-collapse:separate;border-spacing:0}
+.tbl th:first-child,.tbl td:first-child{padding-left:10px}
+.tbl th:last-child,.tbl td:last-child{padding-right:10px}
+/* 選中／需要注意的一列。整列一塊底色，兩端收圓角 —— 所以上面是 separate 不是
+   collapse：collapse 會讓 td 的圓角完全失效，底色就變成一個方角色塊。 */
+.tbl tr.sel td{background:var(--priSoft)}
+.tbl tr.warnrow td{background:var(--dangerSoft)}
+.tbl tr.sel td:first-child,.tbl tr.warnrow td:first-child{border-radius:10px 0 0 10px}
+.tbl tr.sel td:last-child,.tbl tr.warnrow td:last-child{border-radius:0 10px 10px 0}
+.tbl th{text-align:left;padding:0 12px 10px 0;border-bottom:1px solid var(--line);
+  font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
+.tbl td{padding:11px 12px 11px 0;border-bottom:1px solid var(--line);font-size:14px;font-weight:600;
+  vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .r{text-align:right;font-variant-numeric:tabular-nums}
+.av{width:30px;height:30px;flex:none;border-radius:50%;background:var(--priSoft);color:var(--priD);
+  font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center}
+.row{display:flex;align-items:center;gap:10px}
+.sub{color:var(--muted);font-size:12px;font-weight:600}
+
+/* ---- 標籤 ---- */
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 10px;
+  font-size:12px;font-weight:700;background:var(--track);color:var(--ink);white-space:nowrap}
+.pill.ok{background:var(--okSoft);color:var(--ok)}
+.pill.warn{background:var(--dangerSoft);color:var(--danger)}
+.pill.mute{background:var(--track);color:var(--muted)}
+
+/* ---- 按鈕 ---- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;
+  border-radius:14px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:0 16px;
+  font-size:14px;font-weight:700;font-family:inherit}
+.btn:hover{border-color:var(--lineS)}
+.btn-danger{border-color:var(--dangerLine);color:var(--danger)}
+.btn-danger:hover{background:var(--dangerSoft)}
+.btn-primary{border-color:var(--priD);background:var(--priD);color:#fff}
+.btn-sm{min-height:32px;padding:0 12px;font-size:13px;border-radius:10px}
+
+/* ---- 輸入 ---- */
+.input{width:100%;min-height:40px;border:1px solid var(--line);border-radius:14px;
+  background:var(--surface);color:var(--ink);padding:0 14px;font-weight:600;font-family:inherit;
+  font-size:14px}
+.input::placeholder{color:var(--soft);font-weight:600}
+
+/* ---- 隱私遮罩 ---- */
+.masked{border:1px dashed var(--lineS);border-radius:14px;background:var(--bg);padding:16px;
+  display:flex;gap:12px;align-items:flex-start}
+.masked svg{flex:none;color:var(--soft);margin-top:1px}
+
+/* ---- 佔比條 ---- */
+.bar{display:flex;gap:2px;height:12px;border-radius:999px;overflow:hidden;background:var(--track)}
+.bar > span{display:block;height:100%}
+  </style>
+</helmet>
+<main style="width:1440px;padding:32px;display:flex;flex-direction:column;gap:24px">
+  <div>
+    <h1 class="h1">怎麼進去，以及動手時會怎樣</h1>
+    <p class="tiny" style="margin-top:4px">這一頁不是後台的頁面，是後台的兩條邊界：誰進得來，還有唯二會動到別人東西的對話框長什麼樣</p>
+  </div>
+
+  <div class="card">
+    <h2 class="card-head">管理者身分不在資料庫裡，在 token 上</h2>
+    <div style="display:flex;gap:24px;margin-top:16px">
+      <div style="flex-grow:1;flex-basis:0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:22px;height:22px;flex:none;border-radius:50%;background:#1a1613;color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center">1</span>
+          <span style="font-weight:800;font-size:14px">用指令授予</span>
+        </div>
+        <p class="tiny" style="margin-top:8px">在本機跑 <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;color:#1a1613">npm run set-admin -- &lt;email&gt;</span>，用 Admin SDK 寫下 custom claim。沒有「在網頁上把自己升成管理者」這條路。</p>
+      </div>
+      <div style="flex-grow:1;flex-basis:0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:22px;height:22px;flex:none;border-radius:50%;background:#1a1613;color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center">2</span>
+          <span style="font-weight:800;font-size:14px">後端每次都自己查</span>
+        </div>
+        <p class="tiny" style="margin-top:8px">後台的資料一律走 callable functions，每支進來先驗 <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;color:#1a1613">token.admin === true</span>。Firestore 規則完全不用為管理者開洞，users 仍然只有本人讀得到。</p>
+      </div>
+      <div style="flex-grow:1;flex-basis:0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:22px;height:22px;flex:none;border-radius:50%;background:#1a1613;color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center">3</span>
+          <span style="font-weight:800;font-size:14px">只有網頁版有這段路由</span>
+        </div>
+        <p class="tiny" style="margin-top:8px">Flutter App 沒有 /admin，也沒有呼叫這些 function 的程式碼。手機上不存在這個後台。</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;align-items:start">
+
+    <div>
+      <h2 class="card-head" style="margin-bottom:12px">不是管理者的人打開 /admin</h2>
+      <div class="card" style="background:#f2f0ec;padding:24px;box-shadow:none">
+        <div style="border:1px dashed #e2dcd4;border-radius:22px;padding:32px 18px;text-align:center;background:#fbfaf8">
+          <div style="font-size:20px;font-weight:900">找不到這個頁面</div>
+          <p class="tiny" style="margin-top:8px">網址可能打錯了，或這個頁面已經不在了。</p>
+          <button class="btn btn-primary" style="margin-top:16px">回到我的任務</button>
+        </div>
+      </div>
+      <p class="tiny" style="margin-top:10px">回 404 不回「權限不足」是故意的：後者等於告訴對方這個網址是真的、只是他不夠格。這次嘗試仍然會進稽核日誌。</p>
+    </div>
+
+    <div>
+      <h2 class="card-head" style="margin-bottom:12px">撤下公開報告</h2>
+      <div class="card" style="box-shadow:0 18px 44px -30px rgba(26,22,19,.5)">
+        <div style="font-size:17px;font-weight:900;line-height:1.3">撤下「曼谷五日的旅費報告」</div>
+        <p class="tiny" style="margin-top:8px">連結會立刻失效，也會從探索頁移除。任務本身、支出與分攤都不動。</p>
+
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">
+          <span class="label">撤下理由（必填，會寫進日誌並通知發布者）</span>
+          <div class="input" style="display:flex;align-items:center;min-height:44px">
+            <span style="font-weight:600">報告內含他人的個人資料</span>
+            <svg style="margin-left:auto;color:#8a8078" width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1.5 6 6.5 11 1.5"></path></svg>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+          <span class="label">補充說明（選填）</span>
+          <div class="input" style="min-height:64px;padding:12px 14px;display:flex;align-items:flex-start">
+            <span style="color:#8a8078;font-weight:600">寫給發布者看的一兩句話</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-top:20px">
+          <button class="btn" style="flex-grow:1">取消</button>
+          <button class="btn btn-danger" style="flex-grow:1">確認撤下</button>
+        </div>
+      </div>
+      <p class="tiny" style="margin-top:10px">他可以修好之後自己重新分享，這不是永久封鎖。強制封存任務用同一個版型。</p>
+    </div>
+
+    <div>
+      <h2 class="card-head" style="margin-bottom:12px">停用帳號</h2>
+      <div class="card" style="box-shadow:0 18px 44px -30px rgba(26,22,19,.5)">
+        <div style="font-size:17px;font-weight:900;line-height:1.3">停用「winnerbot」的帳號</div>
+        <p class="tiny" style="margin-top:8px">他將無法再登入。已經記過的支出、分攤與付款全部留在任務裡，其他成員的帳不受影響。</p>
+
+        <div style="border:1px solid #f3d2ce;background:#fff5f5;border-radius:14px;padding:12px 14px;margin-top:14px;display:flex;gap:10px;align-items:flex-start">
+          <svg style="flex:none;margin-top:2px;color:#d63939" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5"></path><path d="M12 16.3v.2"></path></svg>
+          <div>
+            <div style="font-weight:800;font-size:13px;color:#1a1613">不是立刻生效，最長還有 1 小時</div>
+            <p class="tiny" style="margin-top:4px;color:#1a1613">停用擋的是換發新憑證。他手上那張最長還能用 1 小時，這段時間仍然讀得到、也寫得進他已加入的任務。這是 Firebase 換發 token 的機制，關不掉。真的緊急就先撤下他的公開報告、封存出問題的任務。</p>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+          <span class="label">停用理由（必填，會寫進日誌並通知本人）</span>
+          <div class="input" style="display:flex;align-items:center;min-height:44px">
+            <span style="font-weight:600">大量建立空任務</span>
+            <svg style="margin-left:auto;color:#8a8078" width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1.5 6 6.5 11 1.5"></path></svg>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-top:20px">
+          <button class="btn" style="flex-grow:1">取消</button>
+          <button class="btn btn-danger" style="flex-grow:1">確認停用</button>
+        </div>
+      </div>
+      <p class="tiny" style="margin-top:10px">那塊紅框不是提示，是規格的一部分。這個限制寫在文件裡會被忘掉，寫在這裡每次動手都會看到一次。</p>
+    </div>
+  </div>
+
+  <div class="card" style="display:flex;gap:14px;align-items:flex-start">
+    <svg style="flex:none;margin-top:2px;color:#8a8078" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3.2v5.4c0 4.6-3.1 8.2-7.5 9.4-4.4-1.2-7.5-4.8-7.5-9.4V6.2z"></path><path d="M9 12l2.2 2.2L15.5 10"></path></svg>
+    <div>
+      <h2 class="card-head">後台做不到的事</h2>
+      <p class="tiny" style="margin-top:6px;max-width:1100px">不能讀單筆支出的名稱、地點、備註與收據照片；不能替使用者新增或修改支出；不能加入任務或改成員角色；不能改任何人的暱稱；不能刪除帳號或任務。真的需要動資料的時候，走的是 Firebase Console 加上一筆手寫紀錄，而不是在這裡多開一個按鈕。</p>
+    </div>
+  </div>
+</main>
+
+</x-dc>
+</body>
+</html>

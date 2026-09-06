@@ -1,0 +1,292 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800;900&display=swap');
+:root{
+  --bg:#f2f0ec;--surface:#fbfaf8;--card:#ffffff;--ink:#1a1613;--muted:#6f665e;--soft:#8a8078;
+  --line:#ede7e0;--lineS:#e2dcd4;--pri:#e8590c;--priD:#c2410c;--priDeep:#9a3412;--priSoft:#fff0e4;
+  --b1:#e8590c;--b2:#f0a072;--b3:#f7d3bd;
+  --danger:#d63939;--dangerLine:#f3d2ce;--dangerSoft:#fff5f5;--dangerQuiet:#b8837c;
+  --ok:#0e9f6e;--okSoft:#e6f6ef;--track:#f0ebe4;
+  --rest:0 1px 2px rgba(26,22,19,.045);--pop:0 18px 44px -30px rgba(26,22,19,.5);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+  font-family:"Noto Sans TC",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px}
+a{color:var(--priD);text-decoration:none}
+a:hover{color:var(--priDeep)}
+.app{display:flex;min-height:1100px}
+
+/* ---- 左側導覽 ---- */
+.side{width:232px;flex:none;background:var(--surface);border-right:1px solid var(--line);
+  padding:24px 16px;display:flex;flex-direction:column;gap:24px}
+.mark{display:flex;align-items:center;gap:12px;padding:0 4px}
+.mark-sq{width:38px;height:38px;flex:none;border-radius:14px;background:var(--pri);color:#fff;
+  font-weight:900;font-size:17px;display:flex;align-items:center;justify-content:center}
+.mark-name{font-weight:900;line-height:1.2}
+.mark-sub{font-size:12px;font-weight:700;color:var(--muted);line-height:1.4}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:10px;
+  color:var(--muted);font-weight:700;font-size:14px}
+.nav-item svg{flex:none;color:var(--soft)}
+.nav-item.active{background:var(--card);color:var(--ink);box-shadow:var(--rest)}
+.nav-item.active svg{color:var(--priD)}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:10px}
+.ro{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;border-radius:999px;
+  padding:5px 10px;background:var(--track);color:var(--muted);font-size:12px;font-weight:700}
+.who{display:flex;align-items:center;gap:10px;padding:0 4px}
+.who-av{width:32px;height:32px;flex:none;border-radius:50%;background:var(--ink);color:#fff;
+  font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center}
+
+/* ---- 主區 ---- */
+.main{flex-grow:1;min-width:0;padding:32px;display:flex;flex-direction:column;gap:24px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.h1{margin:0;font-size:30px;font-weight:900;line-height:1.15}
+.tiny{margin:0;color:var(--muted);font-size:12px;line-height:1.7}
+.seg{display:inline-flex;flex:none;gap:4px;padding:4px;border-radius:14px;background:var(--track)}
+.seg-item{border:0;border-radius:10px;background:transparent;padding:6px 12px;color:var(--muted);
+  font-size:12px;font-weight:700;font-family:inherit}
+.seg-item.active{background:var(--card);color:var(--ink);box-shadow:var(--rest)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;
+  box-shadow:var(--rest)}
+.card.tight{padding:16px}
+.card-head{margin:0;font-size:17px;font-weight:800}
+.label{color:var(--muted);font-size:12px;font-weight:700}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.split{display:grid;grid-template-columns:720px minmax(0,1fr);gap:24px}
+.split-r{display:grid;grid-template-columns:minmax(0,1fr) 408px;gap:24px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---- 統計磚 ---- */
+.tile-v{margin:2px 0 0;font-size:34px;font-weight:900;line-height:1.1;font-variant-numeric:tabular-nums}
+.delta{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--ok)}
+.delta.flat{color:var(--muted)}
+
+/* ---- 表格 ---- */
+.tbl{width:100%;border-collapse:separate;border-spacing:0}
+.tbl th:first-child,.tbl td:first-child{padding-left:10px}
+.tbl th:last-child,.tbl td:last-child{padding-right:10px}
+/* 選中／需要注意的一列。整列一塊底色，兩端收圓角 —— 所以上面是 separate 不是
+   collapse：collapse 會讓 td 的圓角完全失效，底色就變成一個方角色塊。 */
+.tbl tr.sel td{background:var(--priSoft)}
+.tbl tr.warnrow td{background:var(--dangerSoft)}
+.tbl tr.sel td:first-child,.tbl tr.warnrow td:first-child{border-radius:10px 0 0 10px}
+.tbl tr.sel td:last-child,.tbl tr.warnrow td:last-child{border-radius:0 10px 10px 0}
+.tbl th{text-align:left;padding:0 12px 10px 0;border-bottom:1px solid var(--line);
+  font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
+.tbl td{padding:11px 12px 11px 0;border-bottom:1px solid var(--line);font-size:14px;font-weight:600;
+  vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .r{text-align:right;font-variant-numeric:tabular-nums}
+.av{width:30px;height:30px;flex:none;border-radius:50%;background:var(--priSoft);color:var(--priD);
+  font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center}
+.row{display:flex;align-items:center;gap:10px}
+.sub{color:var(--muted);font-size:12px;font-weight:600}
+
+/* ---- 標籤 ---- */
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 10px;
+  font-size:12px;font-weight:700;background:var(--track);color:var(--ink);white-space:nowrap}
+.pill.ok{background:var(--okSoft);color:var(--ok)}
+.pill.warn{background:var(--dangerSoft);color:var(--danger)}
+.pill.mute{background:var(--track);color:var(--muted)}
+
+/* ---- 按鈕 ---- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;
+  border-radius:14px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:0 16px;
+  font-size:14px;font-weight:700;font-family:inherit}
+.btn:hover{border-color:var(--lineS)}
+.btn-danger{border-color:var(--dangerLine);color:var(--danger)}
+.btn-danger:hover{background:var(--dangerSoft)}
+.btn-primary{border-color:var(--priD);background:var(--priD);color:#fff}
+.btn-sm{min-height:32px;padding:0 12px;font-size:13px;border-radius:10px}
+
+/* ---- 輸入 ---- */
+.input{width:100%;min-height:40px;border:1px solid var(--line);border-radius:14px;
+  background:var(--surface);color:var(--ink);padding:0 14px;font-weight:600;font-family:inherit;
+  font-size:14px}
+.input::placeholder{color:var(--soft);font-weight:600}
+
+/* ---- 隱私遮罩 ---- */
+.masked{border:1px dashed var(--lineS);border-radius:14px;background:var(--bg);padding:16px;
+  display:flex;gap:12px;align-items:flex-start}
+.masked svg{flex:none;color:var(--soft);margin-top:1px}
+
+/* ---- 佔比條 ---- */
+.bar{display:flex;gap:2px;height:12px;border-radius:999px;overflow:hidden;background:var(--track)}
+.bar > span{display:block;height:100%}
+  </style>
+</helmet>
+<div class="app">
+<aside class="side">
+  <div class="mark">
+    <div class="mark-sq">分</div>
+    <div>
+      <div class="mark-name">簡單分帳</div>
+      <div class="mark-sub">管理後台</div>
+    </div>
+  </div>
+  <nav class="nav">
+    <a class="nav-item" data-nav="總覽" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="8" rx="1.5"></rect><rect x="14" y="3" width="7" height="5" rx="1.5"></rect><rect x="14" y="11" width="7" height="10" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect></svg>總覽</a>
+    <a class="nav-item" data-nav="使用者" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"></path><path d="M16 5.4A3.2 3.2 0 0 1 16 11"></path><path d="M18 14.8c2 .8 3 2.7 3 5.2"></path></svg>使用者</a>
+    <a class="nav-item" data-nav="任務" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2l2 2.4h7.8A2.5 2.5 0 0 1 21 9.9v7.6A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"></path></svg>任務</a>
+    <a class="nav-item" data-nav="公開報告" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.4 2.6 3.6 5.6 3.6 9s-1.2 6.4-3.6 9c-2.4-2.6-3.6-5.6-3.6-9S9.6 5.6 12 3z"></path></svg>公開報告</a>
+    <a class="nav-item active" data-nav="系統健康" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12.5h3.8l2-5.5 3.2 11 2.4-7 1.6 3h4.5"></path></svg>系統健康</a>
+    <a class="nav-item" data-nav="稽核日誌" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"></path><path d="M14 3v5h5"></path><path d="M9 13h6"></path><path d="M9 17h4"></path></svg>稽核日誌</a>
+  </nav>
+  <div class="side-foot">
+    <span class="ro"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>唯讀模式</span>
+    <div class="who">
+      <div class="who-av">D</div>
+      <div>
+        <div style="font-weight:800;font-size:13px">dyco</div>
+        <div class="sub" style="font-size:11px">平台管理者</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="head">
+    <div>
+      <h1 class="h1">系統健康</h1>
+      <p class="tiny" style="margin-top:4px">來自 App 與網頁自己回報的 perf 樣本，以及 Cloud Functions 的呼叫結果</p>
+    </div>
+    <div class="seg">
+      <button class="seg-item active">24 小時</button>
+      <button class="seg-item">7 天</button>
+      <button class="seg-item">30 天</button>
+    </div>
+  </div>
+
+  <div class="grid4">
+    <div class="card tight">
+      <div class="label">任務列表 p75</div>
+      <div class="tile-v">1.82<span style="font-size:17px;font-weight:800"> 秒</span></div>
+      <div class="delta" style="margin-top:4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M6 13l6 6 6-6"></path></svg>比上週快 0.31 秒</div>
+    </div>
+    <div class="card tight">
+      <div class="label">單一任務 p75</div>
+      <div class="tile-v">2.41<span style="font-size:17px;font-weight:800"> 秒</span></div>
+      <div class="delta" style="margin-top:4px;color:#d63939"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"></path><path d="M6 11l6-6 6 6"></path></svg>比上週慢 0.44 秒</div>
+    </div>
+    <div class="card tight">
+      <div class="label">24 小時樣本數</div>
+      <div class="tile-v">1,047</div>
+      <div class="delta flat" style="margin-top:4px">來自 289 個裝置</div>
+    </div>
+    <div class="card tight">
+      <div class="label">Functions 失敗率</div>
+      <div class="tile-v">0.7<span style="font-size:17px;font-weight:800">%</span></div>
+      <div class="delta flat" style="margin-top:4px">4,318 次呼叫中 31 次失敗</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="card">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+        <h2 class="card-head">時間花在哪一段</h2>
+        <p class="tiny">p75 · 24 小時</p>
+      </div>
+
+      <div style="margin-top:20px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px">
+          <span style="font-weight:800;font-size:13px">任務列表 /tasks</span>
+          <span class="num sub" style="font-weight:800">1,820 ms</span>
+        </div>
+        <div style="display:flex;gap:2px;height:20px;width:75.5%">
+          <span style="width:57.9%;background:#e8590c;border-radius:999px 0 0 999px"></span>
+          <span style="width:15.4%;background:#f0a072"></span>
+          <span style="width:18.7%;background:#f7d3bd"></span>
+          <span style="width:8.1%;background:#e2dcd4;border-radius:0 999px 999px 0"></span>
+        </div>
+      </div>
+
+      <div style="margin-top:22px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px">
+          <span style="font-weight:800;font-size:13px">單一任務 /tasks/:id</span>
+          <span class="num sub" style="font-weight:800">2,410 ms</span>
+        </div>
+        <div style="display:flex;gap:2px;height:20px;width:100%">
+          <span style="width:82.2%;background:#f7d3bd;border-radius:999px 0 0 999px"></span>
+          <span style="width:17.8%;background:#e2dcd4;border-radius:0 999px 999px 0"></span>
+        </div>
+        <p class="tiny" style="margin-top:8px">這一頁沒有登入與個人檔案兩段，因為進來之前已經還原過了。慢的是同時發出的六趟查詢。</p>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:22px;padding-top:16px;border-top:1px solid #ede7e0">
+        <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:#e8590c"></span>還原登入狀態</span>
+        <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:#f0a072"></span>讀個人檔案</span>
+        <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:#f7d3bd"></span>查詢資料</span>
+        <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:#e2dcd4"></span>畫面渲染</span>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column;gap:20px">
+      <div>
+        <h2 class="card-head">冷啟動與熱啟動</h2>
+        <p class="tiny" style="margin-top:2px">冷啟動 = 這個裝置這次開啟後第一次進任務列表</p>
+        <div style="display:flex;flex-direction:column;gap:14px;margin-top:16px">
+          <div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <span style="font-weight:700;font-size:13px">冷啟動</span>
+              <span class="num" style="font-weight:800;font-size:13px">2,940 ms</span>
+            </div>
+            <div style="height:12px;border-radius:999px;background:#f0ebe4;margin-top:6px">
+              <div style="width:100%;height:100%;border-radius:999px;background:#e8590c"></div>
+            </div>
+            <p class="tiny" style="margin-top:4px">佔全部樣本 23%</p>
+          </div>
+          <div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <span style="font-weight:700;font-size:13px">熱啟動</span>
+              <span class="num" style="font-weight:800;font-size:13px">640 ms</span>
+            </div>
+            <div style="height:12px;border-radius:999px;background:#f0ebe4;margin-top:6px">
+              <div style="width:21.8%;height:100%;border-radius:999px;background:#f0a072"></div>
+            </div>
+            <p class="tiny" style="margin-top:4px">佔全部樣本 77%</p>
+          </div>
+        </div>
+      </div>
+      <div style="border-top:1px solid #ede7e0;padding-top:18px">
+        <h2 class="card-head">待處理的離線寫入</h2>
+        <div style="display:flex;align-items:baseline;gap:10px;margin-top:10px">
+          <span class="num" style="font-size:34px;font-weight:900;line-height:1.1">18</span>
+          <span class="sub">分佈在 6 個裝置</span>
+        </div>
+        <p class="tiny" style="margin-top:6px">收據照片還在使用者手機裡沒送上來。超過 7 天沒送達的有 2 筆。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px">
+      <h2 class="card-head">Cloud Functions</h2>
+      <p class="tiny">近 24 小時</p>
+    </div>
+    <table class="tbl">
+      <thead>
+        <tr><th>函式</th><th>做什麼</th><th class="r">呼叫</th><th class="r">失敗</th><th class="r">失敗率</th><th class="r">p95</th><th class="r">最後一次錯誤</th></tr>
+      </thead>
+      <tbody>
+        <tr><td style="font-weight:800">joinTask</td><td class="sub">用邀請碼加入任務</td><td class="r">412</td><td class="r">3</td><td class="r">0.7%</td><td class="r num">840 ms</td><td class="r sub">邀請碼已失效 · 2 小時前</td></tr>
+        <tr><td style="font-weight:800">onReceiptUpload</td><td class="sub">收據上傳後產縮圖</td><td class="r">1,284</td><td class="r"><span style="color:#d63939">24</span></td><td class="r"><span style="color:#d63939;font-weight:800">1.9%</span></td><td class="r num">3,120 ms</td><td class="r sub">圖片超過大小上限 · 14 分鐘前</td></tr>
+        <tr><td style="font-weight:800">notifyExpense</td><td class="sub">新增支出時通知成員</td><td class="r">2,190</td><td class="r">4</td><td class="r">0.2%</td><td class="r num">520 ms</td><td class="r sub">推播 token 已失效 · 40 分鐘前</td></tr>
+        <tr><td style="font-weight:800">fetchWeather</td><td class="sub">補當天天氣</td><td class="r">432</td><td class="r">0</td><td class="r">0%</td><td class="r num">610 ms</td><td class="r sub">—</td></tr>
+      </tbody>
+    </table>
+    <p class="tiny" style="margin-top:14px">onReceiptUpload 的 1.9% 是這張表上唯一值得追的數字，而且它跟總覽那條「收據連續上傳失敗的帳號」是同一件事。</p>
+  </div>
+</main>
+</div>
+</x-dc>
+</body>
+</html>
