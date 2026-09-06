@@ -58,8 +58,14 @@ const retention = computed(() => {
 });
 
 
-/** 有幾天真的有彙總資料。0 代表排程還沒開始寫，那時候不要畫線。 */
-const hasSeries = computed(() => (data.value?.coverage.present ?? 0) > 0);
+/**
+ * 有沒有東西可以畫。
+ *
+ * **看的是「有沒有任何一天有值」，不是「有沒有彙總文件」。** 戳記開始收
+ * 之前的日子文件是存在的，只是 dau 為 null —— 用 coverage 判斷的話，
+ * 那幾天會讓這裡以為有資料，然後畫出一張空的圖表框。
+ */
+const hasSeries = computed(() => (data.value?.dau ?? []).some(point => point.value !== null));
 
 const PLOT = { w: 640, h: 160 };
 
@@ -172,7 +178,7 @@ const peak = computed(() => {
             <h3 class="section-title">累積中</h3>
             <p class="tiny">
               活躍人數從使用者開啟 app 的那一刻才開始記，沒辦法從既有資料回推。<br />
-              這條線會從記錄開始的那天長出來。
+              這條線會從記錄開始的那天長出來 —— 在那之前的日子是空的，不是 0。
             </p>
           </div>
 

@@ -28,6 +28,8 @@ export interface AdminOverview {
   /*
     當天最後一次開啟在哪個平台。**沒有「兩者都用」** —— lastPlatform 只記
     最後一次，同一個人同一天先開網頁再開 App，第二次會蓋掉第一次。
+
+    戳記開始收之前的日子是 null，不是三個 0。
   */
   platforms: { web: number; android: number; ios: number } | null;
   /** 建立任務後 7 天內記了 3 筆以上支出。來自每日彙總，排程還沒跑時是 null。 */

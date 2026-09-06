@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AGGREGATE_VERSION,
+  DAU_SINCE,
   dailyDoc,
   latestDoc,
   retentionRate,
@@ -20,9 +21,7 @@ const COUNTS: DailyCounts = {
   expensesTotal: 47930,
   expensesNew: 284,
   dau: 402,
-  platformWeb: 229,
-  platformAndroid: 152,
-  platformIos: 0,
+  platforms: { web: 229, android: 152, ios: 0 },
   cohortMatured: 4,
   cohortRetained: 3
 };
@@ -118,6 +117,19 @@ describe("series", () => {
     ]);
   });
 
+  /*
+    lastSeenAt 上線之前的日子，文件存在但 dau 是 null。那兩種 null 在圖上
+    是同一件事 —— 線都該在那裡斷開，而不是掉到底。
+  */
+  it("文件在、但值是 null 的那天也是斷的", () => {
+    const docs = [doc("2026-09-03", { dau: null }), doc("2026-09-05", { dau: 186 })];
+    expect(series(docs, keys, d => d.dau)).toEqual([
+      { date: "2026-09-03", value: null },
+      { date: "2026-09-04", value: null },
+      { date: "2026-09-05", value: 186 }
+    ]);
+  });
+
   it("順序照 keys 走，不照文件進來的順序", () => {
     const docs = [doc("2026-09-05", { dau: 186 }), doc("2026-09-03", { dau: 118 })];
     expect(series(docs, keys, d => d.dau).map(p => p.date)).toEqual(keys);
@@ -136,5 +148,18 @@ describe("latestDoc", () => {
 
   it("沒有文件時回 null", () => {
     expect(latestDoc([])).toBeNull();
+  });
+});
+
+describe("DAU_SINCE", () => {
+  /*
+    寫死一個日期而不是「count 是 0 就當成 null」：一個真的沒有人開啟的日子
+    也會是 0。那種日子對這個 app 幾乎不可能發生，但用「幾乎不可能」當判斷
+    條件，就是把一個歷史事實換成一個機率假設。
+  */
+  it("是一個日期字串，可以直接跟日期鍵比大小", () => {
+    expect(DAU_SINCE).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect("2026-09-06" < DAU_SINCE).toBe(true);
+    expect("2026-09-07" < DAU_SINCE).toBe(false);
   });
 });

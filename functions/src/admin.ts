@@ -47,6 +47,7 @@ import {
 } from "./admin/users.js";
 import {
   dailyDoc,
+  DAU_SINCE,
   latestDoc,
   series,
   sumRecent,
@@ -286,9 +287,6 @@ async function computeDaily(day: string): Promise<DailyCounts> {
   const inDay = (query: FirebaseFirestore.Query, field: string) =>
     query.where(field, ">=", start).where(field, "<", end);
 
-  const seenThatDay = (platform: string) =>
-    countOf(inDay(users.where("lastPlatform", "==", platform), "lastSeenAt"));
-
   const [
     usersTotal,
     usersNew,
@@ -297,11 +295,7 @@ async function computeDaily(day: string): Promise<DailyCounts> {
     tasksDeleted,
     tasksNew,
     expensesTotal,
-    expensesNew,
-    dau,
-    platformWeb,
-    platformAndroid,
-    platformIos
+    expensesNew
   ] = await Promise.all([
     countOf(users),
     countOf(inDay(users, "createdAt")),
@@ -310,12 +304,28 @@ async function computeDaily(day: string): Promise<DailyCounts> {
     countOf(tasks.where("status", "==", "deleted")),
     countOf(inDay(tasks, "createdAt")),
     countOf(expenses),
-    countOf(inDay(expenses, "createdAt")),
-    countOf(inDay(users, "lastSeenAt")),
-    seenThatDay("web"),
-    seenThatDay("android"),
-    seenThatDay("ios")
+    countOf(inDay(expenses, "createdAt"))
   ]);
+
+  /*
+    活躍人數與裝置分佈只有 lastSeenAt 開始收之後才算得出來。
+
+    之前的日子**不查也不寫 0**：那四個查詢一定回 0，而 0 在折線圖上是一個
+    真的點，會被讀成「那天沒有人來」。null 才說得出「那天沒有人在數」。
+    順便省掉補算舊日期時的四趟查詢。
+  */
+  const measured = day >= DAU_SINCE;
+  const seenThatDay = (platform: string) =>
+    countOf(inDay(users.where("lastPlatform", "==", platform), "lastSeenAt"));
+
+  const [dau, platforms] = measured
+    ? await Promise.all([
+        countOf(inDay(users, "lastSeenAt")),
+        Promise.all([seenThatDay("web"), seenThatDay("android"), seenThatDay("ios")]).then(
+          ([web, android, ios]) => ({ web, android, ios })
+        )
+      ])
+    : [null, null];
 
   const cohort = await computeCohort(day);
 
@@ -329,9 +339,7 @@ async function computeDaily(day: string): Promise<DailyCounts> {
     expensesTotal,
     expensesNew,
     dau,
-    platformWeb,
-    platformAndroid,
-    platformIos,
+    platforms,
     ...cohort
   };
 }
@@ -451,7 +459,11 @@ export const adminBackfill = onCall({ region: REGION, timeoutSeconds: 540 }, asy
   return {
     days,
     // 呼叫端要把這件事講給使用者聽，不要讓補出來的 0 被當成「那天沒有人來」。
-    warning: "活躍人數與平台分佈補不回來，這幾天的 dau 一律是 0"
+    /*
+      補出來的 dau 是 null 不是 0（見 DAU_SINCE），所以圖上會是斷的而不是
+      一條假線。這句話留著，因為呼叫端仍然該知道那幾天缺的是什麼。
+    */
+    warning: `${DAU_SINCE} 之前的活躍人數與平台分佈補不回來，那幾天會是空的`
   };
 });
 

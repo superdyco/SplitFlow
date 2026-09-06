@@ -16,7 +16,20 @@
  * 定義算的 —— 沒有這個欄位就分不出來，而折線圖會若無其事地把兩種定義畫成
  * 同一條線。那種錯誤沒有任何症狀，只是結論是錯的。
  */
-export const AGGREGATE_VERSION = 1;
+export const AGGREGATE_VERSION = 2;
+
+/**
+ * `lastSeenAt` 開始有完整一天資料的第一天。**這一天之前的 dau 是 null，不是 0。**
+ *
+ * 那個欄位 2026-09-06 下午才上線，所以 09-06 只有大半天、更早的日子根本
+ * 沒有任何樣本。兩者算出來都是 0，而 0 在折線圖上是一個真的點 ——
+ * 它會被讀成「那天沒有人來」，而實際上是「那天還沒有人在數」。
+ *
+ * 為什麼要寫死一個日期而不是「count 是 0 就當成 null」：一個真的沒有人開啟
+ * 的日子也會是 0。那種日子對這個 app 幾乎不可能發生，但用「幾乎不可能」
+ * 當判斷條件，就是把一個歷史事實換成一個機率假設。這個日期是事實。
+ */
+export const DAU_SINCE = "2026-09-07";
 
 export interface DailyCounts {
   usersTotal: number;
@@ -27,8 +40,8 @@ export interface DailyCounts {
   tasksNew: number;
   expensesTotal: number;
   expensesNew: number;
-  /** 當天有寫過 lastSeenAt 的帳號數。 */
-  dau: number;
+  /** 當天有寫過 lastSeenAt 的帳號數。DAU_SINCE 之前是 null —— 那時候沒有人在數。 */
+  dau: number | null;
   /*
     當天最後一次開啟是在哪個平台。
 
@@ -37,9 +50,8 @@ export interface DailyCounts {
     第一次蓋掉了。要算得出「兩者都用」得改成每天記一個集合，而那是為了
     一個沒有人在等的數字多一份寫入。
   */
-  platformWeb: number;
-  platformAndroid: number;
-  platformIos: number;
+  /** 跟 dau 同進退：算不出來的日子是 null，不是三個 0。 */
+  platforms: { web: number; android: number; ios: number } | null;
   /** 當天剛好滿 7 天的任務數。 */
   cohortMatured: number;
   /** 其中前 7 天記了 3 筆以上支出的。 */
@@ -51,8 +63,8 @@ export interface DailyDoc {
   users: { total: number; new: number };
   tasks: { active: number; archived: number; deleted: number; new: number };
   expenses: { total: number; new: number };
-  dau: number;
-  platforms: { web: number; android: number; ios: number };
+  dau: number | null;
+  platforms: { web: number; android: number; ios: number } | null;
   cohort: { matured: number; retained: number };
   computedAt: Date;
   version: number;
@@ -70,11 +82,7 @@ export function dailyDoc(date: string, counts: DailyCounts, computedAt: Date): D
     },
     expenses: { total: counts.expensesTotal, new: counts.expensesNew },
     dau: counts.dau,
-    platforms: {
-      web: counts.platformWeb,
-      android: counts.platformAndroid,
-      ios: counts.platformIos
-    },
+    platforms: counts.platforms,
     cohort: { matured: counts.cohortMatured, retained: counts.cohortRetained },
     computedAt,
     version: AGGREGATE_VERSION
@@ -130,11 +138,12 @@ export function sumRecent(
 export function series(
   docs: DailyDoc[],
   keys: string[],
-  pick: (doc: DailyDoc) => number
+  pick: (doc: DailyDoc) => number | null
 ): Array<{ date: string; value: number | null }> {
   const byDate = new Map(docs.map(doc => [doc.date, doc]));
   return keys.map(date => {
     const doc = byDate.get(date);
+    // 兩種 null 在圖上是同一件事：那天沒有文件，或那天的值本來就不存在。
     return { date, value: doc ? pick(doc) : null };
   });
 }
