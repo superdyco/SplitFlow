@@ -38,7 +38,17 @@ const number = (n: number) => n.toLocaleString("zh-TW");
  * 沒資料的時候 weekly 全部是 0，而畫面上的「本週 +0」跟「本週真的沒有新增」
  * 看起來一模一樣 —— 前者是假的。寧可什麼都不顯示。
  */
-const hasWeekly = computed(() => (data.value?.coverage.present ?? 0) > 0);
+const hasWeekly = computed(() => (data.value?.coverage?.present ?? 0) > 0);
+
+/**
+ * 前端與 functions 是**分開部署**的，中間一定有一段版本對不上的窗口 ——
+ * 而且使用者的瀏覽器還可能拿著舊的 JS 打新的函式。
+ *
+ * 所以新欄位一律當成「可能不存在」。少了這一層，舊的 adminOverview 沒回
+ * topTasks 時，`data.topTasks.length` 會在 undefined 上直接爆掉整頁 ——
+ * 那不是「這一區沒東西」，是整個總覽白畫面。
+ */
+const topTasks = computed(() => data.value?.topTasks ?? []);
 
 const retention = computed(() => {
   const cohort = data.value?.cohort;
@@ -190,7 +200,7 @@ const peak = computed(() => {
             <p class="tiny">照支出筆數，不含已刪除的</p>
           </div>
           <EmptyState
-            v-if="data.topTasks.length === 0"
+            v-if="topTasks.length === 0"
             title="還沒有任務"
             message="有人建立任務並開始記帳之後，這裡會列出前五名。"
           />
@@ -202,7 +212,7 @@ const peak = computed(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="task in data.topTasks" :key="task.id">
+              <tr v-for="task in topTasks" :key="task.id">
                 <td>
                   <span class="tname">{{ task.name || "（沒有名稱）" }}</span>
                   <span v-if="task.status !== 'active'" class="tiny"> · 已封存</span>
