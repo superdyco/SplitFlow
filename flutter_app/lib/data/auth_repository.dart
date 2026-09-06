@@ -211,10 +211,26 @@ class UserRepository {
     );
   }
 
-  /// 用 merge 而不是覆寫：使用者可能已經有資料（換裝置重新登入），
-  /// 全量覆寫會把 createdAt 洗掉。
-  Future<void> createProfile(User user, String nickname) {
-    return usersRef.doc(user.uid).set({
+  /// 建立個人檔案。
+  ///
+  /// **先讀一次，是為了不寫 createdAt。**
+  ///
+  /// merge 保得住沒提到的欄位，但保不住有提到的 —— 把 createdAt 放進 payload，
+  /// merge 就會拿新的時間蓋掉舊的。原本的註解說「全量覆寫會把 createdAt 洗掉」，
+  /// 但 merge 一樣會洗掉，寫法沒有做到註解說的那件事。
+  ///
+  /// 而且這條路碰得到：`main.dart` 的 gate 在**讀檔案失敗**時會顯示取暱稱頁
+  /// （註解寫著「只是網路不好的話，存的時候用的是 merge，不會洗掉既有資料」——
+  /// 就是這裡不成立）。也就是一次網路不順就會把註冊日洗成今天，而註冊日正是
+  /// 後台用來看「這個月來了多少新人」的欄位。
+  ///
+  /// 從 affectedKeys 那次規則修正之後，這種寫入還會直接被擋下來（createdAt
+  /// 不在 users 的 hasOnly 名單裡），使用者看到的是存不了暱稱。
+  Future<void> createProfile(User user, String nickname) async {
+    final ref = usersRef.doc(user.uid);
+    final existing = await ref.get();
+
+    final base = <String, dynamic>{
       'uid': user.uid,
       'nickname': nickname,
       'email': user.email ?? '',
@@ -222,9 +238,15 @@ class UserRepository {
       'provider': user.providerData.isEmpty
           ? 'unknown'
           : user.providerData.first.providerId,
-      'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    };
+
+    await ref.set(
+      existing.exists
+          ? base
+          : {...base, 'createdAt': FieldValue.serverTimestamp()},
+      SetOptions(merge: true),
+    );
   }
 
   Future<void> updateNickname(String uid, String nickname) {

@@ -2168,6 +2168,45 @@ async function main() {
     await assertFails(deleteDoc(doc(as(MEMBER), "users", MEMBER)));
   });
 
+  /*
+    註冊日改不了。這是後台用來看「這個月來了多少新人」的欄位 ——
+    能被本人重寫的話，那條線就只是「最近一次網路不順是什麼時候」。
+  */
+  await test("createdAt 改不了", async () => {
+    await seedProfile();
+    await assertFails(
+      setDoc(
+        doc(as(MEMBER), "users", MEMBER),
+        { nickname: "重來一次", createdAt: serverTimestamp(), updatedAt: serverTimestamp() },
+        { merge: true }
+      )
+    );
+  });
+
+  /*
+    而 createProfile 拿掉 createdAt 之後那條路要還通。
+
+    讀檔案失敗時畫面會退回取暱稱頁，那個人其實早就註冊過了 —— 這一條就是
+    那個情境：檔案已經在，再存一次暱稱，不該被擋。
+  */
+  await test("已經有檔案的人再存一次暱稱，不帶 createdAt 就過得了", async () => {
+    await seedProfile();
+    await assertSucceeds(
+      setDoc(
+        doc(as(MEMBER), "users", MEMBER),
+        {
+          uid: MEMBER,
+          nickname: "重來一次",
+          email: `${MEMBER}@example.com`,
+          photoURL: null,
+          provider: "password",
+          updatedAt: serverTimestamp()
+        },
+        { merge: true }
+      )
+    );
+  });
+
   await testEnv.cleanup();
 
   console.log(`\n${passed} passed, ${failed} failed`);
