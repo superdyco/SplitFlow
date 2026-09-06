@@ -29,11 +29,17 @@ export interface DailyCounts {
   expensesNew: number;
   /** 當天有寫過 lastSeenAt 的帳號數。 */
   dau: number;
+  /*
+    當天最後一次開啟是在哪個平台。
+
+    這裡**不會有「兩者都用」**，而那不是漏掉的欄位，是資料形狀決定的：
+    lastPlatform 只記最後一次，同一個人同一天先開網頁再開 App，第二次就把
+    第一次蓋掉了。要算得出「兩者都用」得改成每天記一個集合，而那是為了
+    一個沒有人在等的數字多一份寫入。
+  */
   platformWeb: number;
   platformAndroid: number;
   platformIos: number;
-  /** 同一天在網頁與 App 都出現過的人。 */
-  platformMulti: number;
   /** 當天剛好滿 7 天的任務數。 */
   cohortMatured: number;
   /** 其中前 7 天記了 3 筆以上支出的。 */
@@ -46,7 +52,7 @@ export interface DailyDoc {
   tasks: { active: number; archived: number; deleted: number; new: number };
   expenses: { total: number; new: number };
   dau: number;
-  platforms: { web: number; android: number; ios: number; multi: number };
+  platforms: { web: number; android: number; ios: number };
   cohort: { matured: number; retained: number };
   computedAt: Date;
   version: number;
@@ -67,8 +73,7 @@ export function dailyDoc(date: string, counts: DailyCounts, computedAt: Date): D
     platforms: {
       web: counts.platformWeb,
       android: counts.platformAndroid,
-      ios: counts.platformIos,
-      multi: counts.platformMulti
+      ios: counts.platformIos
     },
     cohort: { matured: counts.cohortMatured, retained: counts.cohortRetained },
     computedAt,

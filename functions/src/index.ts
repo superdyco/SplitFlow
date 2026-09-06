@@ -495,4 +495,4 @@ export const onExpenseWeather = onDocumentCreated(
   這裡的是使用者流程的旁支（通知、天氣、加入任務），那裡的是另一個
   完全不同的介面，而且身分驗證的方式也不一樣（custom claim）。
 */
-export { adminOverview } from "./admin.js";
+export { adminOverview, aggregateDaily, adminBackfill } from "./admin.js";

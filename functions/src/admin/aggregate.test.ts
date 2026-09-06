@@ -23,7 +23,6 @@ const COUNTS: DailyCounts = {
   platformWeb: 229,
   platformAndroid: 152,
   platformIos: 0,
-  platformMulti: 21,
   cohortMatured: 4,
   cohortRetained: 3
 };
@@ -42,7 +41,7 @@ describe("dailyDoc", () => {
     expect(d.users).toEqual({ total: 1284, new: 6 });
     expect(d.tasks).toEqual({ active: 216, archived: 431, deleted: 58, new: 3 });
     expect(d.expenses).toEqual({ total: 47930, new: 284 });
-    expect(d.platforms).toEqual({ web: 229, android: 152, ios: 0, multi: 21 });
+    expect(d.platforms).toEqual({ web: 229, android: 152, ios: 0 });
     expect(d.cohort).toEqual({ matured: 4, retained: 3 });
   });
 

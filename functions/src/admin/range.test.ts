@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayKeyOf, dayKeys, latestCompletedDay, parseRange, shiftDay } from "./range.js";
+import { dayBounds, dayKeyOf, dayKeys, latestCompletedDay, parseRange, shiftDay } from "./range.js";
 
 /** UTC 時間，方便直接看出台北是幾點。 */
 const at = (iso: string) => new Date(iso);
@@ -106,5 +106,44 @@ describe("parseRange", () => {
     expect(parseRange(30)).toBeNull();
     expect(parseRange(null)).toBeNull();
     expect(parseRange(undefined)).toBeNull();
+  });
+});
+
+describe("dayBounds", () => {
+  /*
+    台北的一天從 UTC 的前一天 16:00 開始。直接拿 new Date("2026-09-05") 當
+    起點會少算台北時間 00:00–08:00 那八小時，而且每天都少同一段 ——
+    看起來就只是「數字比預期低一點」，不會有任何症狀。
+  */
+  it("台北的一天在 UTC 是前一天 16:00 到當天 16:00", () => {
+    const { start, end } = dayBounds("2026-09-05");
+    expect(start.toISOString()).toBe("2026-09-04T16:00:00.000Z");
+    expect(end.toISOString()).toBe("2026-09-05T16:00:00.000Z");
+  });
+
+  it("剛好 24 小時", () => {
+    const { start, end } = dayBounds("2026-09-05");
+    expect(end.getTime() - start.getTime()).toBe(86_400_000);
+  });
+
+  it("月底接得上下個月一號", () => {
+    expect(dayBounds("2026-08-31").end.toISOString()).toBe(
+      dayBounds("2026-09-01").start.toISOString()
+    );
+  });
+
+  it("跨年也接得上", () => {
+    expect(dayBounds("2025-12-31").end.toISOString()).toBe(
+      dayBounds("2026-01-01").start.toISOString()
+    );
+  });
+
+  it("每一天的結束就是下一天的開始，連續 60 天不漏也不疊", () => {
+    let key = "2026-07-01";
+    for (let i = 0; i < 60; i++) {
+      const next = shiftDay(key, 1);
+      expect(dayBounds(key).end.getTime()).toBe(dayBounds(next).start.getTime());
+      key = next;
+    }
   });
 });

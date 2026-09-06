@@ -87,3 +87,50 @@ export function dayKeys(range: Range, now: Date): string[] {
 export function parseRange(value: unknown): Range | null {
   return value === "7d" || value === "30d" || value === "90d" ? value : null;
 }
+
+/**
+ * 台北時區某一天的起訖瞬間，`[start, end)`。
+ *
+ * 排程要問 Firestore「createdAt 落在這一天」，而 Firestore 只認 UTC 的瞬間。
+ * 台北的 2026-09-05 是 UTC 的 09-04 16:00 到 09-05 16:00 —— 直接拿
+ * `new Date("2026-09-05")` 當起點的話，會少算台北時間 00:00–08:00 那八小時，
+ * 而且少算的方向永遠一樣，看起來就只是「每天都比預期少一點」。
+ *
+ * 偏移量是量出來的不是寫死的。台北自 1980 年就沒有日光節約時間，寫死
+ * `+8` 現在會對 —— 但這支函式沒有理由依賴一個它自己檢查不了的前提。
+ */
+export function dayBounds(key: string): { start: Date; end: Date } {
+  return { start: localMidnight(key), end: localMidnight(shiftDay(key, 1)) };
+}
+
+/** 這個日曆日在台北的午夜，換算成 UTC 的瞬間。 */
+function localMidnight(key: string): Date {
+  const [y, m, d] = key.split("-").map(Number);
+  const guess = Date.UTC(y, m - 1, d);
+  return new Date(guess - offsetAt(new Date(guess)));
+}
+
+/**
+ * 某個瞬間，台北比 UTC 快幾毫秒。
+ *
+ * 做法是把同一個瞬間格式化成台北的年月日時分秒，再把那串數字當成 UTC 讀
+ * 回來 —— 兩者的差就是偏移量。
+ */
+function offsetAt(at: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIME_ZONE,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).formatToParts(at);
+
+  const get = (type: string) => Number(parts.find(part => part.type === type)?.value ?? 0);
+  // hour12: false 在某些執行環境會把午夜印成 24。
+  const hour = get("hour") % 24;
+  const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), hour, get("minute"), get("second"));
+  return asUtc - at.getTime();
+}

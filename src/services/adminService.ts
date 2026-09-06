@@ -25,7 +25,11 @@ export interface AdminOverview {
   };
   weekly: { users: number; tasks: number; expenses: number; missingDays: number };
   dau: Array<{ date: string; value: number | null }>;
-  platforms: { web: number; android: number; ios: number; multi: number } | null;
+  /*
+    當天最後一次開啟在哪個平台。**沒有「兩者都用」** —— lastPlatform 只記
+    最後一次，同一個人同一天先開網頁再開 App，第二次會蓋掉第一次。
+  */
+  platforms: { web: number; android: number; ios: number } | null;
   coverage: { expected: number; present: number };
 }
 

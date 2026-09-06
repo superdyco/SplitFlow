@@ -169,8 +169,10 @@ const peak = computed(() => {
             <li><span>網頁版</span><strong>{{ number(data.platforms.web) }}</strong></li>
             <li><span>Android App</span><strong>{{ number(data.platforms.android) }}</strong></li>
             <li><span>iPhone／iPad</span><strong>{{ number(data.platforms.ios) }}</strong></li>
-            <li><span>兩者都用</span><strong>{{ number(data.platforms.multi) }}</strong></li>
           </ul>
+          <p v-if="data.platforms" class="tiny plat-note">
+            算的是當天<strong>最後一次</strong>開啟在哪 —— 同一個人同一天用了兩種裝置，只會算後面那次。
+          </p>
         </div>
       </template>
     </section>
@@ -256,5 +258,9 @@ const peak = computed(() => {
 
 .platforms strong {
   font-variant-numeric: tabular-nums;
+}
+
+.plat-note {
+  margin-top: var(--space-3);
 }
 </style>
