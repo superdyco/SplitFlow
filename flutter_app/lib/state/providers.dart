@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,6 +10,7 @@ import '../data/expense_repository.dart';
 import '../data/favorite_repository.dart';
 import '../data/geolocation.dart';
 import '../data/place_service.dart';
+import '../data/presence_store.dart';
 import '../data/push_repository.dart';
 import '../data/receipt_picker.dart';
 import '../data/receipt_repository.dart';
@@ -41,6 +44,7 @@ final settlementRepositoryProvider =
 /// 地點欄位就退回純文字輸入。
 final placeServiceProvider = Provider((ref) => PlaceService());
 final biasStoreProvider = Provider((ref) => BiasStore());
+final presenceStoreProvider = Provider((ref) => PresenceStore());
 
 /// 「我現在在哪」。只用來當地點搜尋的位置偏好與地圖的中心點，
 /// 不會存進任何一筆支出。
@@ -81,7 +85,25 @@ final authStateProvider = StreamProvider<User?>((ref) {
 final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
   final user = ref.watch(authStateProvider).value;
   if (user == null) return null;
-  return ref.watch(userRepositoryProvider).getProfile(user.uid);
+  final profile = await ref.watch(userRepositoryProvider).getProfile(user.uid);
+
+  /*
+    記下「這個人今天有來」。管理後台的活躍人數與裝置分佈只有這一個來源。
+
+    放在這裡的兩個理由跟網頁版路由守衛那邊一樣：
+
+      - **要有暱稱才算。** 還在取暱稱頁的人不算一個在用這個 app 的人，
+        算進去就是把註冊流程的中途也當成活躍。
+      - **不 await。** 這個 provider 擋在畫面前面（讀不到就是一直轉圈），
+        而戳記慢一秒鐘沒有任何人會受影響。
+
+    markSeen 自己擋掉一天第二次以後的呼叫，所以 provider 重算幾次都便宜。
+  */
+  if (profile != null && profile.nickname.trim().isNotEmpty) {
+    unawaited(ref.read(presenceStoreProvider).markSeen(user.uid));
+  }
+
+  return profile;
 });
 
 /// 這個任務存過的結算紀錄。

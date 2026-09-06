@@ -133,12 +133,35 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
+      /*
+        「這個人今天有來」的戳記，一天最多寫一次（用戶端自己擋）。
+
+        為什麼需要它：個人檔案本來只有 createdAt 與 updatedAt，沒有任何欄位
+        說得出「有多少人還在用」。`perf` 集合有 uid 跟時間，但它只追兩個頁面
+        而且是抽樣的，拿它當活躍人數會系統性低估。
+
+        **`lastSeenAt == request.time` 不是格式潔癖，是這個欄位的全部價值。**
+        少了它，任何人都能把自己的戳記寫成任意時間 —— 而這是唯一一個會被
+        拿來做決定的數字。用戶端送 serverTimestamp()，在規則裡就等於
+        request.time，所以誠實的寫入不用做任何事就會過。
+
+        平台一起要求，是因為半套的寫入（有時間沒平台）會讓裝置分佈默默漏算，
+        而漏算的方向永遠是同一邊。
+      */
+      function stampsLastSeen() {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        return !changed.hasAny(["lastSeenAt", "lastPlatform"])
+          || (request.resource.data.lastSeenAt == request.time
+              && request.resource.data.lastPlatform in ["web", "android", "ios"]);
+      }
+
       allow read: if isSelf(uid);
       allow create: if isSelf(uid)
         && request.resource.data.uid == request.auth.uid;
       allow update: if isSelf(uid)
         && request.resource.data.uid == resource.data.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["nickname", "email", "photoURL", "provider", "updatedAt"]);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["nickname", "email", "photoURL", "provider", "updatedAt", "lastSeenAt", "lastPlatform"])
+        && stampsLastSeen();
       allow delete: if false;
     }
 

@@ -2040,6 +2040,134 @@ async function main() {
     );
   });
 
+  // --- 個人檔案與「今天有來」的戳記 ---
+
+  /** 一份已經存在的個人檔案。update 規則要有東西可以 diff。 */
+  async function seedProfile(uid = MEMBER) {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "users", uid), {
+        uid,
+        nickname: uid,
+        email: `${uid}@example.com`,
+        photoURL: null,
+        provider: "password",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    });
+  }
+
+  await test("可以蓋自己今天的戳記", async () => {
+    await seedProfile();
+    await assertSucceeds(
+      updateDoc(doc(as(MEMBER), "users", MEMBER), {
+        lastSeenAt: serverTimestamp(),
+        lastPlatform: "web"
+      })
+    );
+  });
+
+  await test("三種平台都收", async () => {
+    for (const platform of ["web", "android", "ios"]) {
+      await seedProfile();
+      await assertSucceeds(
+        updateDoc(doc(as(MEMBER), "users", MEMBER), {
+          lastSeenAt: serverTimestamp(),
+          lastPlatform: platform
+        })
+      );
+    }
+  });
+
+  /*
+    這一條是整個欄位的價值所在。少了 lastSeenAt == request.time，任何人都能
+    把自己的戳記寫成任意時間 —— 而它是後台唯一一個會被拿來做決定的數字。
+  */
+  await test("偽造的時間擋得住 —— 自己寫死一個時間不算數", async () => {
+    await seedProfile();
+    await assertFails(
+      updateDoc(doc(as(MEMBER), "users", MEMBER), {
+        lastSeenAt: new Date("2030-01-01T00:00:00Z"),
+        lastPlatform: "web"
+      })
+    );
+  });
+
+  await test("不認得的平台擋下來", async () => {
+    await seedProfile();
+    await assertFails(
+      updateDoc(doc(as(MEMBER), "users", MEMBER), {
+        lastSeenAt: serverTimestamp(),
+        lastPlatform: "windows-phone"
+      })
+    );
+  });
+
+  /*
+    半套的寫入會讓裝置分佈默默漏算，而漏算的方向永遠是同一邊 ——
+    不擋的話，那張圖看起來完全正常，只是少了一群人。
+  */
+  await test("只寫時間不寫平台擋下來", async () => {
+    await seedProfile();
+    await assertFails(
+      updateDoc(doc(as(MEMBER), "users", MEMBER), { lastSeenAt: serverTimestamp() })
+    );
+  });
+
+  await test("只寫平台不寫時間也擋下來", async () => {
+    await seedProfile();
+    await assertFails(updateDoc(doc(as(MEMBER), "users", MEMBER), { lastPlatform: "web" }));
+  });
+
+  await test("別人的戳記蓋不了", async () => {
+    await seedProfile();
+    await assertFails(
+      updateDoc(doc(as(OTHER), "users", MEMBER), {
+        lastSeenAt: serverTimestamp(),
+        lastPlatform: "web"
+      })
+    );
+  });
+
+  await test("改暱稱這條路沒有被戳記弄壞", async () => {
+    await seedProfile();
+    await assertSucceeds(
+      updateDoc(doc(as(MEMBER), "users", MEMBER), {
+        nickname: "新名字",
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
+  await test("戳記跟著暱稱一起寫也可以", async () => {
+    await seedProfile();
+    await assertSucceeds(
+      updateDoc(doc(as(MEMBER), "users", MEMBER), {
+        nickname: "新名字",
+        updatedAt: serverTimestamp(),
+        lastSeenAt: serverTimestamp(),
+        lastPlatform: "web"
+      })
+    );
+  });
+
+  await test("多開的欄位還是擋著 —— 戳記沒有把 hasOnly 打開", async () => {
+    await seedProfile();
+    await assertFails(
+      updateDoc(doc(as(MEMBER), "users", MEMBER), {
+        lastSeenAt: serverTimestamp(),
+        lastPlatform: "web",
+        admin: true
+      })
+    );
+  });
+
+  await test("個人檔案還是刪不掉", async () => {
+    await seedProfile();
+    await assertFails(deleteDoc(doc(as(MEMBER), "users", MEMBER)));
+  });
+
   await testEnv.cleanup();
 
   console.log(`\n${passed} passed, ${failed} failed`);

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteLocationNormalized } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
+import { markSeen } from "@/services/presenceService";
 import { markPhase, startTrace, traceDetail } from "@/utils/perfTrace";
 import { backgroundContext } from "@/utils/visibility";
 
@@ -210,6 +211,19 @@ router.beforeEach(async (to, from) => {
     也就是每次進任務頁／支出頁都要三趟串行往返，其中一趟純屬重複。
     手機網路上那一趟就是使用者說的「按下去之後卡了一下才有反應」。
   */
+
+  /*
+    記下「這個人今天有來」。放在這裡有兩個原因：
+
+      - **在所有轉址之後**。還沒填暱稱的人會被導去 onboarding，那不算一個
+        在用這個 app 的人，算進去就是把註冊流程的中途也當成活躍。
+      - **不 await**。上面那段註解講的就是這件事 —— 守衛裡多一趟往返，
+        代價是使用者多看一段上一頁的畫面。這個戳記不值那個代價。
+
+    markSeen 自己擋掉一天第二次以後的呼叫，所以每次導航都叫它是便宜的。
+  */
+  markSeen(user.uid);
+
   return true;
 });
 

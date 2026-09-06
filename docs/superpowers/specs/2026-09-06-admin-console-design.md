@@ -186,7 +186,7 @@ version     1                                     // AGGREGATE_VERSION，改定�
 
 一天大概 2–3 個任務到期，成本可以忽略。
 
-## 擋在前面的事：現在算不出 DAU
+## 活躍人數的來源（2026-09-06 已完成）
 
 `UserProfile` 只有 `createdAt` 與 `updatedAt`，**沒有任何欄位記錄「這個人今天
 有來」**。`perf` 集合有 uid 跟時間，但它只追兩個頁面而且是抽樣的，拿它當 DAU
@@ -227,6 +227,38 @@ allow update: if isSelf(uid)
 **DAU 與平台分佈回填不了**，因為 `lastSeenAt` 在部署之前不存在。折線圖上線後
 前 30 天會是空的。不要用註冊數或支出數去「估」一條看起來像 DAU 的線 —— 那條
 線唯一的用途就是被拿來做決定，而它會是假的。畫面上留一句「累積中」。
+
+### 順手挖出來的：六條 hasOnly 守衛本來全部形同虛設
+
+實作這條規則時，新寫的測試有五條「該擋沒擋」。查下去發現不是新規則的問題，
+是 `changedKeys()` 的語義跟大家以為的不一樣：
+
+> `changedKeys()` 只回**兩邊都有、而值不同**的欄位。新增的欄位屬於
+> `addedKeys()`，不在裡面。
+
+所以 `changedKeys().hasOnly([...])` 實際表達的是「不准改這幾個以外的**既有**
+欄位」，而不是它看起來的「這次寫入只能碰這幾個欄位」。用 emulator 的
+`debug()` 量到的實情：
+
+```
+request.resource.data.keys()  →  [admin, createdAt, email, nickname, ...]
+resource.data.keys()          →  [createdAt, email, nickname, ...]
+diff().changedKeys()          →  {}          ← 空的
+```
+
+`updateDoc(users/自己, { admin: true })` 會成功，欄位真的落到後端。
+
+`firestore.rules` 裡有六個位置是同一種寫法，所以六個一起破：任務的
+`updatesExpenseCountOnly` 與 `changesStatusAsOwner`、個人檔案的 update、
+成員的 `renamesSelf`、付款的確認收款。全部改成 `affectedKeys()`（新增 + 刪除
++ 變更的聯集），既有的 190 條規則測試沒有一條被弄壞。
+
+嚴重程度不一：多數只是能往文件塞垃圾欄位（角色、狀態這些既有欄位本來就
+擋著），但個人檔案那條等於一塊沒有上限的免費私人儲存空間，而那正是收藏與
+推播 token 兩個集合特地加欄位數上限要防的事。
+
+`tests/firestore.rules.test.mjs` 加了一組回歸測試，六個位置各挑一個代表，
+確認「多塞一個新欄位」會被擋。改回 `changedKeys()` 的話那組會紅。
 
 ## 系統健康的資料從哪來
 
@@ -274,17 +306,25 @@ expireAt    Timestamp     // at + 400 天，交給 Firestore TTL 政策
 
 ## 索引
 
-`firestore.indexes.json` 要加：
+**先分清楚哪些不用宣告。** Firestore 會自動替每個欄位建單欄位索引，所以
+`users.lastSeenAt`、`users.createdAt`、`tasks.createdAt`、`adminLogs.at` 這些
+單欄位排序與範圍查詢**不需要進 `firestore.indexes.json`**。寫進去只是多幾行
+沒有作用的設定，然後讓下一個讀的人以為它們有作用。
 
-| 集合 | 欄位 | 給誰用 |
+真正要宣告的只有三種：
+
+| 集合 | 索引 | 給誰用 |
 |---|---|---|
-| `users` | `lastSeenAt DESC` | DAU count、近 7 日活躍篩選 |
-| `users` | `createdAt DESC` | 使用者列表預設排序、每日新增 count |
-| `tasks` | `status ASC, updatedAt DESC` | 任務列表的四個分頁 |
-| `tasks` | `createdAt ASC` | 每日新增、滿七天的世代 |
-| `expenses`（collection group） | `createdAt ASC` | 每日新增支出 count |
-| `adminLogs` | `at DESC` | 日誌列表 |
-| `adminLogs` | `action ASC, at DESC` | 「只看處置」「只看檢視」 |
+| `tasks` | `status ASC, updatedAt DESC`（複合） | 任務列表的四個分頁 |
+| `adminLogs` | `action ASC, at DESC`（複合） | 「只看處置」「只看檢視」 |
+| `expenses` | `createdAt` + **COLLECTION_GROUP 範圍**（`fieldOverrides`） | 每日新增支出的 count |
+
+最後那條是最容易漏的：自動建立的單欄位索引只有 collection 範圍，跨所有任務數
+支出需要 collection group 範圍，那個要自己開。現有的 `reports` 那條 collection
+group 索引就是同一件事。
+
+這些等到查詢真的寫出來再一起加 —— 替一個還不存在的查詢先建索引，只會得到
+一個沒人知道還需不需要的索引。
 
 ## 用戶端
 
