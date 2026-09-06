@@ -131,3 +131,36 @@ export async function fetchUser(uid: string): Promise<AdminUserDetail> {
   const result = await callable<{ uid: string }, AdminUserDetail>("adminUser")({ uid });
   return result.data;
 }
+
+/* ------------------------------------------------------------------ 稽核日誌 */
+
+export type AuditFilter = "all" | "act" | "view";
+
+export interface AuditRow {
+  id: string;
+  at: string | null;
+  adminUid: string;
+  adminEmail: string;
+  action: string;
+  kind: "view" | "act" | "denied";
+  targetType: string;
+  targetId: string;
+  targetLabel: string;
+  reason: string | null;
+  ip: string;
+  result: string;
+}
+
+export interface AuditResult {
+  rows: AuditRow[];
+  cursor: string | null;
+  monthly: { views: number; acts: number; denied: number };
+}
+
+export async function fetchAudit(params: {
+  filter?: AuditFilter;
+  cursor?: string | null;
+}): Promise<AuditResult> {
+  const result = await callable<typeof params, AuditResult>("adminAudit")(params);
+  return result.data;
+}

@@ -20,15 +20,18 @@ import { logger } from "firebase-functions";
 
 import { DENIED_CODE, DENIED_MESSAGE, isAdmin } from "./admin/guard.js";
 import { dayBounds, dayKeys, latestCompletedDay, parseRange, TIME_ZONE } from "./admin/range.js";
-import { auditEntry, type AdminAction, type TargetType } from "./admin/audit.js";
+import {
+  auditEntry,
+  parseAuditFilter,
+  type AdminAction,
+  type TargetType
+} from "./admin/audit.js";
+import { decodeCursor, encodeCursor, parseLimit } from "./admin/paging.js";
 import {
   classifySearch,
-  decodeCursor,
-  encodeCursor,
   FILTER_BLIND_SPOT,
   listPlan,
   parseFilter,
-  parseLimit,
   prefixEnd
 } from "./admin/users.js";
 import {
@@ -616,3 +619,93 @@ export const adminUser = onCall({ region: REGION }, async request => {
     tasks
   };
 });
+
+/* ------------------------------------------------------------------ 稽核日誌 */
+
+/**
+ * 稽核日誌列表。
+ *
+ * **這一支自己不寫日誌。** 跟其他列表同一條規則（列表是瀏覽，詳情才記），
+ * 但這裡還多一個理由：讀日誌會寫日誌的話，翻幾頁就把真正該被看見的那幾筆
+ * 推到後面去了。
+ *
+ * 日誌本身在規則層對所有登入身分關閉（`allow read, write: if false`），
+ * 只有這支函式讀得到 —— 包含管理者本人也不能繞過它去改。
+ */
+export const adminAudit = onCall({ region: REGION }, async request => {
+  await requireAdmin(request, "view.report");
+
+  const data = (request.data ?? {}) as { filter?: unknown; cursor?: unknown; limit?: unknown };
+
+  const filter = parseAuditFilter(data.filter ?? "all");
+  if (!filter) throw new HttpsError("invalid-argument", "不認得的篩選");
+
+  const limit = parseLimit(data.limit);
+  let query: FirebaseFirestore.Query = db().collection("adminLogs");
+
+  /*
+    等值過濾，不是 action 的前綴過濾。Firestore 要求範圍欄位必須是第一個
+    排序欄位，用前綴的話就得照 action 排 —— 而這份日誌唯一有意義的排序
+    是時間由新到舊。kind 就是為了換回這件事才存的。
+
+    「被擋下的存取」歸在 act 裡一起看：它不是管理者做的，但跟處置一樣是
+    「有人動了什麼」而不是「有人看了什麼」。
+  */
+  if (filter === "act") query = query.where("kind", "in", ["act", "denied"]);
+  else if (filter === "view") query = query.where("kind", "==", "view");
+
+  query = query.orderBy("at", "desc").orderBy(FieldPath.documentId(), "desc");
+
+  if (data.cursor !== undefined && data.cursor !== null) {
+    const cursor = decodeCursor(data.cursor);
+    if (!cursor) throw new HttpsError("invalid-argument", "翻頁位置不正確，請重新整理");
+    query = query.startAfter(new Date(cursor.value), cursor.id);
+  }
+
+  const snap = await query.limit(limit + 1).get();
+  const docs = snap.docs.slice(0, limit);
+  const hasMore = snap.docs.length > limit;
+
+  const last = docs[docs.length - 1];
+  const lastAt = last?.get("at");
+
+  return {
+    rows: docs.map(doc => ({
+      id: doc.id,
+      at: iso(doc.get("at")),
+      adminUid: (doc.get("adminUid") as string) ?? "",
+      adminEmail: (doc.get("adminEmail") as string) ?? "",
+      action: (doc.get("action") as string) ?? "",
+      // kind 是後來才加的欄位，這之前寫進去的那幾筆沒有它 —— 直接讀會拿到
+      // undefined。同一個坑 virtual 與 listed 都踩過。
+      kind: (doc.get("kind") as string) ?? "view",
+      targetType: (doc.get("targetType") as string) ?? "",
+      targetId: (doc.get("targetId") as string) ?? "",
+      targetLabel: (doc.get("targetLabel") as string) ?? "",
+      reason: (doc.get("reason") as string) ?? null,
+      ip: (doc.get("ip") as string) ?? "",
+      result: (doc.get("result") as string) ?? "ok"
+    })),
+    cursor:
+      hasMore && last && lastAt instanceof Timestamp
+        ? encodeCursor({ value: lastAt.toMillis(), id: last.id })
+        : null,
+    /*
+      這個月各做了幾次。放在同一支裡是因為它們是同一個問題的兩半：
+      「最近發生了什麼」與「總共發生了多少」。分兩支就是兩次往返。
+    */
+    monthly: await monthlyCounts()
+  };
+});
+
+/** 本月各類動作的次數。用 count 聚合，不是把日誌讀回來數。 */
+async function monthlyCounts(): Promise<{ views: number; acts: number; denied: number }> {
+  const now = new Date();
+  const since = new Date(now.getFullYear(), now.getMonth(), 1);
+  const logs = db().collection("adminLogs");
+  const of = (kind: string) =>
+    countOf(logs.where("kind", "==", kind).where("at", ">=", since));
+
+  const [views, acts, denied] = await Promise.all([of("view"), of("act"), of("denied")]);
+  return { views, acts, denied };
+}

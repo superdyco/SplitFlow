@@ -48,6 +48,21 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "//": "稽核日誌的「只看處置／只看檢視」，以及本月次數統計。kind 等值加上時間排序 —— 用 action 前綴過濾的話就得照 action 排，而這份日誌唯一有意義的排序是時間由新到舊。",
+      "collectionGroup": "adminLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "kind",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "at",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

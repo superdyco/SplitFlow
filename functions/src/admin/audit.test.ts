@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { auditEntry, disableEffectiveAt, RETENTION_DAYS, type AuditInput } from "./audit.js";
+import {
+  auditEntry,
+  disableEffectiveAt,
+  kindOf,
+  parseAuditFilter,
+  RETENTION_DAYS,
+  type AuditInput
+} from "./audit.js";
 
 const AT = new Date("2026-09-06T06:38:00Z");
 
@@ -117,5 +124,47 @@ describe("disableEffectiveAt", () => {
   */
   it("是一小時後", () => {
     expect(disableEffectiveAt(AT).toISOString()).toBe("2026-09-06T07:38:00.000Z");
+  });
+});
+
+describe("kindOf", () => {
+  /*
+    這個欄位是「只看處置」做得出來的前提。Firestore 要求範圍欄位必須是第一個
+    排序欄位，所以拿 action 的前綴過濾就得照 action 排 —— 而稽核日誌唯一有
+    意義的排序是時間由新到舊。
+  */
+  it("三個處置是 act", () => {
+    for (const action of ["act.revokeReport", "act.disableUser", "act.archiveTask"] as const) {
+      expect(kindOf(action)).toBe("act");
+    }
+  });
+
+  it("檢視與匯出都是 view", () => {
+    for (const action of ["view.user", "view.task", "view.report", "export.stats"] as const) {
+      expect(kindOf(action)).toBe("view");
+    }
+  });
+
+  it("被擋下的存取自成一類 —— 那不是管理者做的", () => {
+    expect(kindOf("denied.access")).toBe("denied");
+  });
+
+  it("組出來的日誌帶著 kind", () => {
+    const result = build({ action: "act.archiveTask", reason: "濫用" });
+    if (!result.ok) throw new Error("應該要成功");
+    expect(result.entry.kind).toBe("act");
+  });
+});
+
+describe("parseAuditFilter", () => {
+  it("認得三個", () => {
+    expect(parseAuditFilter("all")).toBe("all");
+    expect(parseAuditFilter("act")).toBe("act");
+    expect(parseAuditFilter("view")).toBe("view");
+  });
+
+  it("其他回 null", () => {
+    expect(parseAuditFilter("denied")).toBeNull();
+    expect(parseAuditFilter(undefined)).toBeNull();
   });
 });

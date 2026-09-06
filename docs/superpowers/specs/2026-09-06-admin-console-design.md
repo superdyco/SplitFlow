@@ -330,6 +330,7 @@ adminEmail  string
 action      "view.user" | "view.task" | "view.report" | "export.stats"
             | "act.revokeReport" | "act.disableUser" | "act.archiveTask"
             | "denied.access"
+kind        "view" | "act" | "denied"    // 從 action 推出來，但要存，見下
 targetType  "user" | "task" | "report" | "route"
 targetId    string
 targetLabel string        // 當下的暱稱／任務名，之後改名了也查得到當時看的是誰
@@ -349,6 +350,23 @@ expireAt    Timestamp     // at + 400 天，交給 Firestore TTL 政策
 
 `denied.access` 是非管理者打 `/admin` 或呼叫這些函式時記的。這是唯一一種不是
 管理者做的動作，但它正是最該留下來的那種。
+
+### 為什麼 `kind` 要存，不在查詢時從 action 推
+
+「只看處置」直覺上是 `action` 的前綴過濾（`>= "act."`）。做不到：Firestore
+要求**範圍欄位必須是第一個排序欄位**，所以那樣就得照 `action` 排序 —— 而這份
+日誌唯一有意義的排序是時間由新到舊。
+
+多存一個等值欄位，才換得回「只看處置、而且照時間排」。它是從 `action` 推
+出來的（`kindOf`，有測試），存進去只是為了讓 Firestore 查得動。
+
+讀的時候要當成可能不存在：`kind` 是後來才加的，在那之前寫進去的幾筆沒有它。
+同一個坑 `virtual` 與 `listed` 都踩過。
+
+### 讀日誌不寫日誌
+
+`adminAudit` 自己不留紀錄。除了「列表是瀏覽」這條通則之外還多一個理由：
+讀日誌會寫日誌的話，翻幾頁就把真正該被看見的那幾筆推到後面去了。
 
 ## 索引
 
@@ -415,7 +433,8 @@ group 索引就是同一件事。
    累計的四塊磚是即時 count，不等排程；折線圖顯示「累積中」
 3. ~~排程與每日彙總，加上索引~~（2026-09-06 完成）
 4. ~~使用者列表與詳情~~（2026-09-06 完成，第一個真的會寫檢視日誌的地方）
-5. 其餘 callable 與頁面：任務、公開報告、系統健康、稽核日誌
+5. ~~稽核日誌~~（2026-09-06 完成）
+6. 其餘：任務、公開報告、系統健康三頁，以及三個處置
 
 順序調過。原本把 callable 排在最後，但那樣在資料累積的這幾週裡完全進不去
 後台 —— 而累計數字（使用者、任務、支出）根本不需要等排程，count 聚合當場
@@ -451,7 +470,7 @@ group 索引就是同一件事。
 
 ### 還沒接上的
 
-`adminUser` 上線之後，`view.user` 已經真的在寫了。但**還沒有地方讀得到**
-那份日誌 —— `adminAudit` 與稽核日誌頁還沒做，所以現在只能從 Firebase Console
-看。這是下一輪要補的第一件事：一份寫得進去卻讀不出來的日誌，跟沒有的差別
-只在「以後查得到」。
+日誌現在寫得進去也讀得出來了（`adminAudit` + `/admin/audit`）。剩下的是
+任務、公開報告、系統健康三頁，以及三個處置本身 —— 目前為止後台**還是完全
+唯讀的**，`act.*` 那三個 action 有定義、有測試、有畫面設計，但還沒有任何一支
+函式會寫出它們。

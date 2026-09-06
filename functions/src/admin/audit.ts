@@ -24,6 +24,28 @@ export type AdminAction =
 
 export type TargetType = "user" | "task" | "report" | "route";
 
+/**
+ * 這一筆屬於哪一類。**從 action 推出來，但要存進文件。**
+ *
+ * 為什麼不在查詢時用 action 的前綴過濾：Firestore 要求範圍欄位必須是第一個
+ * 排序欄位，所以拿 `action >= "act."` 過濾就得照 action 排序 —— 而稽核日誌
+ * 唯一有意義的排序是時間由新到舊。多一個等值欄位，才換得回「只看處置、
+ * 而且照時間排」。
+ */
+export type AuditKind = "view" | "act" | "denied";
+
+export function kindOf(action: AdminAction): AuditKind {
+  if (action === DENIED_ACTION) return "denied";
+  return (ACT_ACTIONS as readonly string[]).includes(action) ? "act" : "view";
+}
+
+/** 列表的篩選。 */
+export type AuditFilter = "all" | "act" | "view";
+
+export function parseAuditFilter(value: unknown): AuditFilter | null {
+  return value === "all" || value === "act" || value === "view" ? value : null;
+}
+
 /** 日誌保存 400 天，交給 Firestore 的 TTL 政策刪。 */
 export const RETENTION_DAYS = 400;
 
@@ -51,6 +73,7 @@ export interface AuditEntry {
   adminUid: string;
   adminEmail: string;
   action: AdminAction;
+  kind: AuditKind;
   targetType: TargetType;
   targetId: string;
   targetLabel: string;
@@ -97,6 +120,7 @@ export function auditEntry(input: AuditInput): AuditResult {
       adminUid: input.adminUid,
       adminEmail: input.adminEmail,
       action: input.action,
+      kind: kindOf(input.action),
       targetType: input.targetType,
       targetId: input.targetId,
       // 存當下的名字而不是指標。理由跟結算快照存 memberNames 一樣：
