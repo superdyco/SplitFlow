@@ -51,8 +51,22 @@ service cloud.firestore {
 
       現在加入走 `joinTask` callable，它用 Admin SDK 寫、繞過這裡。
     */
+    /*
+      **一律用 affectedKeys()，不要用 changedKeys()。**
+
+      這兩個名字看起來可以互換，但 `changedKeys()` 只回「兩邊都有、而值不同」
+      的欄位 —— **新增的欄位不在裡面**（那是 addedKeys()）。所以
+      `changedKeys().hasOnly([...])` 表達的其實是「不准改這幾個以外的既有欄位」，
+      而不是它看起來的「這次寫入只能碰這幾個欄位」。
+
+      實際後果量過：規則寫著 hasOnly(["nickname", ...]) 的情況下，
+      `updateDoc(users/自己, { admin: true })` 會**成功**，欄位真的落到後端。
+      六條守衛全部有同一個洞，因為六條都是同一種寫法。
+
+      affectedKeys() 是新增 + 刪除 + 變更的聯集，才是這些守衛想說的那件事。
+    */
     function updatesExpenseCountOnly() {
-      let changed = request.resource.data.diff(resource.data).changedKeys();
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
       return isCurrentTaskMember()
         && changed.hasOnly(["expenseCount", "updatedAt"]);
     }
@@ -71,7 +85,7 @@ service cloud.firestore {
     // 只有 owner 能封存、解除封存、刪除，而且這次寫入只能動 status。
     // 沒有 hasOnly 的話，owner 可以藉著改狀態的名義順便改掉別的欄位。
     function changesStatusAsOwner() {
-      let changed = request.resource.data.diff(resource.data).changedKeys();
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
       return signedIn()
         && resource.data.ownerId == request.auth.uid
         && changed.hasOnly(["status", "updatedAt"])
@@ -124,7 +138,7 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid;
       allow update: if isSelf(uid)
         && request.resource.data.uid == resource.data.uid
-        && request.resource.data.diff(resource.data).changedKeys().hasOnly(["nickname", "email", "photoURL", "provider", "updatedAt"]);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["nickname", "email", "photoURL", "provider", "updatedAt"]);
       allow delete: if false;
     }
 
@@ -167,14 +181,14 @@ service cloud.firestore {
           不看 active，離開過的人改名，舊帳目上的名字也該跟著對。
 
           `hasAll` 是要求 nickname 真的變了。少了它，什麼都沒改的寫入（例如把
-          自己的 active: true 再寫一次）changedKeys 是空的，hasOnly 會放行 ——
+          自己的 active: true 再寫一次）affectedKeys 是空的，hasOnly 會放行 ——
           那等於替本人開了一條「寫任何欄位只要值沒變就通過」的路，會讓
           「還在任務裡的人不能自己動 active」那條防線看起來破了。
         */
         function renamesSelf() {
           return isSelf(uid)
-            && request.resource.data.diff(resource.data).changedKeys().hasOnly(["nickname"])
-            && request.resource.data.diff(resource.data).changedKeys().hasAll(["nickname"]);
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["nickname"])
+            && request.resource.data.diff(resource.data).affectedKeys().hasAll(["nickname"]);
         }
 
         /*
@@ -438,7 +452,7 @@ service cloud.firestore {
           && (request.auth.uid == resource.data.to || isTaskAdmin(taskId))
           && resource.data.status == "pending"
           && request.resource.data.status == "confirmed"
-          && request.resource.data.diff(resource.data).changedKeys().hasOnly(["status", "confirmedAt", "updatedAt"]);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "confirmedAt", "updatedAt"]);
 
         allow delete: if isTaskMember(taskId)
           && taskIsActive(taskId)

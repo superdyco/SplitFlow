@@ -1957,6 +1957,89 @@ async function main() {
     await assertFails(deleteDoc(doc(as(MEMBER), "perf", "s6")));
   });
 
+  /*
+    --- 「這次寫入只能碰這幾個欄位」的守衛，一律要擋得住「多塞一個新欄位」 ---
+
+    這一組全部是回歸測試。規則本來用 changedKeys()，而它只回「兩邊都有、
+    但值不同」的欄位 —— 新增的欄位不在裡面。所以六條 hasOnly 守衛全部可以
+    靠多塞一個沒人見過的欄位繞過去，而且六條都是同一種寫法，所以一起破。
+
+    現在用 affectedKeys()。下面每一條都是那六個位置各挑一個代表：改回
+    changedKeys() 的話，這裡就會紅。
+  */
+
+  await test("加支出時不能順便往任務文件塞新欄位", async () => {
+    await seed();
+    await assertFails(
+      updateDoc(doc(as(MEMBER), "tasks", TASK), {
+        expenseCount: increment(1),
+        updatedAt: serverTimestamp(),
+        injected: true
+      })
+    );
+  });
+
+  await test("owner 封存時不能順便往任務文件塞新欄位", async () => {
+    await seed();
+    await assertFails(
+      updateDoc(doc(as(OWNER), "tasks", TASK), {
+        status: "archived",
+        updatedAt: serverTimestamp(),
+        injected: true
+      })
+    );
+  });
+
+  await test("改自己的成員暱稱時不能順便塞新欄位", async () => {
+    await seed();
+    await assertFails(
+      updateDoc(doc(as(MEMBER), "tasks", TASK, "members", MEMBER), {
+        nickname: "改過的名字",
+        injected: true
+      })
+    );
+  });
+
+  await test("確認收款時不能順便往付款文件塞新欄位", async () => {
+    await seed();
+    await seedPayment();
+    await assertFails(
+      updateDoc(doc(as(OWNER), "tasks", TASK, "payments", "p1"), {
+        status: "confirmed",
+        confirmedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        injected: true
+      })
+    );
+  });
+
+  await test("而那四條路本來要做的事都還做得到", async () => {
+    await seed();
+    await assertSucceeds(
+      updateDoc(doc(as(MEMBER), "tasks", TASK), {
+        expenseCount: increment(1),
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertSucceeds(
+      updateDoc(doc(as(MEMBER), "tasks", TASK, "members", MEMBER), { nickname: "改過的名字" })
+    );
+    await seedPayment();
+    await assertSucceeds(
+      updateDoc(doc(as(OWNER), "tasks", TASK, "payments", "p1"), {
+        status: "confirmed",
+        confirmedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertSucceeds(
+      updateDoc(doc(as(OWNER), "tasks", TASK), {
+        status: "archived",
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
   await testEnv.cleanup();
 
   console.log(`\n${passed} passed, ${failed} failed`);
