@@ -59,6 +59,15 @@ const ProfilePage = () => import("@/pages/ProfilePage.vue");
 const ReportPage = () => import("@/pages/ReportPage.vue");
 const FavoritesPage = () => import("@/pages/FavoritesPage.vue");
 const ExplorePage = () => import("@/pages/ExplorePage.vue");
+const NotFoundPage = () => import("@/pages/NotFoundPage.vue");
+/*
+  管理後台。掛的是「門」不是後台本身 —— 門確認過 claim 才去載後台那包 JS，
+  所以不是管理者的人連下載都不會發生。見 AdminGate.vue。
+
+  刻意沒有 requiresAuth：那會讓沒登入的人被導去 /login?redirect=/admin，
+  而那個轉址等於承認這個網址是真的。沒有 claim 的一律看到找不到頁面。
+*/
+const AdminGate = () => import("@/pages/AdminGate.vue");
 
 /**
  * 這個文件第一次還原登入狀態與讀個人資料各花了多久。
@@ -128,7 +137,14 @@ export const router = createRouter({
       使用者。規則那邊也是這樣寫的，不是只有這裡擋。
     */
     { path: "/favorites", component: FavoritesPage, meta: { requiresAuth: true, requiresProfile: true } },
-    { path: "/explore", component: ExplorePage, meta: { requiresAuth: true, requiresProfile: true } }
+    { path: "/explore", component: ExplorePage, meta: { requiresAuth: true, requiresProfile: true } },
+    { path: "/admin", component: AdminGate, meta: { public: true } },
+    /*
+      萬用路由要排在最後。沒有它的話，打錯的網址會渲染一片空白 ——
+      而「一片空白」跟「這個網址存在但你看不到」在畫面上是同一件事，
+      那正是 /admin 不想洩漏的差別。
+    */
+    { path: "/:pathMatch(.*)*", component: NotFoundPage, meta: { public: true } }
   ]
 });
 

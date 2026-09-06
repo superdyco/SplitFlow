@@ -9,9 +9,16 @@
  * 的地方，所以沒有「在網頁上把自己升成管理者」這條路。
  */
 
-/** `request.auth?.token` 的形狀。除了 admin 之外的欄位這裡都不看。 */
+/**
+ * `request.auth?.token` 的形狀。除了 admin 之外的欄位這裡都不看。
+ *
+ * 索引簽章不是裝飾：少了它，只有選填欄位的介面會觸發 TypeScript 的
+ * weak type 檢查，而 `DecodedIdToken`（真正傳進來的東西）就會被判定成
+ * 「沒有任何共同屬性」而拒收。
+ */
 export interface AdminClaims {
   admin?: unknown;
+  [claim: string]: unknown;
 }
 
 /**

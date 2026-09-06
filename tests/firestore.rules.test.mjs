@@ -2040,6 +2040,48 @@ async function main() {
     );
   });
 
+  // --- 後台自己的兩個集合 ---
+
+  /*
+    稽核日誌記的是「誰看了誰的資料」。管理者能改自己的紀錄的話，那份紀錄
+    就只證明了「他還沒去改」—— 所以連他本人也讀不到、寫不了，讀走 callable。
+  */
+  await test("稽核日誌沒有任何登入身分讀得到或寫得進去", async () => {
+    await seed();
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "adminLogs", "log1"), {
+        at: new Date(),
+        adminUid: OWNER,
+        action: "view.user"
+      });
+    });
+    await assertFails(getDoc(doc(as(OWNER), "adminLogs", "log1")));
+    await assertFails(getDocs(collection(as(OWNER), "adminLogs")));
+    await assertFails(setDoc(doc(as(OWNER), "adminLogs", "log2"), { action: "偽造" }));
+    await assertFails(updateDoc(doc(as(OWNER), "adminLogs", "log1"), { action: "改掉" }));
+    await assertFails(deleteDoc(doc(as(OWNER), "adminLogs", "log1")));
+    await assertFails(getDoc(doc(anon(), "adminLogs", "log1")));
+  });
+
+  /*
+    每日彙總是全站的數字：有多少人、多少任務、多少支出。讀得到就等於把
+    營運狀況 publish 給每一個註冊帳號。
+  */
+  await test("每日彙總也是誰都讀不到", async () => {
+    await seed();
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "stats", "daily", "days", "2026-09-05"), {
+        date: "2026-09-05",
+        dau: 402
+      });
+    });
+    await assertFails(getDoc(doc(as(OWNER), "stats", "daily", "days", "2026-09-05")));
+    await assertFails(getDocs(collection(as(OWNER), "stats", "daily", "days")));
+    await assertFails(
+      setDoc(doc(as(OWNER), "stats", "daily", "days", "2026-09-06"), { dau: 99999 })
+    );
+  });
+
   // --- 個人檔案與「今天有來」的戳記 ---
 
   /** 一份已經存在的個人檔案。update 規則要有東西可以 diff。 */

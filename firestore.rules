@@ -541,6 +541,31 @@ service cloud.firestore {
       驗證只擋「掛在別人名下」與「塞爆一筆文件」這兩件事。欄位形狀刻意不寫死：
       之後多量一段就要改一次規則、還要等部署，那筆帳划不來，而這個集合沒有人讀。
     */
+    /*
+      管理後台的稽核日誌。**沒有任何登入身分讀得到，包含管理者本人。**
+
+      這不是保守，是這份日誌的意義所在：它記的是「誰看了誰的資料、誰動了
+      什麼」，而管理者能改自己的紀錄的話，那份紀錄就只證明了「他還沒去改」。
+      要看走 `adminAudit` callable，那支自己驗 claim；要寫只有 Admin SDK
+      進得來。
+
+      過期由 Firestore 的 TTL 政策照 `expireAt` 刪（400 天），不靠任何人動手。
+    */
+    match /adminLogs/{logId} {
+      allow read, write: if false;
+    }
+
+    /*
+      每日彙總。同樣不對 client 開放。
+
+      它是後台的資料來源，不是使用者的資料 —— 而且它是**全站的**數字：
+      有多少人、多少任務、多少支出。這種東西一旦讀得到，等於把營運狀況
+      publish 給每一個註冊帳號。
+    */
+    match /stats/{document=**} {
+      allow read, write: if false;
+    }
+
     match /perf/{sampleId} {
       allow read: if false;
       allow create: if signedIn()
