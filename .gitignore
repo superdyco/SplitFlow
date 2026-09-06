@@ -27,3 +27,7 @@ flutter_app/.flutter-plugins-dependencies
 # 但 firebase_options.dart 缺了是編譯錯誤，clone 下來的人連 analyze 都跑不動。
 #
 # 真的遇到有人濫用配額時，解法是開 App Check，不是把設定檔藏起來。
+
+# 設計畫布的產出檔。2.6MB，而且每次重發都是一份全新的 blob。
+# 來源是同一個目錄下的 parts/、_shell.css 與 canvas.json，用 build.mjs 重組。
+docs/design/**/splitflow-*.html
