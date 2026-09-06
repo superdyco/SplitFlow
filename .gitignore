@@ -31,3 +31,9 @@ flutter_app/.flutter-plugins-dependencies
 # 設計畫布的產出檔。2.6MB，而且每次重發都是一份全新的 blob。
 # 來源是同一個目錄下的 parts/、_shell.css 與 canvas.json，用 build.mjs 重組。
 docs/design/**/splitflow-*.html
+
+# Service account 金鑰。set-admin 需要它，但那個檔案等於整個專案的鑰匙 ——
+# 正確做法是放在 repo 外面，這幾條只是安全網。
+*firebase-adminsdk*.json
+serviceAccountKey.json
+service-account*.json
