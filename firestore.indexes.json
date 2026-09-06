@@ -108,6 +108,36 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "//": "任務詳情的分類加總。sum() 聚合要求被加總的欄位也在索引裡 —— 只有 category 的等值索引不夠，這是聚合查詢跟一般查詢不一樣的地方。",
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "category",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "baseAmount",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "//": "稽核日誌的本月次數：where kind== and at>= 沒有明寫 orderBy，而沒有明寫時範圍欄位的隱含排序是遞增 —— 所以上面那個 (kind, at DESC) 接不上，兩個都要。",
+      "collectionGroup": "adminLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "kind",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "at",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

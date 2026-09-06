@@ -449,6 +449,49 @@ group 索引就是同一件事。
 `adminLogs` 那兩個等列表頁真的寫出來再加 —— 替一個還不存在的查詢先建索引，
 只會得到一個沒人知道還需不需要的索引。
 
+## 索引：本機測不到，只有正式站會說話
+
+**Firestore emulator 不檢查索引。** 所以 205 條規則測試、160 條函式測試、
+`vue-tsc`、build 全綠，卻有兩個查詢一上正式站就 500。這不是測試寫得不夠，
+是那一類問題本機看不到 —— 每加一個查詢都要自己回頭對一次索引。
+
+上線後被打臉的兩個：
+
+| 查詢 | 我以為 | 實際 |
+|---|---|---|
+| `expenses.where(category==).aggregate(sum(baseAmount))` | 只要 category 的自動索引 | **sum() 要求被加總的欄位也在索引裡**，需要 `(category, baseAmount)` |
+| `adminLogs.where(kind==).where(at>=)` | `(kind, at DESC)` 兩邊通吃 | 沒有明寫 orderBy 時，範圍欄位的隱含排序是**遞增** —— 要另一個 `(kind, at ASC)` |
+
+第二個特別值得記：同樣兩個欄位、只差排序方向，就是兩個索引。「有一個
+`(kind, at)` 索引了」不代表任何 `(kind, at)` 的查詢都跑得動。
+
+### 全部查詢的索引對照
+
+一個一個對過，不是等 500 再修：
+
+| 位置 | 查詢 | 靠什麼 |
+|---|---|---|
+| `adminOverview` | `tasks.where(status==)` count | 自動單欄位 |
+| | `collectionGroup(expenses)` count | 無篩選，靠 `__name__` |
+| | `stats/daily/days` 日期範圍 | 自動單欄位 |
+| `adminUsers` | `users` 照 createdAt / lastSeenAt 排 | 自動（含 `__name__` 同向） |
+| | email 等值、nickname 前綴 | 自動單欄位 |
+| `adminUser` | `tasks.where(memberIds contains).orderBy(updatedAt)` | 複合 |
+| | `collectionGroup(expenses).where(createdBy==)` | fieldOverride（CG 範圍） |
+| `adminTasks` | `tasks.where(status==).orderBy(updatedAt desc)` | 複合 |
+| `adminTask` | `expenses.where(category==)` + `sum(baseAmount)` | 複合 ← **漏過** |
+| | `expenses.where(baseAmount==null)` / `where(receipt!=null)` count | 自動單欄位 |
+| `adminReports` | `reports` CG，active/listed + updatedAt | 複合 ×2 + fieldOverride |
+| `adminHealth` | `perf.where(mode==).where(day in)` | 複合 |
+| `adminAudit` | `adminLogs.where(kind in).orderBy(at desc)` | 複合（at DESC） |
+| | `adminLogs.where(kind==).where(at>=)` count | 複合（at **ASC**）← **漏過** |
+| `aggregateDaily` | `users.where(lastPlatform==).where(lastSeenAt 範圍)` | 複合 |
+| | `collectionGroup(expenses).where(createdAt 範圍)` | fieldOverride（CG 範圍） |
+
+還沒被證實的兩個：無篩選的 collection group count，以及 `receipt != null` 的
+count。前者在總覽（那頁進得去，所以應該沒事），後者在任務詳情 —— 詳情是在
+分類加總那一步就爆了，所以還沒輪到它。索引補上之後要再確認一次。
+
 ## 用戶端
 
 路由掛在 `/admin` 底下，`meta: { requiresAdmin: true }`。守衛讀
