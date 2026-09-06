@@ -2,132 +2,121 @@
   <div class="head">
     <div>
       <h1 class="h1">系統健康</h1>
-      <p class="tiny" style="margin-top:4px">來自 App 與網頁自己回報的 perf 樣本，以及 Cloud Functions 的呼叫結果</p>
-    </div>
-    <div class="seg">
-      <button class="seg-item active">24 小時</button>
-      <button class="seg-item">7 天</button>
-      <button class="seg-item">30 天</button>
+      <p class="tiny" style="margin-top:4px">2026-08-30 至 2026-09-05 · 1,047 筆樣本，來自 App 與網頁自己回報的 perf 集合</p>
     </div>
   </div>
 
-  <div class="grid4">
-    <div class="card tight">
-      <div class="label">任務列表 p75</div>
-      <div class="tile-v">1.82<span style="font-size:17px;font-weight:800"> 秒</span></div>
-      <div class="delta" style="margin-top:4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M6 13l6 6 6-6"></path></svg>比上週快 0.31 秒</div>
-    </div>
-    <div class="card tight">
-      <div class="label">單一任務 p75</div>
-      <div class="tile-v">2.41<span style="font-size:17px;font-weight:800"> 秒</span></div>
-      <div class="delta" style="margin-top:4px;color:#d63939"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"></path><path d="M6 11l6-6 6 6"></path></svg>比上週慢 0.44 秒</div>
-    </div>
-    <div class="card tight">
-      <div class="label">24 小時樣本數</div>
-      <div class="tile-v">1,047</div>
-      <div class="delta flat" style="margin-top:4px">來自 289 個裝置</div>
-    </div>
-    <div class="card tight">
-      <div class="label">Functions 失敗率</div>
-      <div class="tile-v">0.7<span style="font-size:17px;font-weight:800">%</span></div>
-      <div class="delta flat" style="margin-top:4px">4,318 次呼叫中 31 次失敗</div>
-    </div>
-  </div>
+  <p class="tiny" style="margin:0;padding:12px 16px;border-radius:14px;background:#fbfaf8;border:1px solid #ede7e0">
+    <strong style="font-weight:800">固定七天，而且不給區間選擇。</strong>
+    樣本一天大約一千筆，讀七天是一支 callable 的極限。要看更長的區間得等排程先把每天的百分位數算好 ——
+    收一個選了沒反應的區間按鈕，比不收更糟。
+  </p>
 
   <div class="split">
     <div class="card">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
-        <h2 class="card-head">時間花在哪一段</h2>
-        <p class="tiny">p75 · 24 小時</p>
+      <div class="spread">
+        <h2 class="card-head">任務列表 /tasks</h2>
+        <p class="tiny">683 筆</p>
       </div>
-
-      <div style="margin-top:20px">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px">
-          <span style="font-weight:800;font-size:13px">任務列表 /tasks</span>
-          <span class="num sub" style="font-weight:800">1,820 ms</span>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:16px;padding-bottom:16px;border-bottom:1px solid #ede7e0">
+        <div><div class="label">p50</div><div class="num" style="font-size:20px;font-weight:900;margin-top:2px">0.94 秒</div></div>
+        <div><div class="label">p75</div><div class="num" style="font-size:20px;font-weight:900;margin-top:2px">1.82 秒</div></div>
+        <div><div class="label">p95</div><div class="num" style="font-size:20px;font-weight:900;margin-top:2px">4.10 秒</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:16px 0;border-bottom:1px solid #ede7e0">
+        <div>
+          <div class="label">冷啟動 p50</div>
+          <div class="num" style="font-size:17px;font-weight:900;margin-top:2px">2.94 秒</div>
+          <div class="sub">157 筆</div>
         </div>
-        <div style="display:flex;gap:2px;height:20px;width:75.5%">
-          <span style="width:57.9%;background:#e8590c;border-radius:999px 0 0 999px"></span>
-          <span style="width:15.4%;background:#f0a072"></span>
-          <span style="width:18.7%;background:#f7d3bd"></span>
-          <span style="width:8.1%;background:#e2dcd4;border-radius:0 999px 999px 0"></span>
+        <div>
+          <div class="label">熱啟動 p50</div>
+          <div class="num" style="font-size:17px;font-weight:900;margin-top:2px">0.64 秒</div>
+          <div class="sub">526 筆</div>
         </div>
       </div>
-
-      <div style="margin-top:22px">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px">
-          <span style="font-weight:800;font-size:13px">單一任務 /tasks/:id</span>
-          <span class="num sub" style="font-weight:800">2,410 ms</span>
+      <div style="margin-top:16px">
+        <div class="label">最慢的那一段，各出現幾次</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="width:120px;flex:none;font-size:13px;font-weight:700">還原登入狀態</span>
+            <span style="flex-grow:1;height:10px;border-radius:999px;background:#f0ebe4;overflow:hidden"><span style="display:block;height:100%;width:61%;border-radius:999px;background:#e8590c"></span></span>
+            <span class="sub num" style="width:44px;text-align:right">417</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="width:120px;flex:none;font-size:13px;font-weight:700">查詢資料</span>
+            <span style="flex-grow:1;height:10px;border-radius:999px;background:#f0ebe4;overflow:hidden"><span style="display:block;height:100%;width:26%;border-radius:999px;background:#e8590c"></span></span>
+            <span class="sub num" style="width:44px;text-align:right">178</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="width:120px;flex:none;font-size:13px;font-weight:700">讀個人檔案</span>
+            <span style="flex-grow:1;height:10px;border-radius:999px;background:#f0ebe4;overflow:hidden"><span style="display:block;height:100%;width:13%;border-radius:999px;background:#e8590c"></span></span>
+            <span class="sub num" style="width:44px;text-align:right">88</span>
+          </div>
         </div>
-        <div style="display:flex;gap:2px;height:20px;width:100%">
-          <span style="width:82.2%;background:#f7d3bd;border-radius:999px 0 0 999px"></span>
-          <span style="width:17.8%;background:#e2dcd4;border-radius:0 999px 999px 0"></span>
-        </div>
-        <p class="tiny" style="margin-top:8px">這一頁沒有登入與個人檔案兩段，因為進來之前已經還原過了。慢的是同時發出的六趟查詢。</p>
-      </div>
-
-      <div style="display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:22px;padding-top:16px;border-top:1px solid #ede7e0">
-        <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:#e8590c"></span>還原登入狀態</span>
-        <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:#f0a072"></span>讀個人檔案</span>
-        <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:#f7d3bd"></span>查詢資料</span>
-        <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:#e2dcd4"></span>畫面渲染</span>
       </div>
     </div>
 
-    <div class="card" style="display:flex;flex-direction:column;gap:20px">
-      <div>
-        <h2 class="card-head">冷啟動與熱啟動</h2>
-        <p class="tiny" style="margin-top:2px">冷啟動 = 這個裝置這次開啟後第一次進任務列表</p>
-        <div style="display:flex;flex-direction:column;gap:14px;margin-top:16px">
-          <div>
-            <div style="display:flex;align-items:baseline;justify-content:space-between">
-              <span style="font-weight:700;font-size:13px">冷啟動</span>
-              <span class="num" style="font-weight:800;font-size:13px">2,940 ms</span>
-            </div>
-            <div style="height:12px;border-radius:999px;background:#f0ebe4;margin-top:6px">
-              <div style="width:100%;height:100%;border-radius:999px;background:#e8590c"></div>
-            </div>
-            <p class="tiny" style="margin-top:4px">佔全部樣本 23%</p>
-          </div>
-          <div>
-            <div style="display:flex;align-items:baseline;justify-content:space-between">
-              <span style="font-weight:700;font-size:13px">熱啟動</span>
-              <span class="num" style="font-weight:800;font-size:13px">640 ms</span>
-            </div>
-            <div style="height:12px;border-radius:999px;background:#f0ebe4;margin-top:6px">
-              <div style="width:21.8%;height:100%;border-radius:999px;background:#f0a072"></div>
-            </div>
-            <p class="tiny" style="margin-top:4px">佔全部樣本 77%</p>
-          </div>
+    <div class="card">
+      <div class="spread">
+        <h2 class="card-head">單一任務 /tasks/:id</h2>
+        <p class="tiny">364 筆</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:16px;padding-bottom:16px;border-bottom:1px solid #ede7e0">
+        <div><div class="label">p50</div><div class="num" style="font-size:20px;font-weight:900;margin-top:2px">1.31 秒</div></div>
+        <div><div class="label">p75</div><div class="num" style="font-size:20px;font-weight:900;margin-top:2px">2.41 秒</div></div>
+        <div><div class="label">p95</div><div class="num" style="font-size:20px;font-weight:900;margin-top:2px">5.62 秒</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:16px 0;border-bottom:1px solid #ede7e0">
+        <div>
+          <div class="label">冷啟動 p50</div>
+          <div style="font-size:17px;font-weight:900;margin-top:2px;color:#6f665e">樣本不足</div>
+          <div class="sub">3 筆</div>
+        </div>
+        <div>
+          <div class="label">熱啟動 p50</div>
+          <div class="num" style="font-size:17px;font-weight:900;margin-top:2px">1.28 秒</div>
+          <div class="sub">361 筆</div>
         </div>
       </div>
-      <div style="border-top:1px solid #ede7e0;padding-top:18px">
-        <h2 class="card-head">待處理的離線寫入</h2>
-        <div style="display:flex;align-items:baseline;gap:10px;margin-top:10px">
-          <span class="num" style="font-size:34px;font-weight:900;line-height:1.1">18</span>
-          <span class="sub">分佈在 6 個裝置</span>
+      <p class="tiny" style="margin-top:14px">
+        三筆算出來的中位數不是統計是巧合，所以不給數字。這一頁幾乎都是從列表點進來的，本來就很少冷啟動。
+      </p>
+      <div style="margin-top:16px">
+        <div class="label">最慢的那一段，各出現幾次</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="width:120px;flex:none;font-size:13px;font-weight:700">查詢資料</span>
+            <span style="flex-grow:1;height:10px;border-radius:999px;background:#f0ebe4;overflow:hidden"><span style="display:block;height:100%;width:84%;border-radius:999px;background:#e8590c"></span></span>
+            <span class="sub num" style="width:44px;text-align:right">306</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="width:120px;flex:none;font-size:13px;font-weight:700">畫面渲染</span>
+            <span style="flex-grow:1;height:10px;border-radius:999px;background:#f0ebe4;overflow:hidden"><span style="display:block;height:100%;width:16%;border-radius:999px;background:#e8590c"></span></span>
+            <span class="sub num" style="width:44px;text-align:right">58</span>
+          </div>
         </div>
-        <p class="tiny" style="margin-top:6px">收據照片還在使用者手機裡沒送上來。超過 7 天沒送達的有 2 筆。</p>
+        <p class="tiny" style="margin-top:12px">同時發出的六趟查詢是這一頁的成本所在，跟列表不是同一件事 —— 所以兩頁分開統計。</p>
       </div>
     </div>
   </div>
 
   <div class="card">
-    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px">
-      <h2 class="card-head">Cloud Functions</h2>
-      <p class="tiny">近 24 小時</p>
-    </div>
-    <table class="tbl">
-      <thead>
-        <tr><th>函式</th><th>做什麼</th><th class="r">呼叫</th><th class="r">失敗</th><th class="r">失敗率</th><th class="r">p95</th><th class="r">最後一次錯誤</th></tr>
-      </thead>
-      <tbody>
-        <tr><td style="font-weight:800">joinTask</td><td class="sub">用邀請碼加入任務</td><td class="r">412</td><td class="r">3</td><td class="r">0.7%</td><td class="r num">840 ms</td><td class="r sub">邀請碼已失效 · 2 小時前</td></tr>
-        <tr><td style="font-weight:800">onReceiptUpload</td><td class="sub">收據上傳後產縮圖</td><td class="r">1,284</td><td class="r"><span style="color:#d63939">24</span></td><td class="r"><span style="color:#d63939;font-weight:800">1.9%</span></td><td class="r num">3,120 ms</td><td class="r sub">圖片超過大小上限 · 14 分鐘前</td></tr>
-        <tr><td style="font-weight:800">notifyExpense</td><td class="sub">新增支出時通知成員</td><td class="r">2,190</td><td class="r">4</td><td class="r">0.2%</td><td class="r num">520 ms</td><td class="r sub">推播 token 已失效 · 40 分鐘前</td></tr>
-        <tr><td style="font-weight:800">fetchWeather</td><td class="sub">補當天天氣</td><td class="r">432</td><td class="r">0</td><td class="r">0%</td><td class="r num">610 ms</td><td class="r sub">—</td></tr>
-      </tbody>
-    </table>
-    <p class="tiny" style="margin-top:14px">onReceiptUpload 的 1.9% 是這張表上唯一值得追的數字，而且它跟總覽那條「收據連續上傳失敗的帳號」是同一件事。</p>
+    <h2 class="card-head">這一頁還沒有的東西</h2>
+    <ul style="margin:12px 0 0;padding-left:24px">
+      <li class="tiny" style="margin-bottom:8px">
+        <strong style="font-weight:800">Cloud Functions 的呼叫數與失敗率還沒接。</strong>
+        那份資料在 Cloud Monitoring 不在 Firestore。要嘛接 Monitoring API（多一組權限與相依），
+        要嘛每支函式自己累加一份計數（要動六支正在服役、而且發送路徑沒有測試的函式）。
+        兩個都不是順手做得完的事 —— 畫一張沒有資料的表比沒有更糟。
+      </li>
+      <li class="tiny" style="margin-bottom:8px">
+        <strong style="font-weight:800">只有近 7 天。</strong>
+        更長的區間要等排程先把每天的百分位數算好。
+      </li>
+      <li class="tiny">
+        這份清單由後端回傳，不是畫面寫死的 —— 寫死的話，等它做好了那句話會留在畫面上沒人記得拿掉。
+      </li>
+    </ul>
   </div>
 </main>

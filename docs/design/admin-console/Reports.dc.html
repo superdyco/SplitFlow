@@ -157,91 +157,96 @@ a:hover{color:var(--priDeep)}
   <div class="head">
     <div>
       <h1 class="h1">公開報告</h1>
-      <p class="tiny" style="margin-top:4px">使用者自己按下分享才會出現在這裡 · 目前公開 87 篇，其中 42 篇出現在探索頁</p>
+      <p class="tiny" style="margin-top:4px">使用者自己按下分享才會出現在這裡 · 目前公開 87 篇，其中 42 篇在探索頁</p>
     </div>
     <div class="seg">
-      <button class="seg-item active">被檢舉 3</button>
-      <button class="seg-item">全部公開 87</button>
+      <button class="seg-item active">探索頁上的 42</button>
+      <button class="seg-item">只給連結 45</button>
       <button class="seg-item">已撤下 4</button>
+      <button class="seg-item">全部</button>
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px">
+  <p class="tiny" style="margin:0;padding:12px 16px;border-radius:14px;background:#fbfaf8;border:1px solid #ede7e0">
+    <strong style="font-weight:800">沒有「被檢舉」這一項。</strong>
+    這張稿子原本畫了一個檢舉分頁與檢舉理由，但 app 裡沒有任何地方讓使用者檢舉報告 ——
+    那要先做一個面向使用者的功能（按鈕、理由、寫進哪裡、誰看得到），不是後台加一個分頁就有的。
+    畫一個查不到東西的分頁，比沒有更糟。
+  </p>
 
-    <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
-      <div style="height:132px;background:#f0ebe4;display:flex;align-items:center;justify-content:center;border-bottom:1px solid #ede7e0">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#8a8078" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z"></path><path d="M9 4v13.5"></path><path d="M15 6.5V20"></path></svg>
-      </div>
-      <div style="padding:16px;display:flex;flex-direction:column;gap:10px;flex-grow:1">
-        <div>
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-            <div style="font-weight:800;font-size:15px;line-height:1.3">曼谷五日的旅費報告</div>
-            <span class="pill warn">檢舉 2</span>
-          </div>
-          <p class="tiny" style="margin-top:4px">Kim 於 08-20 發布 · 瀏覽 1,284</p>
-        </div>
-        <p class="tiny" style="background:#fff5f5;border-radius:10px;padding:10px;color:#1a1613">檢舉理由：<strong style="font-weight:800">報告裡有其他人的全名</strong>（2 筆，最近一筆今天 11:04）</p>
-        <div style="display:flex;gap:8px;margin-top:auto">
-          <button class="btn btn-sm">開啟報告</button>
-          <button class="btn btn-sm btn-danger">撤下分享</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
-      <div style="height:132px;background:#f0ebe4;display:flex;align-items:center;justify-content:center;border-bottom:1px solid #ede7e0">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#8a8078" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z"></path><path d="M9 4v13.5"></path><path d="M15 6.5V20"></path></svg>
-      </div>
-      <div style="padding:16px;display:flex;flex-direction:column;gap:10px;flex-grow:1">
-        <div>
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-            <div style="font-weight:800;font-size:15px;line-height:1.3">東京跨年的旅費報告</div>
-            <span class="pill warn">檢舉 1</span>
-          </div>
-          <p class="tiny" style="margin-top:4px">Ariel 於 01-05 發布 · 瀏覽 3,902</p>
-        </div>
-        <p class="tiny" style="background:#fff5f5;border-radius:10px;padding:10px;color:#1a1613">檢舉理由：<strong style="font-weight:800">照片裡拍到住宿地址</strong>（1 筆，昨天 20:47）</p>
-        <div style="display:flex;gap:8px;margin-top:auto">
-          <button class="btn btn-sm">開啟報告</button>
-          <button class="btn btn-sm btn-danger">撤下分享</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
-      <div style="height:132px;background:#f0ebe4;display:flex;align-items:center;justify-content:center;border-bottom:1px solid #ede7e0">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#8a8078" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z"></path><path d="M9 4v13.5"></path><path d="M15 6.5V20"></path></svg>
-      </div>
-      <div style="padding:16px;display:flex;flex-direction:column;gap:10px;flex-grow:1">
-        <div>
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-            <div style="font-weight:800;font-size:15px;line-height:1.3">週五桌遊團的旅費報告</div>
-            <span class="pill warn">檢舉 1</span>
-          </div>
-          <p class="tiny" style="margin-top:4px">Nate 於 08-30 發布 · 瀏覽 96</p>
-        </div>
-        <p class="tiny" style="background:#fff5f5;border-radius:10px;padding:10px;color:#1a1613">檢舉理由：<strong style="font-weight:800">不是旅費報告，是廣告</strong>（1 筆，08-31 09:15）</p>
-        <div style="display:flex;gap:8px;margin-top:auto">
-          <button class="btn btn-sm">開啟報告</button>
-          <button class="btn btn-sm btn-danger">撤下分享</button>
-        </div>
+  <div class="card">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>報告</th><th>發布者</th><th class="r">天數</th><th class="r">支出</th>
+          <th class="r">總額</th><th class="r">最後更新</th><th class="r">狀態</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div style="font-weight:800">曼谷五日</div><div class="sub">6 人 · 建立於 2026-08-20</div></td>
+          <td class="sub">Kim</td><td class="r sub num">5</td><td class="r sub num">184</td>
+          <td class="r sub num">TWD 96,420</td><td class="r sub num">2026-08-20</td>
+          <td class="r"><span class="pill ok">探索頁</span></td>
+        </tr>
+        <tr>
+          <td><div style="font-weight:800">東京跨年</div><div class="sub">8 人 · 建立於 2026-01-05</div></td>
+          <td class="sub">Ariel</td><td class="r sub num">7</td><td class="r sub num">151</td>
+          <td class="r sub num">JPY 412,300</td><td class="r sub num">2026-01-05</td>
+          <td class="r"><span class="pill ok">探索頁</span></td>
+        </tr>
+        <tr>
+          <td><div style="font-weight:800">越南自駕</div><div class="sub">5 人 · 建立於 2026-09-02</div></td>
+          <td class="sub">Sunny</td><td class="r sub num">10</td><td class="r sub num">128</td>
+          <td class="r sub num">VND 18,240,000</td><td class="r sub num">2026-09-03</td>
+          <td class="r"><span class="pill ok">探索頁</span></td>
+        </tr>
+        <tr>
+          <td><div style="font-weight:800">墾丁三日</div><div class="sub">4 人 · 建立於 2026-06-24</div></td>
+          <td class="sub">Jamie</td><td class="r sub num">3</td><td class="r sub num">71</td>
+          <td class="r sub num">TWD 31,050</td><td class="r sub num">2026-06-24</td>
+          <td class="r"><span class="pill mute">只給連結</span></td>
+        </tr>
+        <tr>
+          <td><div style="font-weight:800;color:#6f665e">花蓮兩天一夜</div><div class="sub">3 人 · 建立於 2026-08-26</div></td>
+          <td class="sub">Jamie</td><td class="r sub num">2</td><td class="r sub num">38</td>
+          <td class="r sub num">TWD 14,900</td><td class="r sub num">2026-08-28</td>
+          <td class="r"><span class="pill warn">已撤下</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #ede7e0">
+      <p class="tiny">第 1 頁</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" disabled style="color:#8a8078">上一頁</button>
+        <button class="btn btn-sm">下一頁</button>
       </div>
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:720px minmax(0,1fr);gap:24px">
+  <div class="split">
     <div class="card">
-      <h2 class="card-head">最近撤下的</h2>
-      <table class="tbl" style="margin-top:12px">
-        <thead>
-          <tr><th>報告</th><th>發布者</th><th>撤下時間</th><th>處理人</th><th class="r">理由</th></tr>
-        </thead>
-        <tbody>
-          <tr><td style="font-weight:800">花蓮兩天一夜</td><td class="sub">Jamie</td><td class="sub">08-28 16:20</td><td class="sub">dyco</td><td class="r sub">含他人聯絡方式</td></tr>
-          <tr><td style="font-weight:800">團購對帳</td><td class="sub">winnerbot</td><td class="sub">08-04 10:02</td><td class="sub">dyco</td><td class="r sub">廣告</td></tr>
-          <tr><td style="font-weight:800">未命名報告</td><td class="sub">winnerbot</td><td class="sub">08-04 10:02</td><td class="sub">dyco</td><td class="r sub">廣告</td></tr>
-        </tbody>
-      </table>
+      <h2 class="card-head">要撤下哪一份</h2>
+      <p class="tiny" style="margin-top:6px">
+        撤下後連結立刻失效、從探索頁移除。任務本身、支出與分攤完全不動，成員照常使用。
+      </p>
+      <div style="display:flex;flex-direction:column;margin-top:14px">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #ede7e0">
+          <span style="flex-grow:1;font-weight:700;font-size:13px">曼谷五日</span>
+          <a href="#" style="font-size:13px;font-weight:700">開啟報告</a>
+          <button class="btn btn-sm btn-danger">撤下分享</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #ede7e0">
+          <span style="flex-grow:1;font-weight:700;font-size:13px">東京跨年</span>
+          <a href="#" style="font-size:13px;font-weight:700">開啟報告</a>
+          <button class="btn btn-sm btn-danger">撤下分享</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 0">
+          <span style="flex-grow:1;font-weight:700;font-size:13px">越南自駕</span>
+          <a href="#" style="font-size:13px;font-weight:700">開啟報告</a>
+          <button class="btn btn-sm btn-danger">撤下分享</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -257,13 +262,16 @@ a:hover{color:var(--priDeep)}
         </div>
         <div style="display:flex;gap:10px">
           <svg style="flex:none;margin-top:2px;color:#0e9f6e" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"></path></svg>
-          <p class="tiny" style="color:#1a1613">發布者收到通知，說明是被平台撤下以及理由。</p>
+          <p class="tiny" style="color:#1a1613">發布者收到推播通知，說明是被平台撤下。</p>
         </div>
         <div style="display:flex;gap:10px">
           <svg style="flex:none;margin-top:2px;color:#8a8078" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5"></path><path d="M12 16.5v.2"></path><circle cx="12" cy="12" r="9"></circle></svg>
           <p class="tiny">他可以修好之後自己重新分享，這不是永久封鎖。</p>
         </div>
       </div>
+      <p class="tiny" style="margin-top:14px;padding-top:14px;border-top:1px solid #ede7e0">
+        撤下用的是跟停用帳號、強制封存同一個對話框：必填理由，寫進稽核日誌，通知當事人。
+      </p>
     </div>
   </div>
 </main>

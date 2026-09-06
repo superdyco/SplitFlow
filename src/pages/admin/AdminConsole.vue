@@ -4,6 +4,8 @@ import { RouterLink, useRoute } from "vue-router";
 import AdminOverviewPage from "@/pages/admin/AdminOverviewPage.vue";
 import AdminUsersPage from "@/pages/admin/AdminUsersPage.vue";
 import AdminTasksPage from "@/pages/admin/AdminTasksPage.vue";
+import AdminReportsPage from "@/pages/admin/AdminReportsPage.vue";
+import AdminHealthPage from "@/pages/admin/AdminHealthPage.vue";
 import AdminAuditPage from "@/pages/admin/AdminAuditPage.vue";
 
 /**
@@ -24,6 +26,8 @@ const SECTIONS = [
   { id: "", label: "總覽", to: "/admin" },
   { id: "users", label: "使用者", to: "/admin/users" },
   { id: "tasks", label: "任務", to: "/admin/tasks" },
+  { id: "reports", label: "公開報告", to: "/admin/reports" },
+  { id: "health", label: "系統健康", to: "/admin/health" },
   { id: "audit", label: "稽核日誌", to: "/admin/audit" }
 ] as const;
 
@@ -36,6 +40,8 @@ const section = computed(() => {
 const VIEWS = {
   users: AdminUsersPage,
   tasks: AdminTasksPage,
+  reports: AdminReportsPage,
+  health: AdminHealthPage,
   audit: AdminAuditPage
 } as const;
 

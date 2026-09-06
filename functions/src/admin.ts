@@ -36,6 +36,7 @@ import {
 } from "./admin/audit.js";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "./admin/categories.js";
 import { decodeCursor, encodeCursor, parseLimit } from "./admin/paging.js";
+import { summarize, type PerfSample } from "./admin/perf.js";
 import { categorySlices, parseTaskFilter } from "./admin/tasks.js";
 import {
   classifySearch,
@@ -1156,4 +1157,163 @@ export const adminArchiveTask = onCall({ region: REGION }, async request => {
         : null
     };
   });
+});
+
+/* ------------------------------------------------------------------ 公開報告 */
+
+/**
+ * 公開報告的篩選。
+ *
+ * **沒有「被檢舉」這一項。** 設計稿上有，但 app 裡沒有任何地方讓使用者檢舉
+ * 報告 —— 那要先做一個面向使用者的功能（按鈕、理由、寫進哪裡、誰看得到），
+ * 不是後台加一個篩選就有的。畫成一個查不到東西的分頁，比沒有更糟。
+ *
+ * 換成資料答得出來的三個：出現在探索頁的、只給連結的、已撤下的。
+ * `active` 與 `listed` 是兩件事 —— 前者是「拿到連結的人看不看得到」，
+ * 後者是「陌生人找不找得到」。
+ */
+type ReportFilter = "listed" | "linked" | "revoked" | "all";
+
+function parseReportFilter(value: unknown): ReportFilter | null {
+  return value === "listed" || value === "linked" || value === "revoked" || value === "all"
+    ? value
+    : null;
+}
+
+export const adminReports = onCall({ region: REGION }, async request => {
+  await requireAdmin(request, "view.report");
+
+  const data = (request.data ?? {}) as { filter?: unknown; cursor?: unknown; limit?: unknown };
+  const filter = parseReportFilter(data.filter ?? "listed");
+  if (!filter) throw new HttpsError("invalid-argument", "不認得的篩選");
+
+  const limit = parseLimit(data.limit);
+  let query: FirebaseFirestore.Query = db().collectionGroup("reports");
+
+  if (filter === "listed") query = query.where("active", "==", true).where("listed", "==", true);
+  else if (filter === "linked") {
+    query = query.where("active", "==", true).where("listed", "==", false);
+  } else if (filter === "revoked") query = query.where("active", "==", false);
+
+  query = query.orderBy("updatedAt", "desc").orderBy(FieldPath.documentId(), "desc");
+
+  if (data.cursor !== undefined && data.cursor !== null) {
+    const cursor = decodeCursor(data.cursor);
+    if (!cursor) throw new HttpsError("invalid-argument", "翻頁位置不正確，請重新整理");
+    query = query.startAfter(new Date(cursor.value), cursor.id);
+  }
+
+  const snap = await query.limit(limit + 1).get();
+  const docs = snap.docs.slice(0, limit);
+  const hasMore = snap.docs.length > limit;
+
+  const rows = docs.map(doc => ({
+    // 報告文件裡沒有 taskId —— 它是子集合，所以從路徑拿。
+    taskId: doc.ref.parent.parent?.id ?? "",
+    reportId: doc.id,
+    taskName: (doc.get("taskName") as string) ?? "",
+    currency: (doc.get("currency") as string) ?? "",
+    total: (doc.get("total") as number) ?? 0,
+    days: (doc.get("days") as number) ?? null,
+    memberCount: (doc.get("memberCount") as number) ?? 0,
+    expenseCount: (doc.get("expenseCount") as number) ?? 0,
+    active: doc.get("active") === true,
+    // 這個功能之前產生的報告沒有 listed 欄位，補成 false —— 沒有人被迫在
+    // 不知情的狀況下公開自己的旅程。規則那邊是同一個預設值。
+    listed: doc.get("listed") === true,
+    hasMap: !!doc.get("mapPath"),
+    createdAt: iso(doc.get("createdAt")),
+    updatedAt: iso(doc.get("updatedAt"))
+  }));
+
+  const last = docs[docs.length - 1];
+  const lastAt = last?.get("updatedAt");
+
+  return {
+    rows,
+    owners: await ownersOfTasks(rows.map(row => row.taskId)),
+    cursor:
+      hasMore && last && lastAt instanceof Timestamp
+        ? encodeCursor({ value: lastAt.toMillis(), id: last.id })
+        : null
+  };
+});
+
+/** taskId → 擁有者暱稱。報告文件裡沒有人的資訊（那是刻意的），要從任務繞一圈。 */
+async function ownersOfTasks(taskIds: string[]): Promise<Record<string, string>> {
+  const unique = [...new Set(taskIds.filter(Boolean))];
+  if (unique.length === 0) return {};
+
+  const tasks = await db().getAll(...unique.map(id => db().collection("tasks").doc(id)));
+  const ownerIds = tasks.map(task => (task.get("ownerId") as string) ?? "");
+  const names = await nicknamesOf(ownerIds);
+
+  const out: Record<string, string> = {};
+  tasks.forEach((task, index) => {
+    out[task.id] = names[ownerIds[index]] ?? "";
+  });
+  return out;
+}
+
+/* ------------------------------------------------------------------ 系統健康 */
+
+/**
+ * 讀某幾天的效能樣本。
+ *
+ * `mode == "prod"` 是必要的：dev 的數字跑在開發者的筆電上、vite 不打包，
+ * 混進來會讓中位數變好看而且是假的。樣本自己就有這個欄位，濾掉就好。
+ */
+async function readPerf(days: string[]): Promise<PerfSample[]> {
+  const snap = await db()
+    .collection("perf")
+    .where("mode", "==", "prod")
+    .where("day", "in", days.slice(0, 30))
+    .get();
+
+  return snap.docs.map(doc => ({
+    page: (doc.get("page") as string) ?? "",
+    total: (doc.get("total") as number) ?? 0,
+    slowest: (doc.get("slowest") as string) ?? "",
+    // detail.cold 是路由守衛寫的：這個文件第一次進這一頁才是 true。
+    cold: doc.get("detail.cold") === true
+  }));
+}
+
+/**
+ * 系統健康。
+ *
+ * **只有效能這一半。** 設計稿上還有一張 Cloud Functions 的呼叫數與失敗率表，
+ * 那份資料 Firestore 裡沒有 —— 它在 Cloud Monitoring。要嘛接 Monitoring API
+ * （多一組權限與相依），要嘛每支函式自己 increment 一份計數（要動六支正在
+ * 服役、而且發送路徑沒有測試的函式）。兩個都不是順手做得完的事，所以現在
+ * 不畫那張表 —— 畫一張沒有資料的表比沒有更糟。
+ */
+export const adminHealth = onCall({ region: REGION }, async request => {
+  await requireAdmin(request, "export.stats");
+
+  /*
+    **固定七天，而且不收 range 參數。**
+
+    perf 樣本一天大概一千筆，讀七天是七千筆 —— 一支 callable 的極限差不多在
+    這裡。30 天要三萬筆，那得等排程先把每天的百分位數算好，而那支排程還沒做。
+
+    收一個 range 卻永遠回七天，比不收更糟：呼叫端會以為自己選得到，而畫面上
+    那個選了沒反應的按鈕沒有人查得出原因。
+  */
+  const days = dayKeys("7d", new Date());
+  const samples = await readPerf(days);
+
+  return {
+    days: { from: days[0], to: days[days.length - 1] },
+    pages: summarize(samples),
+    total: samples.length,
+    /*
+      這一頁少了什麼，由後端說。前端寫死一句「Functions 資料還沒有」的話，
+      等它做好了那句話會留在畫面上沒人記得拿掉。
+    */
+    missing: [
+      "Cloud Functions 的呼叫數與失敗率還沒接 —— 那份資料在 Cloud Monitoring，不在 Firestore。",
+      "只有近 7 天。更長的區間要等排程先把每天的百分位數算好。"
+    ]
+  };
 });

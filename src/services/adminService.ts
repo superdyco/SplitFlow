@@ -263,3 +263,70 @@ export async function revokeReport(
     "adminRevokeReport"
   )({ taskId, reportId, reason });
 }
+
+/* ------------------------------------------------------------------ 公開報告 */
+
+/**
+ * 篩選裡**沒有「被檢舉」**。設計稿上有，但 app 裡沒有任何地方讓使用者檢舉
+ * 報告 —— 那要先做一個面向使用者的功能，不是後台加一個分頁就有的。
+ */
+export type ReportFilter = "listed" | "linked" | "revoked" | "all";
+
+export interface AdminReportRow {
+  taskId: string;
+  reportId: string;
+  taskName: string;
+  currency: string;
+  total: number;
+  days: number | null;
+  memberCount: number;
+  expenseCount: number;
+  active: boolean;
+  listed: boolean;
+  hasMap: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface AdminReportsResult {
+  rows: AdminReportRow[];
+  /** taskId → 擁有者暱稱。報告文件裡刻意沒有任何人的資訊。 */
+  owners: Record<string, string>;
+  cursor: string | null;
+}
+
+export async function fetchReports(params: {
+  filter?: ReportFilter;
+  cursor?: string | null;
+}): Promise<AdminReportsResult> {
+  const result = await callable<typeof params, AdminReportsResult>("adminReports")(params);
+  return result.data;
+}
+
+/* ------------------------------------------------------------------ 系統健康 */
+
+export interface PerfPageSummary {
+  page: string;
+  count: number;
+  p50: number;
+  p75: number;
+  p95: number;
+  /** 樣本不足時是 null —— 三筆算出來的中位數不是統計是巧合。 */
+  coldP50: number | null;
+  warmP50: number | null;
+  coldCount: number;
+  slowest: Array<{ phase: string; count: number }>;
+}
+
+export interface AdminHealth {
+  days: { from: string; to: string };
+  pages: PerfPageSummary[];
+  total: number;
+  /** 這一頁少了什麼。由後端說，做好了才會消失。 */
+  missing: string[];
+}
+
+export async function fetchHealth(): Promise<AdminHealth> {
+  const result = await callable<Record<string, never>, AdminHealth>("adminHealth")({});
+  return result.data;
+}

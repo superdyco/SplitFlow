@@ -502,6 +502,8 @@ export {
   adminTasks,
   adminTask,
   adminAudit,
+  adminReports,
+  adminHealth,
   adminRevokeReport,
   adminDisableUser,
   adminArchiveTask,

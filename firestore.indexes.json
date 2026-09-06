@@ -78,6 +78,36 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "//": "後台的公開報告：已撤下的那一頁，以及不分狀態的全部。",
+      "collectionGroup": "reports",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "active",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "//": "系統健康：只讀正式環境的樣本，範圍是最近幾天。dev 的數字跑在開發者筆電上，混進來會讓中位數變好看而且是假的。",
+      "collectionGroup": "perf",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "mode",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "day",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -115,6 +145,25 @@
         },
         {
           "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "//": "公開報告的「全部」那一頁，跨所有任務照最後更新排序。collection group 範圍的單欄位索引要自己開。",
+      "collectionGroup": "reports",
+      "fieldPath": "updatedAt",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
           "queryScope": "COLLECTION_GROUP"
         }
       ]
