@@ -30,6 +30,19 @@ export interface AdminOverview {
     最後一次，同一個人同一天先開網頁再開 App，第二次會蓋掉第一次。
   */
   platforms: { web: number; android: number; ios: number } | null;
+  /** 建立任務後 7 天內記了 3 筆以上支出。來自每日彙總，排程還沒跑時是 null。 */
+  cohort: { matured: number; retained: number } | null;
+  /** 最活躍的任務。這一份不靠每日彙總 —— 排程還沒跑就已經有東西看。 */
+  topTasks: Array<{
+    id: string;
+    name: string;
+    status: string;
+    ownerName: string;
+    memberCount: number;
+    expenseCount: number;
+    currency: string;
+    updatedAt: string | null;
+  }>;
   coverage: { expected: number; present: number };
 }
 

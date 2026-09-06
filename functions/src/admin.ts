@@ -147,6 +147,22 @@ async function writeAudit(args: AuditArgs): Promise<void> {
   await db().collection("adminLogs").add(built.entry);
 }
 
+/** 任務列表加上擁有者暱稱。任務文件裡只有 uid。 */
+async function withOwners(snap: FirebaseFirestore.QuerySnapshot) {
+  const rows = snap.docs.map(doc => ({
+    id: doc.id,
+    name: (doc.get("name") as string) ?? "",
+    status: (doc.get("status") as string) ?? "active",
+    ownerId: (doc.get("ownerId") as string) ?? "",
+    memberCount: (doc.get("memberCount") as number) ?? 0,
+    expenseCount: (doc.get("expenseCount") as number) ?? 0,
+    currency: (doc.get("defaultCurrency") as string) ?? "",
+    updatedAt: iso(doc.get("updatedAt"))
+  }));
+  const names = await nicknamesOf(rows.map(row => row.ownerId));
+  return rows.map(row => ({ ...row, ownerName: names[row.ownerId] ?? "" }));
+}
+
 /** 一次 count 聚合。比把文件讀回來數便宜一個數量級。 */
 async function countOf(query: FirebaseFirestore.Query): Promise<number> {
   const snap = await query.count().get();
@@ -187,13 +203,25 @@ export const adminOverview = onCall({ region: REGION }, async request => {
   const keys = dayKeys(range, new Date());
   const tasks = db().collection("tasks");
 
-  const [users, active, archived, deleted, expenses, daily] = await Promise.all([
+  const [users, active, archived, deleted, expenses, daily, busiest] = await Promise.all([
     countOf(db().collection("users")),
     countOf(tasks.where("status", "==", "active")),
     countOf(tasks.where("status", "==", "archived")),
     countOf(tasks.where("status", "==", "deleted")),
     countOf(db().collectionGroup("expenses")),
-    readDaily(keys)
+    readDaily(keys),
+    /*
+      最活躍的任務。這一份**不需要每日彙總** —— expenseCount 一直都在任務
+      文件上，所以排程還沒跑、資料還在累積的時候，這張表就已經有東西看了。
+
+      濾掉已刪除的：軟刪除的任務前端一律不顯示，後台的「最活躍」也不該把
+      使用者已經丟掉的東西排在第一名。
+    */
+    tasks
+      .where("status", "in", ["active", "archived"])
+      .orderBy("expenseCount", "desc")
+      .limit(5)
+      .get()
   ]);
 
   const week = keys.slice(-7);
@@ -223,6 +251,12 @@ export const adminOverview = onCall({ region: REGION }, async request => {
     },
     dau: series(daily, keys, doc => doc.dau),
     platforms: latest?.platforms ?? null,
+    /*
+      「建立任務後 7 天內記了 3 筆以上支出」。來自每日彙總，所以排程還沒跑
+      的時候是 null —— 畫面要說「累積中」，不要顯示 0%。
+    */
+    cohort: latest?.cohort ?? null,
+    topTasks: await withOwners(busiest),
     /*
       有幾天真的有資料。畫面拿它決定要不要畫那條線 —— 排程還沒上線時
       這裡是 0，那時候該說「累積中」，而不是畫一條貼在底部的直線。

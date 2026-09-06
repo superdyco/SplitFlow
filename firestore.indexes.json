@@ -138,6 +138,21 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "//": "總覽的「最活躍的任務」：濾掉已刪除的，照支出筆數排。這一份不靠每日彙總，排程還沒跑就已經有東西看。",
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "expenseCount",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
