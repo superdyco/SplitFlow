@@ -13,7 +13,8 @@
     "deploy": "npm run build && firebase deploy --only hosting,firestore:rules,firestore:indexes,storage",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
     "deploy:functions": "firebase deploy --only functions",
-    "set-admin": "node scripts/set-admin.mjs"
+    "set-admin": "node scripts/set-admin.mjs",
+    "backfill:perf": "node scripts/backfill-perf.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "^5.2.4",

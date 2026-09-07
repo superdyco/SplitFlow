@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { fetchHealth, type AdminHealth } from "@/services/adminService";
+import { computed, ref, watch } from "vue";
+import { fetchHealth, type AdminHealth, type AdminRange } from "@/services/adminService";
 import LoadingState from "@/components/common/LoadingState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
@@ -18,6 +18,18 @@ const PHASE_LABELS: Record<string, string> = {
   render: "畫面渲染"
 };
 
+const RANGES: Array<{ value: AdminRange; label: string }> = [
+  { value: "7d", label: "7 天" },
+  { value: "30d", label: "30 天" },
+  { value: "90d", label: "90 天" }
+];
+
+/*
+  預設 7 天而不是跟總覽一樣的 30 天。這一頁回答的是「現在有沒有變慢」，
+  而那個問題的答案會被三個月的資料稀釋掉 —— 上週開始變慢的頁面，在 90 天的
+  p95 裡幾乎看不出來。
+*/
+const range = ref<AdminRange>("7d");
 const data = ref<AdminHealth | null>(null);
 const error = ref<string | null>(null);
 const loading = ref(true);
@@ -26,7 +38,7 @@ async function load() {
   loading.value = true;
   error.value = null;
   try {
-    data.value = await fetchHealth();
+    data.value = await fetchHealth(range.value);
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
   } finally {
@@ -34,9 +46,20 @@ async function load() {
   }
 }
 
-load();
+watch(range, load, { immediate: true });
 
 const seconds = (ms: number) => `${(ms / 1000).toFixed(2)} 秒`;
+
+/*
+  缺三天以內就把日期唸出來，再多只講幾天 —— 一行列出二十個日期沒有人讀得完，
+  而讀不完的警告等於沒有警告。
+*/
+const gap = computed(() => {
+  const days = data.value?.missingDays ?? [];
+  if (days.length === 0) return null;
+  const which = days.length <= 3 ? days.join("、") : `${days[0]} 等 ${days.length} 天`;
+  return `${which}的彙總沒有跑成，下面的數字不含那幾天。`;
+});
 </script>
 
 <template>
@@ -49,7 +72,25 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)} 秒`;
             {{ data.days.from }} 至 {{ data.days.to }} · {{ data.total.toLocaleString("zh-TW") }} 筆樣本
           </p>
         </div>
+        <div class="seg" role="group" aria-label="時間區間">
+          <button
+            v-for="item in RANGES"
+            :key="item.value"
+            type="button"
+            class="seg-item"
+            :class="{ active: range === item.value }"
+            @click="range = item.value"
+          >
+            {{ item.label }}
+          </button>
+        </div>
       </header>
+
+      <!--
+        排程沒跑成的那幾天。少一天的結果是一個看起來完全正常、只是不是你
+        以為的那個區間的數字 —— 那種錯誤沒有症狀，只能靠講出來。
+      -->
+      <p v-if="gap" class="tiny gap">{{ gap }}</p>
 
       <LoadingState v-if="loading && !data" title="讀取中" message="正在統計" />
       <ErrorState v-else-if="error" :message="error" retryable :retrying="loading" @retry="load" />
@@ -111,6 +152,15 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)} 秒`;
           這一頁少了什麼由後端說。前端寫死的話，等它做好了那句話會留在畫面上
           沒人記得拿掉。
         -->
+        <!--
+          數字是從每日直方圖算出來的，不是從原始樣本。講出誤差不是免責聲明 ——
+          兩位小數的秒數看起來精確到 10 毫秒，而它不是，那個精確度會被當真。
+        -->
+        <p v-if="data.pages.length" class="tiny bucket">
+          百分位數由每日彙總的 {{ data.bucketMs }} 毫秒分桶算出，最多高估
+          {{ data.bucketMs }} 毫秒。誤差的方向固定 —— 寧可看起來比實際慢。
+        </p>
+
         <div class="card missing">
           <h2 class="card-head">這一頁還沒有的東西</h2>
           <ul>
@@ -214,6 +264,20 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)} 秒`;
   width: 48px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.gap {
+  margin: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  border: 1px solid var(--color-danger-line);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-ink);
+}
+
+.bucket {
+  margin: 0;
+  padding: 0 var(--space-1);
 }
 
 .missing ul {

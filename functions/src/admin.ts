@@ -36,7 +36,16 @@ import {
 } from "./admin/audit.js";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "./admin/categories.js";
 import { decodeCursor, encodeCursor, parseLimit } from "./admin/paging.js";
-import { summarize, type PerfSample } from "./admin/perf.js";
+import { type PerfSample } from "./admin/perf.js";
+import {
+  BUCKET_MS,
+  histogramOf,
+  missingDays,
+  perfDoc,
+  summarizeDays,
+  type PerfDayPage,
+  type PerfDoc
+} from "./admin/histogram.js";
 import { categorySlices, parseTaskFilter } from "./admin/tasks.js";
 import {
   classifySearch,
@@ -395,7 +404,19 @@ function shiftDays(day: string, days: number): string {
  * 04:00 是因為那時候幾乎沒有人在用，而 count 聚合雖然便宜也不是免費的。
  */
 export const aggregateDaily = onSchedule(
-  { schedule: "0 4 * * *", timeZone: TIME_ZONE, region: REGION, retryCount: 3 },
+  /*
+    timeoutSeconds 是明寫的。預設 60 秒，而這支現在多了一段「讀當天一千筆
+    perf 樣本」—— 加上原本的 count 聚合與 cohort 的逐一計數，60 秒開始不夠寬。
+    逾時的排程會重試，而重試也逾時的話那天就永遠沒有文件，然後那個洞會以
+    「近 30 天」少一天的形式出現在畫面上。
+  */
+  {
+    schedule: "0 4 * * *",
+    timeZone: TIME_ZONE,
+    region: REGION,
+    retryCount: 3,
+    timeoutSeconds: 300
+  },
   async () => {
     const day = latestCompletedDay(new Date());
     const startedAt = Date.now();
@@ -414,7 +435,14 @@ export const aggregateDaily = onSchedule(
       .doc(day)
       .set(dailyDoc(day, counts, new Date()));
 
-    logger.info("每日彙總完成", { day, ms: Date.now() - startedAt, dau: counts.dau });
+    const pages = await rollUpPerf(day);
+
+    logger.info("每日彙總完成", {
+      day,
+      ms: Date.now() - startedAt,
+      dau: counts.dau,
+      perfPages: pages.length
+    });
   }
 );
 
@@ -454,6 +482,13 @@ export const adminBackfill = onCall({ region: REGION, timeoutSeconds: 540 }, asy
       .collection("days")
       .doc(day)
       .set(dailyDoc(day, counts, new Date()));
+
+    /*
+      效能的直方圖一起補。**這一份補得回來而且是真的** —— perf 樣本從 2026-06
+      就一直在寫，只是規則寫著 allow read: if false，沒有人讀得到。它跟 dau
+      不一樣，不需要任何警語。
+    */
+    await rollUpPerf(day);
   }
 
   return {
@@ -1304,16 +1339,18 @@ async function ownersOfTasks(taskIds: string[]): Promise<Record<string, string>>
 /* ------------------------------------------------------------------ 系統健康 */
 
 /**
- * 讀某幾天的效能樣本。
+ * 讀某一天的原始效能樣本。
  *
  * `mode == "prod"` 是必要的：dev 的數字跑在開發者的筆電上、vite 不打包，
  * 混進來會讓中位數變好看而且是假的。樣本自己就有這個欄位，濾掉就好。
+ *
+ * 只有排程與補算會走這裡 —— 一天大概一千筆，讀得動。畫面走的是彙總。
  */
-async function readPerf(days: string[]): Promise<PerfSample[]> {
+async function readSamples(day: string): Promise<PerfSample[]> {
   const snap = await db()
     .collection("perf")
     .where("mode", "==", "prod")
-    .where("day", "in", days.slice(0, 30))
+    .where("day", "==", day)
     .get();
 
   return snap.docs.map(doc => ({
@@ -1326,40 +1363,99 @@ async function readPerf(days: string[]): Promise<PerfSample[]> {
 }
 
 /**
+ * 把一天的樣本壓成直方圖存起來。
+ *
+ * **這是「更長的區間」能成立的那一步。** 原始樣本一天約一千筆，讀七天就是
+ * 一支 callable 的極限；三十天三萬筆讀不動。但一天的分佈壓成稀疏的桶只有
+ * 幾百個數字，讀九十份是九十次文件讀取 —— 這個量級跟區間長度幾乎無關。
+ *
+ * 文件 ID 就是日期，所以重跑同一天是覆蓋而不是長出第二筆。排程重試、
+ * 手動補算都靠這個性質。
+ *
+ * **匯出是給 `scripts/backfill-perf.mjs` 用的。** 那支腳本要補的是同一件事，
+ * 而「濾掉 dev 樣本」跟「cold 讀的是 detail.cold」這兩個細節一旦有第二份
+ * 實作就會慢慢走鐘 —— 走鐘的結果是兩批文件用不同的定義算出來，混在一起算
+ * 百分位數，而那不會噴錯只是錯的。同一個行為只留一份。
+ */
+export async function rollUpPerf(day: string): Promise<PerfDayPage[]> {
+  const pages = histogramOf(await readSamples(day));
+
+  await db()
+    .collection("stats")
+    .doc("perf")
+    .collection("days")
+    .doc(day)
+    .set(perfDoc(day, pages, new Date()));
+
+  return pages;
+}
+
+/** 區間裡的每日直方圖。缺的那幾天由 `missingDays` 認出來。 */
+async function readPerfDays(keys: string[]): Promise<PerfDoc[]> {
+  const snap = await db()
+    .collection("stats")
+    .doc("perf")
+    .collection("days")
+    .where("date", ">=", keys[0])
+    .where("date", "<=", keys[keys.length - 1])
+    .get();
+
+  return snap.docs.map(doc => doc.data() as PerfDoc);
+}
+
+/**
  * 系統健康。
  *
  * **只有效能這一半。** 設計稿上還有一張 Cloud Functions 的呼叫數與失敗率表，
  * 那份資料 Firestore 裡沒有 —— 它在 Cloud Monitoring。要嘛接 Monitoring API
- * （多一組權限與相依），要嘛每支函式自己 increment 一份計數（要動六支正在
- * 服役、而且發送路徑沒有測試的函式）。兩個都不是順手做得完的事，所以現在
- * 不畫那張表 —— 畫一張沒有資料的表比沒有更糟。
+ * （多一組相依，還要給 runtime 的 service account monitoring.viewer），要嘛
+ * 每支函式自己 increment 一份計數。後者看起來比較省事其實是錯的：函式掛掉
+ * 或逾時的時候那行 increment 根本跑不到，而那正是「失敗率」最該抓到的東西。
+ * 一個永遠漏掉最嚴重那類失敗的失敗率，比沒有更容易讓人做出錯誤結論。
  */
 export const adminHealth = onCall({ region: REGION }, async request => {
   await requireAdmin(request, "export.stats");
 
   /*
-    **固定七天，而且不收 range 參數。**
+    區間讀的是每日彙總，不是原始樣本。
 
-    perf 樣本一天大概一千筆，讀七天是七千筆 —— 一支 callable 的極限差不多在
-    這裡。30 天要三萬筆，那得等排程先把每天的百分位數算好，而那支排程還沒做。
+    以前這裡寫死七天，理由是「三十天三萬筆讀不動」—— 那是對的，但解法不是
+    不給選，而是先把每天的分佈壓成直方圖。現在排程一天寫一份，讀九十天就是
+    九十次文件讀取。
 
-    收一個 range 卻永遠回七天，比不收更糟：呼叫端會以為自己選得到，而畫面上
-    那個選了沒反應的按鈕沒有人查得出原因。
+    預設七天而不是三十天：這一頁的用途是「現在有沒有變慢」，而不是趨勢。
+    但送進來一個不認得的值要噴錯 —— 那代表前端有 bug，默默當成七天會讓那個
+    bug 永遠不被發現。
   */
-  const days = dayKeys("7d", new Date());
-  const samples = await readPerf(days);
+  const range = parseRange((request.data as { range?: unknown } | undefined)?.range ?? "7d");
+  if (!range) throw new HttpsError("invalid-argument", "不認得的時間區間");
+
+  const keys = dayKeys(range, new Date());
+  const docs = await readPerfDays(keys);
+  const summaries = summarizeDays(docs.flatMap(doc => doc.pages ?? []));
 
   return {
-    days: { from: days[0], to: days[days.length - 1] },
-    pages: summarize(samples),
-    total: samples.length,
+    range,
+    days: { from: keys[0], to: keys[keys.length - 1] },
+    pages: summaries,
+    total: summaries.reduce((sum, page) => sum + page.count, 0),
+    /*
+      少了一天的後果是「近 30 天的 p95」默默變成「近 29 天的」—— 一個看起來
+      完全正常、只是不是你以為的那個區間的數字。畫面要說得出來。
+    */
+    missingDays: missingDays(docs, keys),
+    /*
+      數字是從桶算出來的，所以有一個桶寬的誤差，而且方向固定是高估。
+      畫面要標出來 —— 一個看起來精確到毫秒的數字，如果實際上不是，那個
+      精確度本身就是誤導。
+    */
+    bucketMs: BUCKET_MS,
     /*
       這一頁少了什麼，由後端說。前端寫死一句「Functions 資料還沒有」的話，
       等它做好了那句話會留在畫面上沒人記得拿掉。
     */
     missing: [
-      "Cloud Functions 的呼叫數與失敗率還沒接 —— 那份資料在 Cloud Monitoring，不在 Firestore。",
-      "只有近 7 天。更長的區間要等排程先把每天的百分位數算好。"
+      "Cloud Functions 的呼叫數與失敗率還沒接 —— 那份資料在 Cloud Monitoring，不在 Firestore。"
     ]
   };
 });

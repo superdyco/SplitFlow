@@ -334,14 +334,28 @@ export interface PerfPageSummary {
 }
 
 export interface AdminHealth {
+  range: AdminRange;
   days: { from: string; to: string };
   pages: PerfPageSummary[];
   total: number;
+  /**
+   * 區間裡沒有彙總文件的那幾天。排程失敗的那天不會有。
+   *
+   * 不是空陣列的時候畫面**必須說出來** —— 少一天的後果是「近 30 天的 p95」
+   * 默默變成「近 29 天的」，一個看起來完全正常、只是不是你以為的那個區間的數字。
+   */
+  missingDays: string[];
+  /**
+   * 桶寬（毫秒）。數字是從每日直方圖算出來的，所以有這麼大的誤差，
+   * 而且方向固定是高估。畫面要標出來 —— 一個看起來精確到毫秒的數字，
+   * 如果實際上不是，那個精確度本身就是誤導。
+   */
+  bucketMs: number;
   /** 這一頁少了什麼。由後端說，做好了才會消失。 */
   missing: string[];
 }
 
-export async function fetchHealth(): Promise<AdminHealth> {
-  const result = await callable<Record<string, never>, AdminHealth>("adminHealth")({});
+export async function fetchHealth(range: AdminRange): Promise<AdminHealth> {
+  const result = await callable<{ range: AdminRange }, AdminHealth>("adminHealth")({ range });
   return result.data;
 }
