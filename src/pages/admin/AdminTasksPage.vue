@@ -455,6 +455,15 @@ const day = (value: string | null) => (value ? value.slice(0, 10) : "—");
   }
 }
 
+/*
+  卡片自己捲。清單旁邊固定放 380px 的詳情，視窗窄一點（約 980–1250px）
+  剩給表格的寬度就會小於它的 min-content —— 表格不會再縮，只會整片穿出
+  卡片的圓角邊。捲軸至少讓它留在框裡。
+*/
+.list {
+  overflow-x: auto;
+}
+
 .tbl {
   width: 100%;
   border-collapse: separate;

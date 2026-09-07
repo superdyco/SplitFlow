@@ -93,6 +93,17 @@ const view = computed(
   min-height: 100vh;
 }
 
+/*
+  內容區。.page 本來是一般頁面的根，沒有任何 flex 設定 —— 放進這個橫排裡
+  就成了一個 flex: 0 1 auto、min-width: auto 的項目：寬度由內容決定（寬螢幕
+  上右邊空一大塊、.console 的 margin: 0 auto 也置中不了），而且縮不到內容
+  以下（長的 Email 跟 UID 會把整頁推出視窗）。兩件事都得寫清楚才會停。
+*/
+.admin > .page {
+  flex: 1;
+  min-width: 0;
+}
+
 .side {
   width: 220px;
   flex: none;
