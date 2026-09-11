@@ -12,8 +12,8 @@
  * 錯誤日誌之外，什麼也改變不了。
  */
 import { initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { getAuth, type DecodedIdToken } from "firebase-admin/auth";
+import { FieldValue, getFirestore, type WriteBatch } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { getStorage } from "firebase-admin/storage";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
@@ -26,6 +26,18 @@ import { readWeather, weatherUrl, type WeatherResult } from "./weather.js";
 import { pickSuccessor, type SuccessorCandidate } from "./successor.js";
 import { joinDecision } from "./join.js";
 import { canDeleteReceipt } from "./receipt.js";
+import {
+  accountRoleAfterMerge,
+  checkMergeCaller,
+  mergeTarget,
+  movedMember,
+  rewriteExpense,
+  rewritePayment,
+  rewriteSettlement,
+  rewriteTask,
+  type Data,
+  type MergeIds
+} from "./guestMerge.js";
 
 initializeApp();
 
@@ -489,6 +501,179 @@ export const onExpenseWeather = onDocumentCreated(
     }
   }
 );
+
+/** 一個 batch 上限 500 筆，留 50 筆餘裕。 */
+const CHUNK = 450;
+
+type Write = (batch: WriteBatch) => void;
+
+async function commitInChunks(writes: Write[]): Promise<void> {
+  for (let i = 0; i < writes.length; i += CHUNK) {
+    const batch = db.batch();
+    for (const write of writes.slice(i, i + CHUNK)) write(batch);
+    await batch.commit();
+  }
+}
+
+const LEDGER_REWRITES = [
+  ["expenses", rewriteExpense],
+  ["payments", rewritePayment],
+  ["settlements", rewriteSettlement]
+] as const;
+
+/**
+ * 把訪客合併進正式帳號。規則見 `guestMerge.ts`，這裡只負責讀與寫。
+ *
+ * **身分從兩個地方來**：正式帳號 A 取自 auth context（呼叫者本人），訪客 G 取自
+ * 參數裡的 ID token（驗過簽章）。只收 uid 的話，任何人都能宣稱某個訪客是自己，
+ * 把別人的任務吞掉。
+ *
+ * **可以重跑**：每個任務先改帳目（冪等），最後才在同一個 transaction 裡搬成員
+ * 文件、更新任務。任務更新前下一次查詢還找得到它，更新後就找不到。而「A 的
+ * 成員文件在不在」只在最後一步才會變，所以重跑判斷出來的目標跟第一次一樣。
+ *
+ * Auth 放最後刪，理由跟 `deleteAccount` 一樣：中途失敗 G 還在，還能重試。
+ */
+export const mergeGuest = onCall({ region: REGION }, async request => {
+  const account = request.auth?.uid;
+  if (!account) throw new HttpsError("unauthenticated", "請先登入");
+
+  const guestToken = request.data?.guestToken;
+  if (typeof guestToken !== "string" || !guestToken) {
+    throw new HttpsError("invalid-argument", "缺少訪客憑證");
+  }
+
+  let decoded: DecodedIdToken;
+  try {
+    decoded = await getAuth().verifyIdToken(guestToken, true);
+  } catch (error) {
+    // 簽章沒問題、只是帳號已經不在 —— 上一次其實已經合併完成（Auth 是最後才刪的）。
+    const code = (error as { code?: string }).code;
+    if (code === "auth/user-not-found") return { mergedTasks: 0, virtualizedTasks: 0 };
+    throw new HttpsError("permission-denied", "訪客憑證無效或已過期，請重新綁定一次");
+  }
+
+  const refusal = checkMergeCaller({
+    callerUid: account,
+    callerProvider: request.auth?.token.firebase?.sign_in_provider,
+    guestUid: decoded.uid,
+    guestProvider: decoded.firebase?.sign_in_provider
+  });
+  if (refusal) throw new HttpsError("permission-denied", refusal);
+
+  const guest = decoded.uid;
+  const [guestProfile, accountProfile] = await Promise.all([
+    db.doc(`users/${guest}`).get(),
+    db.doc(`users/${account}`).get()
+  ]);
+  const guestNickname = (guestProfile.get("nickname") as string | undefined) ?? "";
+  const accountNickname = (accountProfile.get("nickname") as string | undefined) ?? "";
+
+  let mergedTasks = 0;
+  let virtualizedTasks = 0;
+
+  const tasks = await db.collection("tasks").where("memberIds", "array-contains", guest).get();
+
+  for (const taskSnap of tasks.docs) {
+    const taskRef = taskSnap.ref;
+    const accountMemberRef = taskRef.collection("members").doc(account);
+    const guestMemberRef = taskRef.collection("members").doc(guest);
+
+    const accountMember = await accountMemberRef.get();
+    const target = mergeTarget({
+      guest,
+      account,
+      taskId: taskSnap.id,
+      accountHasMember: accountMember.exists
+    });
+    const ids: MergeIds = { guest, account, target };
+
+    // 第一步：帳目。冪等 —— 已經改過的文件 rewrite 回 null，不會再寫。
+    const ledgerWrites: Write[] = [];
+    for (const [name, rewrite] of LEDGER_REWRITES) {
+      const snap = await taskRef.collection(name).get();
+      for (const docSnap of snap.docs) {
+        const changes = rewrite(docSnap.data(), ids);
+        if (changes) ledgerWrites.push(batch => batch.update(docSnap.ref, changes));
+      }
+    }
+    await commitInChunks(ledgerWrites);
+
+    // 第二步：成員文件與任務，一起落地。用 transaction 重讀，免得蓋掉這段期間
+    // 剛加入的人（memberIds 是整個陣列寫回去的）。
+    await db.runTransaction(async tx => {
+      const [freshTask, freshAccountMember, freshGuestMember] = await tx.getAll(
+        taskRef,
+        accountMemberRef,
+        guestMemberRef
+      );
+      if (!(freshTask.get("memberIds") as string[] | undefined)?.includes(guest)) return;
+
+      // 第一步之後正式帳號剛好加入或離開這個任務，帳目改的目標就不對了。
+      // 丟 aborted 讓用戶端重試：重跑會用新的判斷把帳目補改一次。
+      if (freshAccountMember.exists !== accountMember.exists) {
+        throw new HttpsError("aborted", "這個任務剛好有變動，請再試一次");
+      }
+
+      if (freshGuestMember.exists) {
+        tx.set(
+          taskRef.collection("members").doc(target),
+          movedMember(freshGuestMember.data() as Data, { ids, guestNickname, accountNickname })
+        );
+        tx.delete(guestMemberRef);
+      }
+
+      if (target !== account) {
+        const role = accountRoleAfterMerge(
+          freshGuestMember.get("role"),
+          freshAccountMember.get("role")
+        );
+        if (role) tx.update(accountMemberRef, { role });
+      }
+
+      tx.update(taskRef, {
+        ...rewriteTask(freshTask.data() as Data, ids),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    });
+
+    if (target === account) mergedTasks += 1;
+    else virtualizedTasks += 1;
+  }
+
+  // 任務以外：邀請、收藏。
+  const invites = await db.collection("invites").where("createdBy", "==", guest).get();
+  await commitInChunks(
+    invites.docs.map(docSnap => (batch: WriteBatch) => batch.update(docSnap.ref, { createdBy: account }))
+  );
+
+  const [guestFavorites, accountFavorites] = await Promise.all([
+    db.collection(`users/${guest}/favorites`).get(),
+    db.collection(`users/${account}/favorites`).get()
+  ]);
+  const owned = new Set(accountFavorites.docs.map(docSnap => docSnap.id));
+  await commitInChunks(
+    guestFavorites.docs
+      .filter(docSnap => !owned.has(docSnap.id))
+      .map(docSnap => (batch: WriteBatch) =>
+        batch.set(db.doc(`users/${account}/favorites/${docSnap.id}`), docSnap.data())
+      )
+  );
+
+  await db.recursiveDelete(db.collection(`users/${guest}/tokens`));
+  await db.recursiveDelete(db.collection(`users/${guest}/favorites`));
+  await db.doc(`users/${guest}`).delete();
+
+  try {
+    await getAuth().deleteUser(guest);
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code !== "auth/user-not-found") throw error;
+  }
+
+  logger.info("訪客已合併", { guest, account, mergedTasks, virtualizedTasks });
+  return { mergedTasks, virtualizedTasks };
+});
 
 /*
   管理後台。單獨一個檔案，因為它跟這裡其他函式沒有共用的東西 ——
