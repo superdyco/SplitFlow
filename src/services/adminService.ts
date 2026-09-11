@@ -135,6 +135,14 @@ export interface AdminUserDetail {
   counts: { tasks: number; owned: number; expenses: number };
   /** 只有前 10 個。 */
   tasks: AdminUserTask[];
+  /** 標成可能不存在：前端與 functions 分開部署，舊版的 adminUser 不會回它。 */
+  ai?: {
+    /** null 代表還沒用過，第一次辨識時才會送 3 點。 */
+    balance: number | null;
+    calls: number;
+    reads: number;
+    ledger: AiLedgerRow[];
+  };
 }
 
 export async function fetchUsers(params: {
@@ -367,5 +375,96 @@ export interface AdminHealth {
 
 export async function fetchHealth(range: AdminRange): Promise<AdminHealth> {
   const result = await callable<{ range: AdminRange }, AdminHealth>("adminHealth")({ range });
+  return result.data;
+}
+
+/* ------------------------------------------------------------------ AI */
+
+export interface AiModelOption {
+  id: string;
+  label: string;
+  note: string;
+}
+
+export interface AdminAiConfig {
+  configured: boolean;
+  keyTail: string;
+  model: string;
+  models: AiModelOption[];
+  updatedAt: string | null;
+  updatedBy: string;
+}
+
+export interface AiLedgerRow {
+  id: string;
+  uid: string;
+  nickname: string;
+  type: string;
+  delta: number;
+  balanceAfter: number;
+  at: string | null;
+  readResult: string | null;
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  adminEmail: string | null;
+  reason: string | null;
+}
+
+export type AiLedgerFilter = "all" | "use" | "adjust" | "free";
+
+export interface AdminAiUsage {
+  range: AdminRange;
+  days: { from: string; to: string };
+  totals: { calls: number; reads: number; failures: number; inputTokens: number; outputTokens: number };
+  /** 0 代表還沒開始記，不是「沒有人用」。 */
+  recordedDays: number;
+  rows: AiLedgerRow[];
+  cursor: string | null;
+}
+
+export type AiTestResult =
+  | {
+      ok: true;
+      model: string;
+      readResult: string;
+      fields: Record<string, unknown>;
+      inputTokens: number | null;
+      outputTokens: number | null;
+      ms: number;
+    }
+  | { ok: false; model: string; error: string; ms: number };
+
+/** 會在稽核日誌留下一筆 view.ai。 */
+export async function fetchAiConfig(): Promise<AdminAiConfig> {
+  return (await callable<Record<string, never>, AdminAiConfig>("adminAiConfig")({})).data;
+}
+
+/** 金鑰留空代表只換模型。後端會先驗再存，驗不過會丟中文訊息。 */
+export async function setAiConfig(params: { apiKey?: string; model: string; reason: string }): Promise<void> {
+  await callable<typeof params, unknown>("adminSetAiConfig")(params);
+}
+
+/** 實際跑一次，會花一點點錢。 */
+export async function testAiConfig(): Promise<AiTestResult> {
+  return (await callable<Record<string, never>, AiTestResult>("adminTestAiConfig")({})).data;
+}
+
+export async function fetchAiUsage(params: {
+  range: AdminRange;
+  type?: AiLedgerFilter;
+  cursor?: string | null;
+}): Promise<AdminAiUsage> {
+  return (await callable<typeof params, AdminAiUsage>("adminAiUsage")(params)).data;
+}
+
+export async function adjustCredits(
+  uid: string,
+  delta: number,
+  reason: string
+): Promise<{ balance: number; delta: number }> {
+  const result = await callable<{ uid: string; delta: number; reason: string }, { balance: number; delta: number }>(
+    "adminAdjustCredits"
+  )({ uid, delta, reason });
   return result.data;
 }

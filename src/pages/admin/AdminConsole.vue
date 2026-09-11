@@ -7,6 +7,7 @@ import AdminTasksPage from "@/pages/admin/AdminTasksPage.vue";
 import AdminReportsPage from "@/pages/admin/AdminReportsPage.vue";
 import AdminHealthPage from "@/pages/admin/AdminHealthPage.vue";
 import AdminAuditPage from "@/pages/admin/AdminAuditPage.vue";
+import AdminAiPage from "@/pages/admin/AdminAiPage.vue";
 
 /**
  * 後台的外框。
@@ -28,6 +29,7 @@ const SECTIONS = [
   { id: "tasks", label: "任務", to: "/admin/tasks" },
   { id: "reports", label: "公開報告", to: "/admin/reports" },
   { id: "health", label: "系統健康", to: "/admin/health" },
+  { id: "ai", label: "AI 設定", to: "/admin/ai" },
   { id: "audit", label: "稽核日誌", to: "/admin/audit" }
 ] as const;
 
@@ -42,6 +44,7 @@ const VIEWS = {
   tasks: AdminTasksPage,
   reports: AdminReportsPage,
   health: AdminHealthPage,
+  ai: AdminAiPage,
   audit: AdminAuditPage
 } as const;
 

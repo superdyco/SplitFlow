@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import {
+  adjustCredits,
   disableUser,
   fetchUser,
   fetchUsers,
@@ -15,6 +16,7 @@ import EmptyState from "@/components/common/EmptyState.vue";
 import AdminActionDialog from "@/pages/admin/AdminActionDialog.vue";
 import { providerLabel } from "@/utils/authError";
 import { GUEST_PROVIDER_ID } from "@/utils/guest";
+import { ledgerResultLabel, ledgerTypeLabel } from "@/utils/aiLedger";
 
 const FILTERS: Array<{ value: UserFilter; label: string }> = [
   { value: "all", label: "全部" },
@@ -100,6 +102,10 @@ async function select(row: AdminUserRow) {
   selected.value = row.uid;
   detail.value = null;
   detailError.value = null;
+  // 上一個人打到一半的點數與理由不能留給下一個人 —— 理由會原字寫進稽核日誌。
+  adjustAmount.value = null;
+  adjustReason.value = "";
+  adjustError.value = null;
   detailLoading.value = true;
   try {
     detail.value = await fetchUser(row.uid);
@@ -133,6 +139,43 @@ async function confirmDisable(reason: string) {
     acting.value = false;
   }
 }
+
+const adjustAmount = ref<number | null>(null);
+const adjustReason = ref("");
+const adjusting = ref(false);
+const adjustError = ref<string | null>(null);
+
+const canAdjust = computed(() => {
+  const value = adjustAmount.value;
+  return (
+    !adjusting.value &&
+    !!adjustReason.value.trim() &&
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value !== 0 &&
+    Math.abs(value) <= 100
+  );
+});
+
+/** 調整點數。申訴的補償就是走這裡；後端寫稽核日誌與點數紀錄。 */
+async function confirmAdjust() {
+  const uid = detail.value?.profile.uid;
+  if (!uid || adjustAmount.value === null) return;
+  adjusting.value = true;
+  adjustError.value = null;
+  try {
+    await adjustCredits(uid, adjustAmount.value, adjustReason.value.trim());
+    adjustAmount.value = null;
+    adjustReason.value = "";
+    await fetchUser(uid).then(next => (detail.value = next));
+  } catch (err) {
+    adjustError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    adjusting.value = false;
+  }
+}
+
+const now = new Date();
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "擁有者",
@@ -312,6 +355,47 @@ function whenSeen(row: AdminUserRow): string {
               <div><span class="label">記過的支出</span><strong>{{ detail.counts.expenses }}</strong></div>
             </div>
 
+            <div v-if="detail.ai" class="tasks">
+              <h3 class="card-head">AI 辨識</h3>
+              <p class="tiny">
+                <template v-if="detail.ai.balance === null">還沒用過（第一次辨識時會送 3 點）。</template>
+                <template v-else>剩 {{ detail.ai.balance }} 點。</template>
+                辨識 {{ detail.ai.calls }} 次，失敗 {{ detail.ai.calls - detail.ai.reads }} 次。
+              </p>
+
+              <div v-if="detail.profile.provider !== GUEST_PROVIDER_ID" class="adjust">
+                <input
+                  v-model.number="adjustAmount"
+                  class="input"
+                  type="number"
+                  min="-100"
+                  max="100"
+                  step="1"
+                  placeholder="例如 3 或 -1"
+                />
+                <input
+                  v-model="adjustReason"
+                  class="input grow"
+                  maxlength="500"
+                  placeholder="理由（必填，會寫進稽核日誌）"
+                />
+                <button type="button" class="btn btn-sm" :disabled="!canAdjust" @click="confirmAdjust">
+                  {{ adjusting ? "調整中..." : "調整點數" }}
+                </button>
+              </div>
+              <p v-else class="tiny">訪客不能用 AI 辨識，也不能調整點數。</p>
+              <p v-if="adjustError" class="tiny ai-error">{{ adjustError }}</p>
+
+              <ul v-if="detail.ai.ledger.length">
+                <li v-for="row in detail.ai.ledger" :key="row.id">
+                  <span class="tiny num">{{ row.at ? row.at.slice(0, 16).replace("T", " ") : "—" }}</span>
+                  <span class="pill">{{ ledgerTypeLabel(row.type) }}</span>
+                  <span class="num">{{ row.delta > 0 ? `+${row.delta}` : row.delta }}</span>
+                  <span class="tiny">{{ ledgerResultLabel(row, now) || row.reason || "" }}</span>
+                </li>
+              </ul>
+            </div>
+
             <div v-if="detail.tasks.length" class="tasks">
               <h3 class="card-head">參與的任務</h3>
               <ul>
@@ -376,6 +460,24 @@ function whenSeen(row: AdminUserRow): string {
     />
   </main>
 </template>
+
+<style scoped>
+/* AI 點數的調整列。放在獨立的 style 區塊，不去動上面那一大段既有樣式。 */
+.adjust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.adjust .input[type="number"] {
+  width: 120px;
+}
+
+.ai-error {
+  color: var(--color-danger);
+}
+</style>
 
 <style scoped>
 .console {

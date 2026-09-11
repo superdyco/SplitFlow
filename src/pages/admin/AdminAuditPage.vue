@@ -19,6 +19,9 @@ const ACTION_LABELS: Record<string, string> = {
   "act.revokeReport": "撤下公開報告",
   "act.disableUser": "停用帳號",
   "act.archiveTask": "強制封存任務",
+  "view.ai": "檢視 AI 設定",
+  "act.setAiConfig": "更換 AI 設定",
+  "act.adjustCredits": "調整 AI 點數",
   "denied.access": "被擋下的存取"
 };
 
