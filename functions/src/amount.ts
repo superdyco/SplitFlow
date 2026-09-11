@@ -18,10 +18,21 @@ const MINOR_UNITS: Record<string, number> = {
   EGP: 2,
   EUR: 2,
   HKD: 2,
+  MOP: 2,
+  SGD: 2,
+  MYR: 2,
+  PHP: 2,
+  GBP: 2,
+  CHF: 2,
+  CAD: 2,
+  AUD: 2,
+  NZD: 2,
   VND: 0,
   KRW: 0,
   // 日圓沒有輔幣單位，1 円就是最小單位 —— 跟 VND、KRW 同一類。
-  JPY: 0
+  JPY: 0,
+  // 印尼盾實際上不用小數。跟網頁版一致，不然推播上的金額差一百倍。
+  IDR: 0
 };
 
 export function minorUnits(currency: string): number {

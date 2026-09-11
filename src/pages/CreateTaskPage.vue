@@ -6,7 +6,7 @@ import ErrorState from "@/components/common/ErrorState.vue";
 import type { Task } from "@/types/task";
 import { createTask } from "@/services/taskService";
 import { useUserStore } from "@/stores/user";
-import { CURRENCIES } from "@/utils/currency";
+import CurrencyPicker from "@/components/common/CurrencyPicker.vue";
 import {
   buildInviteUrl,
   dateRangeError,
@@ -76,9 +76,7 @@ async function copy() {
         </label>
         <label class="field">
           <span class="label">主要幣別</span>
-          <select v-model="defaultCurrency" class="select">
-            <option v-for="currency in CURRENCIES" :key="currency" :value="currency">{{ currency }}</option>
-          </select>
+          <CurrencyPicker v-model="defaultCurrency" />
         </label>
         <label class="field">
           <span class="label">開始日期</span>

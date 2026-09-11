@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CurrencyPicker from "@/components/common/CurrencyPicker.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
@@ -19,7 +20,6 @@ import { lookupWeather } from "@/services/weatherService";
 import type { WeatherAt } from "@/services/weatherService";
 import type { ExpenseWeather } from "@/types/weather";
 import {
-  CURRENCIES,
   allocate,
   amountInputError,
   amountToInput,
@@ -612,9 +612,7 @@ onMounted(load);
             </label>
             <label class="field currency">
               <span class="label">幣別</span>
-              <select v-model="currency" class="select">
-                <option v-for="item in CURRENCIES" :key="item" :value="item">{{ item }}</option>
-              </select>
+              <CurrencyPicker v-model="currency" :pinned="baseCurrency" compact />
             </label>
           </div>
 

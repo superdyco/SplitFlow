@@ -1,4 +1,45 @@
-export const CURRENCIES = ["TWD", "JPY", "THB", "USD", "VND", "CNY", "EGP", "KRW", "EUR", "HKD"];
+export interface CurrencyInfo {
+  code: string;
+  /** 選單上跟代碼並列的中文名。 */
+  name: string;
+  /** 搜尋用：國家、俗稱。打「美國」「美金」要找得到 USD。 */
+  keywords: string[];
+}
+
+/**
+ * 支援的幣別。**順序就是選單的順序**：依地區排，台灣人常去的在前面。
+ *
+ * 金額旁邊只顯示代碼（「USD 1,234」）—— 那裡是在讀，短而且不會混淆；
+ * `$` 同時是美元、港幣、台幣、新加坡幣，`¥` 同時是日圓與人民幣。
+ * 中文名只在選單出現，那裡是在找。
+ *
+ * 加一個幣別要改三份小數位數表（這裡、`functions/src/amount.ts`、Flutter 的
+ * `currency.dart`），`tests/currencyParity.test.ts` 盯著前兩份。
+ */
+export const CURRENCY_INFO: CurrencyInfo[] = [
+  { code: "TWD", name: "新台幣", keywords: ["台灣", "臺灣", "台幣", "臺幣"] },
+  { code: "JPY", name: "日圓", keywords: ["日本", "日幣", "円"] },
+  { code: "KRW", name: "韓元", keywords: ["韓國", "韓幣"] },
+  { code: "CNY", name: "人民幣", keywords: ["中國", "大陸"] },
+  { code: "HKD", name: "港幣", keywords: ["香港"] },
+  { code: "MOP", name: "澳門幣", keywords: ["澳門"] },
+  { code: "THB", name: "泰銖", keywords: ["泰國"] },
+  { code: "VND", name: "越南盾", keywords: ["越南"] },
+  { code: "SGD", name: "新加坡幣", keywords: ["新加坡"] },
+  { code: "MYR", name: "馬幣", keywords: ["馬來西亞", "令吉"] },
+  { code: "PHP", name: "菲律賓披索", keywords: ["菲律賓", "披索"] },
+  { code: "IDR", name: "印尼盾", keywords: ["印尼", "峇里島", "巴里島"] },
+  { code: "USD", name: "美元", keywords: ["美國", "美金"] },
+  { code: "CAD", name: "加幣", keywords: ["加拿大"] },
+  { code: "EUR", name: "歐元", keywords: ["歐洲", "歐盟"] },
+  { code: "GBP", name: "英鎊", keywords: ["英國"] },
+  { code: "CHF", name: "瑞士法郎", keywords: ["瑞士"] },
+  { code: "AUD", name: "澳幣", keywords: ["澳洲"] },
+  { code: "NZD", name: "紐西蘭幣", keywords: ["紐西蘭", "紐幣"] },
+  { code: "EGP", name: "埃及鎊", keywords: ["埃及"] }
+];
+
+export const CURRENCIES = CURRENCY_INFO.map(item => item.code);
 
 const MINOR_UNITS: Record<string, number> = {
   TWD: 2,
@@ -8,14 +49,58 @@ const MINOR_UNITS: Record<string, number> = {
   EGP: 2,
   EUR: 2,
   HKD: 2,
+  MOP: 2,
+  SGD: 2,
+  MYR: 2,
+  PHP: 2,
+  GBP: 2,
+  CHF: 2,
+  CAD: 2,
+  AUD: 2,
+  NZD: 2,
   VND: 0,
   KRW: 0,
   // 日圓沒有輔幣單位，1 円就是最小單位 —— 跟 VND、KRW 同一類。
-  JPY: 0
+  JPY: 0,
+  // 印尼盾在 ISO 上寫 2 位，但實際上沒有人用小數 —— 當成 2 位的話，
+  // 一碗麵會寫成「Rp 35,000.00」，而且輸入時多兩個永遠是 0 的位數。
+  IDR: 0
 };
 
 export function minorUnits(currency: string): number {
   return MINOR_UNITS[currency] ?? 2;
+}
+
+/** 選單上的樣子：代碼在前（電腦上打代碼開頭就跳得到）、中文在後。 */
+export function currencyLabel(code: string): string {
+  const info = CURRENCY_INFO.find(item => item.code === code);
+  return info ? `${info.code} ${info.name}` : code;
+}
+
+/** 0 = 代碼開頭相符，1 = 代碼包含，2 = 中文名或關鍵字包含；null = 不相符。 */
+function matchRank(item: CurrencyInfo, query: string): number | null {
+  if (!query) return 0;
+  const code = item.code.toLowerCase();
+  if (code.startsWith(query)) return 0;
+  if (code.includes(query)) return 1;
+  if (item.name.includes(query) || item.keywords.some(keyword => keyword.includes(query))) return 2;
+  return null;
+}
+
+/**
+ * 幣別選單的搜尋。代碼不分大小寫，中文名、國家、俗稱都比對。
+ *
+ * 排序：相符程度 → 主要幣別優先 → 清單原本的順序。主要幣別在同一級裡排第一，
+ * 因為一趟旅程裡最常選的就是它。
+ */
+export function searchCurrencies(query: string, pinned?: string): CurrencyInfo[] {
+  const normalized = query.trim().toLowerCase();
+  const pin = (item: CurrencyInfo) => (item.code === pinned ? 0 : 1);
+
+  return CURRENCY_INFO.map((item, index) => ({ item, index, rank: matchRank(item, normalized) }))
+    .filter((entry): entry is { item: CurrencyInfo; index: number; rank: number } => entry.rank !== null)
+    .sort((a, b) => a.rank - b.rank || pin(a.item) - pin(b.item) || a.index - b.index)
+    .map(entry => entry.item);
 }
 
 /** 把使用者輸入的金額字串換成最小單位整數，例如 TWD "450.5" -> 45050。 */

@@ -8,9 +8,47 @@ import 'dart:math' as math;
 /// **金額一律是最小單位整數**（TWD 450.50 存成 45050）。浮點數不碰錢，
 /// 這是整份程式碼最重要的一條規則。
 
-const List<String> currencies = [
-  'TWD', 'JPY', 'THB', 'USD', 'VND', 'CNY', 'EGP', 'KRW', 'EUR', 'HKD',
+class CurrencyInfo {
+  final String code;
+
+  /// 選單上跟代碼並列的中文名。
+  final String name;
+
+  /// 搜尋用：國家、俗稱。打「美國」「美金」要找得到 USD。
+  final List<String> keywords;
+
+  const CurrencyInfo(this.code, this.name, this.keywords);
+}
+
+/// 支援的幣別。**順序就是選單的順序**：依地區排，台灣人常去的在前面。
+///
+/// 金額旁邊只顯示代碼 —— `$` 同時是美元、港幣、台幣、新加坡幣，不能拿來認。
+/// 中文名只在選單出現。內容跟 `src/utils/currency.ts` 的 `CURRENCY_INFO` 一致。
+const List<CurrencyInfo> currencyInfo = [
+  CurrencyInfo('TWD', '新台幣', ['台灣', '臺灣', '台幣', '臺幣']),
+  CurrencyInfo('JPY', '日圓', ['日本', '日幣', '円']),
+  CurrencyInfo('KRW', '韓元', ['韓國', '韓幣']),
+  CurrencyInfo('CNY', '人民幣', ['中國', '大陸']),
+  CurrencyInfo('HKD', '港幣', ['香港']),
+  CurrencyInfo('MOP', '澳門幣', ['澳門']),
+  CurrencyInfo('THB', '泰銖', ['泰國']),
+  CurrencyInfo('VND', '越南盾', ['越南']),
+  CurrencyInfo('SGD', '新加坡幣', ['新加坡']),
+  CurrencyInfo('MYR', '馬幣', ['馬來西亞', '令吉']),
+  CurrencyInfo('PHP', '菲律賓披索', ['菲律賓', '披索']),
+  CurrencyInfo('IDR', '印尼盾', ['印尼', '峇里島', '巴里島']),
+  CurrencyInfo('USD', '美元', ['美國', '美金']),
+  CurrencyInfo('CAD', '加幣', ['加拿大']),
+  CurrencyInfo('EUR', '歐元', ['歐洲', '歐盟']),
+  CurrencyInfo('GBP', '英鎊', ['英國']),
+  CurrencyInfo('CHF', '瑞士法郎', ['瑞士']),
+  CurrencyInfo('AUD', '澳幣', ['澳洲']),
+  CurrencyInfo('NZD', '紐西蘭幣', ['紐西蘭', '紐幣']),
+  CurrencyInfo('EGP', '埃及鎊', ['埃及']),
 ];
+
+final List<String> currencies =
+    List.unmodifiable(currencyInfo.map((item) => item.code));
 
 const Map<String, int> _minorUnits = {
   'TWD': 2,
@@ -20,13 +58,69 @@ const Map<String, int> _minorUnits = {
   'EGP': 2,
   'EUR': 2,
   'HKD': 2,
+  'MOP': 2,
+  'SGD': 2,
+  'MYR': 2,
+  'PHP': 2,
+  'GBP': 2,
+  'CHF': 2,
+  'CAD': 2,
+  'AUD': 2,
+  'NZD': 2,
   'VND': 0,
   'KRW': 0,
   // 日圓沒有輔幣單位，1 円就是最小單位 —— 跟 VND、KRW 同一類。
   'JPY': 0,
+  // 印尼盾在 ISO 上寫 2 位，但實際上沒有人用小數。三份表都要是 0。
+  'IDR': 0,
 };
 
 int minorUnits(String currency) => _minorUnits[currency] ?? 2;
+
+/// 選單上的樣子：代碼在前、中文在後。認不得的代碼原樣回傳。
+String currencyLabel(String code) {
+  for (final item in currencyInfo) {
+    if (item.code == code) return '${item.code} ${item.name}';
+  }
+  return code;
+}
+
+/// 0 = 代碼開頭相符，1 = 代碼包含，2 = 中文名或關鍵字包含；null = 不相符。
+int? _matchRank(CurrencyInfo item, String query) {
+  if (query.isEmpty) return 0;
+  final code = item.code.toLowerCase();
+  if (code.startsWith(query)) return 0;
+  if (code.contains(query)) return 1;
+  if (item.name.contains(query) ||
+      item.keywords.any((keyword) => keyword.contains(query))) {
+    return 2;
+  }
+  return null;
+}
+
+/// 幣別選單的搜尋。`src/utils/currency.ts` 的 `searchCurrencies` 的 Dart 版。
+///
+/// 排序：相符程度 → 主要幣別優先 → 清單原本的順序。比較子三段都寫明，
+/// 因為 Dart 的 List.sort 不保證穩定（見 allocate 的說明）。
+List<CurrencyInfo> searchCurrencies(String query, {String? pinned}) {
+  final normalized = query.trim().toLowerCase();
+  final scored = <({CurrencyInfo item, int rank, int index})>[];
+  for (var i = 0; i < currencyInfo.length; i += 1) {
+    final rank = _matchRank(currencyInfo[i], normalized);
+    if (rank != null) scored.add((item: currencyInfo[i], rank: rank, index: i));
+  }
+
+  int pin(CurrencyInfo item) => item.code == pinned ? 0 : 1;
+  scored.sort((a, b) {
+    final byRank = a.rank.compareTo(b.rank);
+    if (byRank != 0) return byRank;
+    final byPin = pin(a.item).compareTo(pin(b.item));
+    if (byPin != 0) return byPin;
+    return a.index.compareTo(b.index);
+  });
+
+  return [for (final entry in scored) entry.item];
+}
 
 /// JS 的 Number.MAX_SAFE_INTEGER。
 ///

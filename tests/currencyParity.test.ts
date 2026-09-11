@@ -20,7 +20,12 @@ import {
  * 裡跟這邊對齊的案例守著。）
  */
 describe("Cloud Function 的金額格式化跟網頁版一致", () => {
-  const currencies = ["TWD", "JPY", "USD", "KRW", "VND", "EUR", "THB", "XXX", ""];
+  // IDR 一定要在這裡：它是新加的幣別裡唯一 0 位小數的，漏設的那一份會差一百倍。
+  const currencies = [
+    "TWD", "JPY", "USD", "KRW", "VND", "EUR", "THB",
+    "IDR", "SGD", "MOP", "GBP", "AUD",
+    "XXX", ""
+  ];
 
   const amounts = [
     0,

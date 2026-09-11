@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
-import '../domain/currency.dart';
 import '../domain/expense_date.dart';
 import '../domain/invite.dart';
 import '../domain/validation.dart' as validate;
 import '../state/providers.dart';
+import 'currency_picker.dart';
 import 'system_share.dart';
 import 'theme.dart';
 
@@ -159,15 +159,9 @@ class _CreateTaskPageState extends ConsumerState<CreateTaskPage> {
           const SizedBox(height: 16),
           Text('主要幣別', style: text.bodySmall),
           const SizedBox(height: 6),
-          DropdownButton<String>(
+          CurrencyPicker(
             value: _currency,
-            isExpanded: true,
-            items: [
-              for (final code in currencies)
-                DropdownMenuItem(value: code, child: Text(code)),
-            ],
-            onChanged: (value) =>
-                setState(() => _currency = value ?? _currency),
+            onChanged: (code) => setState(() => _currency = code),
           ),
           Text('所有支出最後都會換算成這個幣別結算。建立之後不能改。', style: text.bodySmall),
           const SizedBox(height: 20),

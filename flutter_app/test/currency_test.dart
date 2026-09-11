@@ -155,4 +155,103 @@ void main() {
       expect(amountInputError('450.50', 'VND'), 'VND 金額只能是整數');
     });
   });
+
+  // 以下是 `tests/currencySearch.test.ts` 的 Dart 版，案例一比一。
+  group('幣別清單', () {
+    test('20 種，代碼不重複', () {
+      expect(currencies.length, 20);
+      expect(currencies.toSet().length, 20);
+    });
+
+    test('原本的十種一個都沒少 —— 既有任務與支出存的就是這些代碼', () {
+      for (final code in ['TWD', 'JPY', 'THB', 'USD', 'VND', 'CNY', 'EGP', 'KRW', 'EUR', 'HKD']) {
+        expect(currencies, contains(code));
+      }
+    });
+
+    test('這次加的十種都在', () {
+      for (final code in ['SGD', 'MYR', 'PHP', 'IDR', 'MOP', 'GBP', 'CHF', 'CAD', 'AUD', 'NZD']) {
+        expect(currencies, contains(code));
+      }
+    });
+
+    test('每一種都有中文名', () {
+      expect(currencyInfo.every((item) => item.name.isNotEmpty), isTrue);
+    });
+  });
+
+  group('minorUnits（新幣別）', () {
+    test('印尼盾實際上不用小數，跟日圓一樣是 0 位', () {
+      expect(minorUnits('IDR'), 0);
+    });
+
+    test('其他新幣別是 2 位', () {
+      for (final code in ['SGD', 'MYR', 'PHP', 'MOP', 'GBP', 'CHF', 'CAD', 'AUD', 'NZD']) {
+        expect(minorUnits(code), 2);
+      }
+    });
+  });
+
+  group('currencyLabel', () {
+    test('代碼在前、中文在後', () {
+      expect(currencyLabel('USD'), 'USD 美元');
+      expect(currencyLabel('JPY'), 'JPY 日圓');
+    });
+
+    test('認不得的代碼原樣回傳，不會變成空白', () {
+      expect(currencyLabel('XXX'), 'XXX');
+    });
+  });
+
+  group('searchCurrencies', () {
+    List<String> codes(List<CurrencyInfo> list) => [for (final item in list) item.code];
+
+    test('沒打字時是整份清單，主要幣別排第一', () {
+      final result = codes(searchCurrencies('', pinned: 'JPY'));
+      expect(result.first, 'JPY');
+      expect(result.length, 20);
+    });
+
+    test('打代碼開頭找得到，不分大小寫', () {
+      expect(codes(searchCurrencies('us')).first, 'USD');
+      expect(codes(searchCurrencies('US')).first, 'USD');
+    });
+
+    test('代碼開頭相符的排在只是包含的前面', () {
+      final result = codes(searchCurrencies('n'));
+      expect(result.first, 'NZD');
+      expect(result, contains('CNY'));
+      expect(result, contains('VND'));
+    });
+
+    test('打中文名找得到', () {
+      expect(codes(searchCurrencies('美元')), ['USD']);
+      expect(codes(searchCurrencies('泰銖')), ['THB']);
+    });
+
+    test('打國家或俗稱也找得到', () {
+      expect(codes(searchCurrencies('日本')), ['JPY']);
+      expect(codes(searchCurrencies('美國')), ['USD']);
+      expect(codes(searchCurrencies('美金')), ['USD']);
+      expect(codes(searchCurrencies('峇里島')), ['IDR']);
+    });
+
+    test('「澳」同時找到澳幣與澳門幣', () {
+      final result = codes(searchCurrencies('澳'));
+      expect(result, contains('AUD'));
+      expect(result, contains('MOP'));
+    });
+
+    test('有打字時主要幣別也排在同一級的最前面', () {
+      expect(codes(searchCurrencies('新', pinned: 'SGD')).first, 'SGD');
+    });
+
+    test('前後空白不影響', () {
+      expect(codes(searchCurrencies('  usd  ')).first, 'USD');
+    });
+
+    test('找不到時回空清單', () {
+      expect(searchCurrencies('zzz'), isEmpty);
+    });
+  });
 }

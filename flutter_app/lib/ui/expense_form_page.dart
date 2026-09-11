@@ -14,6 +14,7 @@ import '../domain/task_status.dart';
 import '../domain/validation.dart' as validate;
 import '../data/place_service.dart';
 import '../state/providers.dart';
+import 'currency_picker.dart';
 import 'place_field.dart';
 import 'receipt_field.dart';
 import 'theme.dart';
@@ -624,14 +625,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            DropdownButton<String>(
+                            // 窄欄位：輸入框只顯示代碼，打開的清單才是「代碼 中文」。
+                            CurrencyPicker(
                               value: _currency,
-                              items: [
-                                for (final code in currencies)
-                                  DropdownMenuItem(value: code, child: Text(code)),
-                              ],
+                              pinned: task.defaultCurrency,
+                              compact: true,
+                              width: 150,
                               onChanged: (value) {
-                                if (value == null) return;
                                 setState(() {
                                   _currency = value;
                                   _rateUpdatedAt = '';
