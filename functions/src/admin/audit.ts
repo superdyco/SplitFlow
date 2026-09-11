@@ -9,10 +9,16 @@
  * 重構之後靜靜失效，而發現的方式是三個月後翻日誌時發現一整段是空的。
  */
 
-export const VIEW_ACTIONS = ["view.user", "view.task", "view.report", "export.stats"] as const;
+export const VIEW_ACTIONS = ["view.user", "view.task", "view.report", "view.ai", "export.stats"] as const;
 
-/** 會改到別人東西的三個。這三個才需要理由。 */
-export const ACT_ACTIONS = ["act.revokeReport", "act.disableUser", "act.archiveTask"] as const;
+/** 會改到東西的動作。這些才需要理由。 */
+export const ACT_ACTIONS = [
+  "act.revokeReport",
+  "act.disableUser",
+  "act.archiveTask",
+  "act.setAiConfig",
+  "act.adjustCredits"
+] as const;
 
 /** 不是管理者做的，但正是最該留下來的那種。 */
 export const DENIED_ACTION = "denied.access" as const;
@@ -22,7 +28,7 @@ export type AdminAction =
   | (typeof ACT_ACTIONS)[number]
   | typeof DENIED_ACTION;
 
-export type TargetType = "user" | "task" | "report" | "route";
+export type TargetType = "user" | "task" | "report" | "route" | "config";
 
 /**
  * 這一筆屬於哪一類。**從 action 推出來，但要存進文件。**

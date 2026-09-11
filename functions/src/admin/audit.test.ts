@@ -168,3 +168,21 @@ describe("parseAuditFilter", () => {
     expect(parseAuditFilter(undefined)).toBeNull();
   });
 });
+
+describe("AI 相關的動作", () => {
+  it("換 AI 設定與調整點數都是處置，都要理由", () => {
+    for (const action of ["act.setAiConfig", "act.adjustCredits"] as const) {
+      expect(kindOf(action)).toBe("act");
+      expect(build({ action, targetType: "config", targetId: "ai", reason: " " })).toEqual({
+        ok: false,
+        problem: "reason-required"
+      });
+    }
+  });
+
+  it("看 AI 設定頁是檢視，不帶理由", () => {
+    expect(kindOf("view.ai")).toBe("view");
+    const built = build({ action: "view.ai", targetType: "config", targetId: "ai", reason: "順便看看" });
+    expect(built.ok && built.entry.reason).toBeNull();
+  });
+});

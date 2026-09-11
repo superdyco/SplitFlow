@@ -79,6 +79,13 @@ import {
   type GuestDayDoc,
   type GuestEvent
 } from "./admin/guests.js";
+import { GUEST_PROVIDER } from "./guestMerge.js";
+import { ledgerAdjust, parseAdjust, planAdjust } from "./ai/credits.js";
+import { AI_MODELS, isAllowedModel, keyTail, resolveModel } from "./ai/models.js";
+import { cleanReceipt, parseOutput } from "./ai/receipt.js";
+import { sumAiDays, type AiDayDoc } from "./ai/usage.js";
+import { readReceiptText, SAMPLE_RECEIPT_TEXT, verifyModel } from "./ai/openai.js";
+import { AI_CONFIG_PATH, forgetAiConfig, loadAiConfig } from "./ai/config.js";
 
 const REGION = "asia-east1";
 
@@ -747,7 +754,11 @@ export const adminUser = onCall({ region: REGION }, async request => {
   const profile = toRow(doc);
   const memberOf = db().collection("tasks").where("memberIds", "array-contains", uid);
 
-  const [tasksSnap, taskCount, ownedCount, expenseCount, authRecord] = await Promise.all([
+  const creditsRef = db().collection("aiCredits").doc(uid);
+  const ledgerRef = creditsRef.collection("aiLedger");
+
+  const [tasksSnap, taskCount, ownedCount, expenseCount, authRecord, creditsSnap, aiCalls, aiReads, ledgerSnap] =
+    await Promise.all([
     // 參與的任務只給前 10 個。完整清單不是後台要回答的問題。
     memberOf.orderBy("updatedAt", "desc").limit(10).get(),
     countOf(memberOf),
@@ -761,7 +772,12 @@ export const adminUser = onCall({ region: REGION }, async request => {
     */
     getAuth()
       .getUser(uid)
-      .catch(() => null)
+      .catch(() => null),
+    creditsRef.get(),
+    countOf(ledgerRef.where("type", "==", "use")),
+    countOf(ledgerRef.where("readResult", "==", "read")),
+    // 最近 20 筆就夠回答申訴：「上禮拜那三次是不是都失敗」。
+    ledgerRef.orderBy("at", "desc").limit(20).get()
   ]);
 
   const tasks = tasksSnap.docs.map(task => {
@@ -798,7 +814,14 @@ export const adminUser = onCall({ region: REGION }, async request => {
       owned: ownedCount,
       expenses: expenseCount
     },
-    tasks
+    tasks,
+    ai: {
+      // null 代表還沒用過：第一次辨識時才會送 3 點，畫面要講清楚這件事。
+      balance: creditsSnap.exists ? ((creditsSnap.get("balance") as number) ?? 0) : null,
+      calls: aiCalls,
+      reads: aiReads,
+      ledger: ledgerSnap.docs.map(doc => toLedgerRow(doc, { [uid]: profile.nickname }))
+    }
   };
 });
 
@@ -1548,4 +1571,260 @@ export const adminHealth = onCall({ region: REGION }, async request => {
       "Cloud Functions 的呼叫數與失敗率還沒接 —— 那份資料在 Cloud Monitoring，不在 Firestore。"
     ]
   };
+});
+
+/* ------------------------------------------------------------------ AI */
+
+interface AiLedgerRow {
+  id: string;
+  uid: string;
+  nickname: string;
+  type: string;
+  delta: number;
+  balanceAfter: number;
+  at: string | null;
+  readResult: string | null;
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  adminEmail: string | null;
+  reason: string | null;
+}
+
+function toLedgerRow(doc: FirebaseFirestore.DocumentSnapshot, names: Record<string, string>): AiLedgerRow {
+  const uid = (doc.get("uid") as string) ?? "";
+  return {
+    id: doc.id,
+    uid,
+    nickname: names[uid] ?? "",
+    type: (doc.get("type") as string) ?? "",
+    delta: (doc.get("delta") as number) ?? 0,
+    balanceAfter: (doc.get("balanceAfter") as number) ?? 0,
+    at: iso(doc.get("at")),
+    readResult: (doc.get("readResult") as string) ?? null,
+    model: (doc.get("model") as string) ?? null,
+    inputTokens: (doc.get("inputTokens") as number) ?? null,
+    outputTokens: (doc.get("outputTokens") as number) ?? null,
+    adminEmail: (doc.get("adminEmail") as string) ?? null,
+    reason: (doc.get("reason") as string) ?? null
+  };
+}
+
+const AI_CONFIG_LABEL = "AI 設定";
+
+/**
+ * AI 設定頁的狀態。**不回完整金鑰**，只有末四碼。
+ *
+ * 打開這一頁寫一筆 view.ai：這一頁看得到全站的使用紀錄（誰在什麼時候用了幾次），
+ * 跟看某個使用者的詳情同一類。
+ */
+export const adminAiConfig = onCall({ region: REGION }, async request => {
+  const caller = await requireAdmin(request, "view.ai");
+  const config = await loadAiConfig(db(), { fresh: true });
+
+  await writeAudit({
+    action: "view.ai",
+    adminUid: caller.uid,
+    adminEmail: caller.email,
+    targetType: "config",
+    targetId: "ai",
+    targetLabel: AI_CONFIG_LABEL,
+    ip: caller.ip,
+    userAgent: caller.userAgent
+  });
+
+  return {
+    configured: config !== null,
+    keyTail: config?.keyTail ?? "",
+    model: resolveModel(config?.model),
+    models: AI_MODELS,
+    updatedAt: config?.updatedAt ? config.updatedAt.toISOString() : null,
+    updatedBy: config?.updatedBy ?? ""
+  };
+});
+
+/**
+ * 換金鑰或模型。**先驗再存**：貼錯一個字就讓全站辨識停擺，是最容易發生的事故。
+ *
+ * 金鑰留空代表只換模型，沿用舊金鑰。
+ */
+export const adminSetAiConfig = onCall({ region: REGION }, async request => {
+  const data = (request.data ?? {}) as { apiKey?: unknown; model?: unknown };
+  const typed = typeof data.apiKey === "string" ? data.apiKey.trim() : "";
+  if (!isAllowedModel(data.model)) throw new HttpsError("invalid-argument", "不在清單上的模型");
+  const model = data.model;
+
+  return adminAction(request, "act.setAiConfig", "config", "ai", async () => {
+    const current = await loadAiConfig(db(), { fresh: true });
+    const apiKey = typed || current?.apiKey || "";
+    if (!apiKey) throw new HttpsError("invalid-argument", "請貼上 OpenAI 的 API 金鑰");
+
+    const problem = await verifyModel(apiKey, model);
+    if (problem) throw new HttpsError("failed-precondition", `${problem}，設定沒有存。`);
+
+    const tail = keyTail(apiKey);
+    await db()
+      .doc(AI_CONFIG_PATH)
+      .set({
+        apiKey,
+        model,
+        keyTail: tail,
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: (request.auth?.token.email as string | undefined) ?? request.auth?.uid ?? ""
+      });
+    // 只清得到這個 instance 的快取；其他 instance 最慢一分鐘後自己過期。
+    forgetAiConfig();
+
+    return { label: AI_CONFIG_LABEL, notify: null, extra: { keyTail: tail, model } };
+  });
+});
+
+/**
+ * 用現在的設定實際跑一次。只有真的呼叫才抓得到「帳戶沒錢」。
+ *
+ * 用一段收據文字而不是照片（見計畫的「與 spec 的差異」）。不扣任何人的點數、
+ * 不寫點數紀錄、不進用量統計 —— 這是管理者在檢查設定，不是有人在用。
+ */
+export const adminTestAiConfig = onCall({ region: REGION, timeoutSeconds: 60 }, async request => {
+  await requireAdmin(request, "view.ai");
+  const config = await loadAiConfig(db(), { fresh: true });
+  if (!config) throw new HttpsError("failed-precondition", "還沒有設定金鑰");
+
+  const model = resolveModel(config.model);
+  const started = Date.now();
+  try {
+    const output = await readReceiptText({ apiKey: config.apiKey, model, text: SAMPLE_RECEIPT_TEXT });
+    const cleaned = cleanReceipt(parseOutput(output.text));
+    return {
+      ok: true,
+      model,
+      readResult: cleaned.readResult,
+      fields: cleaned.fields,
+      inputTokens: output.inputTokens ?? null,
+      outputTokens: output.outputTokens ?? null,
+      ms: Date.now() - started
+    };
+  } catch (err) {
+    return { ok: false, model, error: err instanceof Error ? err.message : String(err), ms: Date.now() - started };
+  }
+});
+
+type AiLedgerFilter = "all" | "use" | "adjust" | "free";
+
+function parseLedgerFilter(value: unknown): AiLedgerFilter | null {
+  return value === "all" || value === "use" || value === "adjust" || value === "free" ? value : null;
+}
+
+/**
+ * 用量摘要＋跨所有使用者的點數紀錄。**不寫日誌**：打開頁面時 adminAiConfig
+ * 已經記過一筆，翻頁也記的話日誌會被這一頁淹掉。
+ *
+ * 游標的第二個值存**完整路徑**：collection group 查詢用文件 ID 排序時，
+ * startAfter 要的是路徑，只給 ID 會被拒絕。
+ */
+export const adminAiUsage = onCall({ region: REGION }, async request => {
+  await requireAdmin(request, "view.ai");
+
+  const data = (request.data ?? {}) as { range?: unknown; type?: unknown; cursor?: unknown; limit?: unknown };
+  const range = parseRange(data.range ?? "30d");
+  if (!range) throw new HttpsError("invalid-argument", "不認得的區間");
+  const filter = parseLedgerFilter(data.type ?? "all");
+  if (!filter) throw new HttpsError("invalid-argument", "不認得的篩選");
+
+  // 跟訪客統計一樣算到今天：這些是當下記的，不用等凌晨的排程。
+  const now = new Date();
+  const keys = guestKeys(dayKeys(range, now).length, now);
+  const daysSnap = await db()
+    .collection("stats")
+    .doc("ai")
+    .collection("days")
+    .where("date", ">=", keys[0])
+    .where("date", "<=", keys[keys.length - 1])
+    .get();
+  const summary = sumAiDays(daysSnap.docs.map(doc => doc.data() as AiDayDoc), keys);
+
+  const limit = parseLimit(data.limit);
+  let query: FirebaseFirestore.Query = db().collectionGroup("aiLedger");
+  if (filter !== "all") query = query.where("type", "==", filter);
+  query = query.orderBy("at", "desc").orderBy(FieldPath.documentId(), "desc");
+
+  if (data.cursor !== undefined && data.cursor !== null) {
+    const cursor = decodeCursor(data.cursor);
+    if (!cursor) throw new HttpsError("invalid-argument", "翻頁位置不正確，請重新整理");
+    query = query.startAfter(new Date(cursor.value), cursor.id);
+  }
+
+  const snap = await query.limit(limit + 1).get();
+  const docs = snap.docs.slice(0, limit);
+  const hasMore = snap.docs.length > limit;
+  const names = await nicknamesOf(docs.map(doc => (doc.get("uid") as string) ?? ""));
+
+  const last = docs[docs.length - 1];
+  const lastAt = last?.get("at");
+
+  return {
+    range,
+    days: { from: keys[0], to: keys[keys.length - 1] },
+    totals: summary.totals,
+    recordedDays: summary.recordedDays,
+    rows: docs.map(doc => toLedgerRow(doc, names)),
+    cursor:
+      hasMore && last && lastAt instanceof Timestamp
+        ? encodeCursor({ value: lastAt.toMillis(), id: last.ref.path })
+        : null
+  };
+});
+
+/**
+ * 調整某個人的點數。申訴的補償就是走這裡。
+ *
+ * 減到 0 為止，紀錄寫實際扣掉的量。訪客不能調 —— 訪客本來就不能用，調了只會
+ * 讓人以為壞了。還沒用過的人：輸入幾點就是幾點，之後不會再送免費 3 點。
+ */
+export const adminAdjustCredits = onCall({ region: REGION }, async request => {
+  const data = (request.data ?? {}) as { uid?: unknown; delta?: unknown; reason?: unknown };
+  const uid = data.uid;
+  if (typeof uid !== "string" || !uid) throw new HttpsError("invalid-argument", "缺少 uid");
+  const delta = parseAdjust(data.delta);
+  if (delta === null) throw new HttpsError("invalid-argument", "調整的點數要是 −100 到 +100 之間、不能是 0");
+
+  return adminAction(request, "act.adjustCredits", "user", uid, async () => {
+    const user = await db().collection("users").doc(uid).get();
+    if (!user.exists) throw new HttpsError("not-found", "找不到這個帳號");
+    if (user.get("provider") === GUEST_PROVIDER) {
+      throw new HttpsError("failed-precondition", "訪客不能調整點數 —— 訪客本來就不能用 AI 辨識");
+    }
+
+    const creditsRef = db().collection("aiCredits").doc(uid);
+    const reason = typeof data.reason === "string" ? data.reason.trim() : "";
+    const result = await db().runTransaction(async tx => {
+      const snap = await tx.get(creditsRef);
+      const plan = planAdjust(snap.exists ? (snap.data() ?? {}) : null, delta);
+      tx.set(
+        creditsRef,
+        { balance: plan.balanceAfter, freeGranted: true, updatedAt: FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+      tx.set(
+        creditsRef.collection("aiLedger").doc(),
+        ledgerAdjust({
+          uid,
+          at: new Date(),
+          delta: plan.delta,
+          balanceAfter: plan.balanceAfter,
+          adminUid: request.auth?.uid ?? "",
+          adminEmail: (request.auth?.token.email as string | undefined) ?? "",
+          reason
+        })
+      );
+      return plan;
+    });
+
+    const nickname = (user.get("nickname") as string) ?? "";
+    return {
+      label: nickname || (user.get("email") as string) || uid,
+      notify: null,
+      extra: { balance: result.balanceAfter, delta: result.delta }
+    };
+  });
 });
