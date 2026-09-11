@@ -6,6 +6,8 @@ import ErrorState from "@/components/common/ErrorState.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { firebaseErrorMessage, required, textFieldError } from "@/utils/firestore";
+import { signedInAs } from "@/utils/authError";
+import { providerIdOf } from "@/utils/guest";
 
 const authStore = useAuthStore();
 const userStore = useUserStore();
@@ -20,6 +22,9 @@ const nicknameError = computed(() =>
   textFieldError(nickname.value, "暱稱", { max: 20, touched: touched.value })
 );
 const canSubmit = computed(() => !!nickname.value.trim() && !nicknameError.value);
+const signedInLabel = computed(() =>
+  authStore.user ? signedInAs(providerIdOf(authStore.user), authStore.user.email) : ""
+);
 
 async function save() {
   if (!authStore.user) return;
@@ -57,7 +62,7 @@ async function save() {
         />
       </div>
       <p v-if="nicknameError" class="tiny warn">{{ nicknameError }}</p>
-      <p class="tiny">已用 Google 登入 · {{ authStore.user?.email }}</p>
+      <p class="tiny">{{ signedInLabel }}</p>
       <ErrorState :message="error" />
       <button class="btn btn-primary btn-block" :disabled="loading || !canSubmit" @click="save">
         {{ loading ? "儲存中..." : "建立帳號" }}

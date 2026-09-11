@@ -2,6 +2,7 @@ import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firest
 import type { User } from "firebase/auth";
 import { db } from "@/firebase/config";
 import type { UserProfile } from "@/types/user";
+import { providerIdOf } from "@/utils/guest";
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   const snap = await getDoc(doc(db, "users", uid));
@@ -32,7 +33,7 @@ export async function createUserProfile(user: User, nickname: string): Promise<v
     nickname,
     email: user.email || "",
     photoURL: user.photoURL || null,
-    provider: user.providerData[0]?.providerId || "unknown",
+    provider: providerIdOf(user),
     updatedAt: serverTimestamp()
   };
 

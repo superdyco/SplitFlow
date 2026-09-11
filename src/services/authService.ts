@@ -5,6 +5,7 @@ import {
   OAuthProvider,
   fetchSignInMethodsForEmail,
   onAuthStateChanged,
+  signInAnonymously,
   signInWithPopup,
   signOut,
   type AuthProvider,
@@ -78,6 +79,24 @@ export async function signIn(name: SignInProvider): Promise<User> {
     return credential.user;
   } catch (err) {
     throw await toSignInError(err, name);
+  }
+}
+
+/**
+ * 免登入試用。拿到的是一個真的匿名帳號 —— 建任務、記帳、加入別人的任務都跟
+ * 正式帳號一樣，rules 不必為它開任何例外。
+ *
+ * 沒有彈窗，所以 iOS PWA 上彈窗被擋、跨來源 iframe 暖機那一串問題，訪客都不會遇到。
+ */
+export async function signInAsGuest(): Promise<User> {
+  try {
+    const credential = await signInAnonymously(auth);
+    return credential.user;
+  } catch (err) {
+    if (err instanceof FirebaseError && err.code === "auth/operation-not-allowed") {
+      throw new Error("免登入試用還沒有在 Firebase Console 啟用。");
+    }
+    throw err;
   }
 }
 

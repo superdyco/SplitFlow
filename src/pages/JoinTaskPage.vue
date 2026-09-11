@@ -7,7 +7,7 @@ import ErrorState from "@/components/common/ErrorState.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import type { Invite } from "@/types/task";
 import ProviderButtons from "@/components/auth/ProviderButtons.vue";
-import { SignInCancelled, signIn, type SignInProvider } from "@/services/authService";
+import { SignInCancelled, signIn, signInAsGuest, type SignInProvider } from "@/services/authService";
 import { getInvite } from "@/services/inviteService";
 import { getTaskMember, joinTask } from "@/services/memberService";
 import { useAuthStore } from "@/stores/auth";
@@ -76,6 +76,25 @@ async function login(provider: SignInProvider) {
   }
 }
 
+const guestPending = ref(false);
+
+/**
+ * 被朋友拉進來的人最不想先登入 —— 這顆按鈕就是為他做的。
+ * 訪客一定還沒有暱稱：取完暱稱會回到這一頁，再按「加入這個任務」。
+ */
+async function joinAsGuest() {
+  guestPending.value = true;
+  error.value = null;
+  try {
+    await signInAsGuest();
+    await router.push(`/onboarding?redirect=${encodeURIComponent(route.fullPath)}`);
+  } catch (err) {
+    error.value = firebaseErrorMessage(err);
+  } finally {
+    guestPending.value = false;
+  }
+}
+
 async function join() {
   if (!invite.value || !authStore.user) return;
   if (!userStore.profile?.nickname) {
@@ -112,7 +131,12 @@ onMounted(load);
         <p class="tiny">加入簡單分帳</p>
         <h1 class="title">{{ invite.taskName }}</h1>
         <p class="muted">主要幣別 {{ invite.defaultCurrency }} · {{ invite.startDate || "未設定日期" }} - {{ invite.endDate || "未設定日期" }}</p>
-        <ProviderButtons v-if="!authStore.user" :pending="pending" action="登入" @select="login" />
+        <template v-if="!authStore.user">
+          <ProviderButtons :pending="pending" action="登入" @select="login" />
+          <button class="btn btn-block" :disabled="guestPending || pending !== null" @click="joinAsGuest">
+            {{ guestPending ? "準備中..." : "免登入，直接加入" }}
+          </button>
+        </template>
 
         <template v-else-if="alreadyMember">
           <p class="tiny">你已經是這個任務的成員了。</p>
