@@ -74,9 +74,41 @@ describe("firebaseErrorMessage", () => {
       .toBe("連不上伺服器。檢查一下網路，或稍後再試。");
   });
 
-  it("沒有對應的 code 就照原樣傳出去，不要憑空發明訊息", () => {
-    expect(firebaseErrorMessage({ code: "permission-denied", message: "Missing or insufficient permissions." }))
-      .toBe("Missing or insufficient permissions.");
+  it("權限不足翻成中文，不再把 Firebase 的英文原文丟給使用者", () => {
+    const message = firebaseErrorMessage({
+      code: "permission-denied",
+      message: "Missing or insufficient permissions."
+    });
+    expect(message).toContain("沒有權限");
+    expect(message).not.toContain("Missing");
+  });
+
+  it("雲端函式自己寫的中文理由照原樣顯示 —— 那比任何通用文案都準確", () => {
+    expect(firebaseErrorMessage({ code: "functions/failed-precondition", message: "請先設定暱稱" }))
+      .toBe("請先設定暱稱");
+    expect(firebaseErrorMessage({ code: "functions/not-found", message: "這個邀請連結不存在或已停用" }))
+      .toBe("這個邀請連結不存在或已停用");
+  });
+
+  it("雲端函式的通用錯誤（英文的 internal）翻成中文", () => {
+    expect(firebaseErrorMessage({ code: "functions/internal", message: "internal" }))
+      .toContain("伺服器出了點問題");
+  });
+
+  it("Storage 的錯誤碼也認得（收據上傳走這裡）", () => {
+    expect(firebaseErrorMessage({ code: "storage/unauthorized", message: "User does not have permission" }))
+      .toBe("沒有權限存取這個檔案。");
+    expect(firebaseErrorMessage({ code: "storage/retry-limit-exceeded", message: "Max retry time exceeded" }))
+      .toContain("太久沒有回應");
+  });
+
+  it("不認得的 code 照原樣傳出去，不要憑空發明訊息", () => {
+    expect(firebaseErrorMessage({ code: "some-brand-new-code", message: "Something new happened" }))
+      .toBe("Something new happened");
+  });
+
+  it("本來就是中文的一般錯誤照原樣（例如必填檢查丟出來的）", () => {
+    expect(firebaseErrorMessage(new Error("暱稱為必填"))).toBe("暱稱為必填");
   });
 
   it("不是 Firebase 錯誤的東西也不能讓它爆掉", () => {

@@ -9,28 +9,72 @@ import { logError } from "@/utils/debugLog";
  * 而且這樣一來，使用者看到的訊息與診斷資訊裡的那一筆一定對得起來。
  */
 /**
- * 少數幾個「Firebase 的原文完全不能給使用者看」的 code。
+ * Firebase 的 code → 給使用者看的中文。Flutter 的 `domain/error_message.dart`
+ * 是同一張表，改一邊要改另一邊。
  *
  * 判斷 code 而不是比對訊息 —— 訊息會隨 SDK 版本改寫，code 不會（這也是
  * debugLog 一定要留 code 的理由）。
+ *
+ * key 一律不帶前綴：網頁版的 code 是 `functions/not-found`、`storage/unauthorized`，
+ * Firestore 則是裸的 `permission-denied`，查的時候把前綴去掉。
  *
  * failed-precondition 幾乎都是缺索引，而那則原文會附上 Firebase Console 的
  * 網址、專案 id 與一段編碼過的索引定義。那是給開發者看的東西，使用者只會
  * 覺得壞掉了 —— 而且他什麼都做不了，只能等。原文照樣進錯誤清單，診斷資訊
  * 撈得到，開發者不會因此少掉線索。
  */
+const SERVER_TROUBLE = "伺服器出了點問題，請稍後再試。一直發生的話，請到個人設定複製診斷資訊給開發者。";
+const TOO_SLOW = "伺服器太久沒有回應。檢查一下網路，或稍後再試。";
+const GONE = "找不到這筆資料，可能已經被刪除。";
+
 const FRIENDLY: Record<string, string> = {
+  "permission-denied": "你沒有權限做這件事。可能已經被移出這個任務，或任務已經封存。",
+  unauthorized: "沒有權限存取這個檔案。",
+  unauthenticated: "登入狀態過期了，請重新登入。",
+  "not-found": GONE,
+  "object-not-found": GONE,
+  "already-exists": "這筆資料已經存在。",
+  "resource-exhausted": "用量已經到上限，請稍後再試。",
+  "quota-exceeded": "用量已經到上限，請稍後再試。",
   "failed-precondition": "這一頁還在準備中，請稍後再試一次。",
-  unavailable: "連不上伺服器。檢查一下網路，或稍後再試。"
+  aborted: "剛好有其他人同時在修改，請再試一次。",
+  unavailable: "連不上伺服器。檢查一下網路，或稍後再試。",
+  "deadline-exceeded": TOO_SLOW,
+  "retry-limit-exceeded": TOO_SLOW,
+  cancelled: "已經取消了。",
+  canceled: "已經取消了。",
+  internal: SERVER_TROUBLE,
+  unknown: SERVER_TROUBLE,
+  "data-loss": SERVER_TROUBLE,
+  "invalid-argument": "送出的資料格式不對，請檢查一下再試。",
+  "out-of-range": "送出的資料格式不對，請檢查一下再試。",
+  unimplemented: "這個功能目前無法使用。"
 };
 
+const CHINESE = /[一-鿿]/;
+
+function friendlyFor(code: string): string | undefined {
+  const bare = code.slice(code.lastIndexOf("/") + 1);
+  return FRIENDLY[code] ?? FRIENDLY[bare];
+}
+
+/**
+ * 規則三條，依序：
+ *
+ *   1. 訊息本身已經是中文就照原樣 —— 那是我們自己寫的（雲端函式的
+ *      「請先設定暱稱」、`required()` 丟的「暱稱為必填」），比任何通用文案都準確。
+ *   2. 認得的 code 翻成中文。
+ *   3. 不認得的照原文 —— 不要憑空發明一句話。
+ */
 export function firebaseErrorMessage(error: unknown): string {
   logError("firebase", error);
   if (error && typeof error === "object") {
     const maybe = error as FirestoreError;
-    const friendly = typeof maybe.code === "string" ? FRIENDLY[maybe.code] : undefined;
+    const message = typeof maybe.message === "string" ? maybe.message : "";
+    if (CHINESE.test(message)) return message;
+    const friendly = typeof maybe.code === "string" ? friendlyFor(maybe.code) : undefined;
     if (friendly) return friendly;
-    if ("message" in error) return maybe.message || String(error);
+    if ("message" in error) return message || String(error);
   }
   return String(error);
 }
