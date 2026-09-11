@@ -756,3 +756,10 @@ GitHub 的 runner 內建 JDK，不用自己裝。
   效益有限，先不做。
 - 補 ESLint / Prettier。
 - 補 Firestore indexes 文件。
+
+## 免登入試用：這次不做
+
+- **App Check**：擋有人大量產生匿名帳號。這是整個專案都缺的，不是訪客特有的問題。
+- **自動清理閒置的匿名帳號**：要把 Firebase 專案升級到 Identity Platform。
+- 訪客登出就等於刪除（見 `docs/superpowers/specs/2026-09-10-guest-trial-design.md`），
+  匿名帳號不會一直累積，所以這兩件目前都不急。
