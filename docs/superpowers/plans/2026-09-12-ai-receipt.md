@@ -1075,7 +1075,7 @@ export async function verifyModel(apiKey: string, model: string): Promise<string
 }
 ```
 
-`as Parameters<...>` 那一行是因為 SDK 的型別對 `content` 陣列的聯集要求很細；如果 `npm run build` 不需要它就拿掉。**不要**為了過型別改掉任何欄位名稱 —— 欄位名稱照 OpenAI 官方文件（`input_text`、`input_image`、`image_url`、`detail`、`text.format`）。
+**實作時修正**：`as Parameters<OpenAI["responses"]["create"]>[0]` 會落在串流與非串流參數的聯集上，回傳型別跟著變成聯集，build 報 `output_text`／`usage` 不存在。實際採用 `as OpenAI.Responses.ResponseCreateParamsNonStreaming`。**不要**為了過型別改掉任何欄位名稱 —— 欄位名稱照 OpenAI 官方文件（`input_text`、`input_image`、`image_url`、`detail`、`text.format`）。
 
 - [ ] **Step 3: 寫 `ai/config.ts`**
 
