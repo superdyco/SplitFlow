@@ -766,3 +766,27 @@ GitHub 的 runner 內建 JDK，不用自己裝。
 - **自動清理閒置的匿名帳號**：要把 Firebase 專案升級到 Identity Platform。
 - 訪客登出就等於刪除（見 `docs/superpowers/specs/2026-09-10-guest-trial-design.md`），
   匿名帳號不會一直累積，所以這兩件目前都不急。
+
+## 已完成：AI 辨識收據（第一階段）
+
+規格與計畫在 `docs/superpowers/`（2026-09-11、2026-09-12）。支出表單拍了收據之後，
+按一下由 OpenAI 讀出金額、幣別、日期、時間、店名、分類並填進表單。
+
+- **呼叫 AI 就扣 1 點**，讀不出來也扣。每個正式帳號第一次用時送 3 點，用完就沒了。
+  每一次的結果記在 `aiCredits/{uid}/aiLedger`，申訴時管理者照紀錄在後台手動補點。
+- 點數不放在 `users/{uid}`（那份的 create 沒限制欄位），放在獨立集合、rules 全擋寫入。
+- 金鑰與模型在後台維護（`config/ai`，只有函式讀得到）。模型只能從程式裡的白名單挑，
+  存之前先向 OpenAI 驗一次。
+- 已知取捨：扣點之後函式當掉的話，那一筆會停在 pending、點數不會自動退 ——
+  後台會顯示「沒有回來」，靠申訴補。刪帳號重新註冊會再拿到 3 點，損失上限是 3 張收據。
+- `functions/` 的單元測試不在 CI 裡（根目錄的 vitest 只抓 `tests/**`），要在本機
+  `cd functions && npm test`。
+
+## AI 辨識收據：之後
+
+- 第二階段：購買點數，只在 App 內購買（Apple／Google），網頁版不賣。
+- `adminReports` 的翻頁游標可能跟 AI 使用報告踩到同一個坑：collection group 查詢
+  用文件 ID 排序時，`startAfter` 要完整路徑，它只給了 ID。還沒實際翻到第二頁驗證過。
+- 隱私政策還有幾處過時：Facebook 登入早就關了、沒寫 Apple 登入、沒寫 Open-Meteo 天氣、
+  沒寫免登入試用。
+- 考慮把 `functions/` 的測試加進 `.github/workflows/checks.yml`。
