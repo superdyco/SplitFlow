@@ -2249,6 +2249,101 @@ async function main() {
     );
   });
 
+  // ---------------------------------------------------------------- 訪客（匿名登入）
+
+  /*
+    rules 沒有為訪客改任何一行。這幾條是防回歸：訪客的 request.auth 不是 null、
+    有自己的 uid，現有的規則對他都該照常成立。哪天有人加了
+    `sign_in_provider != "anonymous"` 之類的條件，這裡會先響。
+  */
+  const GUEST = "uid_guest";
+
+  function asGuest() {
+    return testEnv
+      .authenticatedContext(GUEST, { firebase: { sign_in_provider: "anonymous" } })
+      .firestore();
+  }
+
+  function guestTask(overrides = {}) {
+    return {
+      name: "試用的旅程",
+      ownerId: GUEST,
+      adminIds: [GUEST],
+      memberIds: [GUEST],
+      defaultCurrency: "TWD",
+      startDate: null,
+      endDate: null,
+      status: "active",
+      inviteCode: "guestcode",
+      memberCount: 1,
+      expenseCount: 0,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      ...overrides
+    };
+  }
+
+  await test("訪客可以建立自己的個人檔案", async () => {
+    await testEnv.clearFirestore();
+    await assertSucceeds(
+      setDoc(doc(asGuest(), "users", GUEST), {
+        uid: GUEST,
+        nickname: "小試",
+        email: "",
+        photoURL: null,
+        provider: "anonymous",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
+  await test("訪客可以建立任務", async () => {
+    await testEnv.clearFirestore();
+    const db = asGuest();
+    const batch = writeBatch(db);
+    batch.set(doc(db, "tasks", "guestTask"), guestTask());
+    batch.set(doc(db, "tasks", "guestTask", "members", GUEST), {
+      uid: GUEST,
+      nickname: "小試",
+      role: "owner",
+      joinedAt: serverTimestamp(),
+      active: true
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  await test("訪客可以在自己的任務裡記帳", async () => {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "tasks", "guestTask"), guestTask());
+    });
+    await assertSucceeds(
+      setDoc(
+        doc(asGuest(), "tasks", "guestTask", "expenses", "e1"),
+        newExpense({ paidBy: GUEST, splits: { [GUEST]: 25000 }, createdBy: GUEST })
+      )
+    );
+  });
+
+  await test("不是成員的訪客讀不到別人的任務", async () => {
+    await seed();
+    await assertFails(getDoc(doc(asGuest(), "tasks", TASK)));
+  });
+
+  // 綁定帳號之後 uid 不變，前端會把 provider、email、photoURL 補上。
+  await test("綁定之後可以補上登入方式與 email", async () => {
+    await seedProfile(GUEST);
+    await assertSucceeds(
+      updateDoc(doc(as(GUEST), "users", GUEST), {
+        provider: "google.com",
+        email: "guest@example.com",
+        photoURL: null,
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
   await testEnv.cleanup();
 
   console.log(`\n${passed} passed, ${failed} failed`);
