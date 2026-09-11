@@ -35,6 +35,50 @@ class TaskListPage extends ConsumerStatefulWidget {
   ConsumerState<TaskListPage> createState() => _TaskListPageState();
 }
 
+/// 訪客才看得到的提示條。**不能關掉**：忘了綁定的後果是資料永久遺失，
+/// 而綁定成功之後 isAnonymous 變成 false，它就自己消失。
+///
+/// 綁定本身在個人頁做，這裡只負責把人帶過去 —— 綁定與合併的流程只寫一份。
+class _GuestBanner extends StatelessWidget implements PreferredSizeWidget {
+  final VoidCallback onBind;
+
+  const _GuestBanner({required this.onBind});
+
+  @override
+  Size get preferredSize => const Size.fromHeight(52);
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    // primaryDeep：文字印在 primarySoft 上，primary 只有 3.2:1，不夠。
+    // 跟取暱稱頁頭像的文字是同一個修正。
+    return Material(
+      color: AppColors.primarySoft,
+      child: SizedBox(
+        height: preferredSize.height,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '目前是訪客，資料只存在這台手機。綁定帳號才不會遺失。',
+                  style: text.bodySmall?.copyWith(color: AppColors.primaryDeep),
+                ),
+              ),
+              TextButton(
+                onPressed: onBind,
+                style: TextButton.styleFrom(foregroundColor: AppColors.primaryDeep),
+                child: const Text('綁定'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TaskListPageState extends ConsumerState<TaskListPage> {
   Map<String, int>? _costs;
   bool _costsBusy = false;
@@ -108,6 +152,14 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     ref.invalidate(tasksProvider);
     // 花費是手動算的，回來之後那份快照可能也過期了，收起來重算比顯示錯的好。
     setState(() => _costs = null);
+  }
+
+  Future<void> _openProfile() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const ProfilePage()),
+    );
+    // 改了暱稱之後，成員清單與結算上顯示的名字都要跟著更新。
+    if (mounted) ref.invalidate(userProfileProvider);
   }
 
   Future<void> _loadCosts(List<Task> tasks) async {
@@ -207,6 +259,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
 
     final tasks = ref.watch(tasksProvider);
     final text = Theme.of(context).textTheme;
+    final guest = ref.watch(authStateProvider).value?.isAnonymous ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -231,15 +284,12 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
           IconButton(
             tooltip: '個人設定',
             icon: const Icon(Icons.person_outline),
-            onPressed: () async {
-              await Navigator.of(context).push<void>(
-                MaterialPageRoute(builder: (_) => const ProfilePage()),
-              );
-              // 改了暱稱之後，成員清單與結算上顯示的名字都要跟著更新。
-              if (mounted) ref.invalidate(userProfileProvider);
-            },
+            onPressed: _openProfile,
           ),
         ],
+        // 放在標題列下方而不是列表裡：沒有任務時列表會換成空白狀態，
+        // 提示條不能跟著消失。
+        bottom: guest ? _GuestBanner(onBind: _openProfile) : null,
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {

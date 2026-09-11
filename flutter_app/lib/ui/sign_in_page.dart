@@ -31,6 +31,9 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   /// 「有沒有」，才能只在被按的那顆按鈕上顯示進行中，其餘只是停用。
   SignInProvider? _busy;
 
+  /// 免登入試用進行中。跟 _busy 分開，因為試用不是一個登入供應商。
+  bool _guestBusy = false;
+
   Future<void> _signIn(SignInProvider provider) async {
     setState(() {
       _busy = provider;
@@ -52,6 +55,21 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       if (mounted) setState(() => _error = err.toString());
     } finally {
       if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  Future<void> _tryAsGuest() async {
+    setState(() {
+      _guestBusy = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authRepositoryProvider).signInAsGuest();
+      // 不必導頁：_Root 看到登入狀態變了，會自己換成取暱稱頁。
+    } catch (err) {
+      if (mounted) setState(() => _error = err.toString());
+    } finally {
+      if (mounted) setState(() => _guestBusy = false);
     }
   }
 
@@ -93,10 +111,22 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                     provider: provider,
                     busy: _busy == provider,
                     // 登入中就把所有按鈕都停用，不然可以同時開兩個授權流程。
-                    onPressed: _busy == null ? () => _signIn(provider) : null,
+                    onPressed: (_busy == null && !_guestBusy)
+                        ? () => _signIn(provider)
+                        : null,
                   ),
                   const SizedBox(height: 12),
                 ],
+                OutlinedButton(
+                  onPressed: (_busy == null && !_guestBusy) ? _tryAsGuest : null,
+                  child: Text(_guestBusy ? '準備中...' : '免登入立即試用'),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '試用的資料先存在這台手機，之後可以在個人設定綁定帳號。',
+                  style: text.bodySmall,
+                ),
+                const SizedBox(height: 12),
                 if (_error != null) ...[
                   const SizedBox(height: 4),
                   Text(

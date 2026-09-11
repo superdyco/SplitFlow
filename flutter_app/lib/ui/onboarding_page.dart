@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/auth_error.dart' show signedInAs;
+import '../domain/guest.dart';
 import '../domain/validation.dart' as validate;
 import '../state/providers.dart';
 import 'theme.dart';
@@ -77,6 +79,27 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     }
   }
 
+  /// 沒有「跳過」，但要有出路：登錯帳號的人不該被關在這一頁。
+  ///
+  /// 訪客走刪除而不是登出：登出之後這個匿名帳號就再也回不來，留著只是一筆永遠
+  /// 不會被用到的帳號。走到這一頁的訪客還沒有暱稱，不可能建過或加入過任何任務，
+  /// 刪掉不會影響任何人。
+  Future<void> _leave() async {
+    final auth = ref.read(authRepositoryProvider);
+    try {
+      if (widget.user.isAnonymous) {
+        await auth.deleteAccount();
+      } else {
+        await auth.signOut(
+          onBeforeSignOut: () =>
+              ref.read(pushRepositoryProvider).removeToken(widget.user.uid),
+        );
+      }
+    } catch (err) {
+      if (mounted) setState(() => _error = err.toString());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
@@ -143,8 +166,18 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     style: text.bodySmall?.copyWith(color: AppColors.danger)),
               ),
             const SizedBox(height: 10),
-            Text('已用 Google 登入 · ${widget.user.email ?? ''}',
-                style: text.bodySmall),
+            Text(
+              signedInAs(
+                providerIdOf(
+                  isAnonymous: widget.user.isAnonymous,
+                  providerIds: widget.user.providerData
+                      .map((info) => info.providerId)
+                      .toList(),
+                ),
+                widget.user.email,
+              ),
+              style: text.bodySmall,
+            ),
             if (_error != null) ...[
               const SizedBox(height: 16),
               Text(_error!,
@@ -156,16 +189,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               child: Text(_saving ? '儲存中...' : '建立帳號'),
             ),
             const SizedBox(height: 12),
-            // 沒有「跳過」，但要有出路：登錯帳號的人不該被關在這一頁。
             TextButton(
-              onPressed: _saving
-                  ? null
-                  : () => ref.read(authRepositoryProvider).signOut(
-                        onBeforeSignOut: () => ref
-                            .read(pushRepositoryProvider)
-                            .removeToken(widget.user.uid),
-                      ),
-              child: const Text('用別的帳號登入'),
+              onPressed: _saving ? null : _leave,
+              child: Text(widget.user.isAnonymous ? '改用帳號登入' : '用別的帳號登入'),
             ),
           ],
         ),
