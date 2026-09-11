@@ -7,6 +7,8 @@ import ErrorState from "@/components/common/ErrorState.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import TaskCard from "@/components/task/TaskCard.vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
+import GuestBanner from "@/components/auth/GuestBanner.vue";
+import { isGuest } from "@/utils/guest";
 import type { Task, TaskStatus } from "@/types/task";
 import type { TaskRole } from "@/types/member";
 import { useAuthStore } from "@/stores/auth";
@@ -323,6 +325,8 @@ onMounted(async () => {
         </div>
         <RouterLink to="/tasks/new" class="btn btn-primary">＋ 建立</RouterLink>
       </div>
+
+      <GuestBanner v-if="isGuest(authStore.user)" />
 
       <p class="tiny intro">
         專為出國旅行設計：多幣別記帳，匯率在當下就鎖住，事後波動不影響帳目。沒訊號也能記，

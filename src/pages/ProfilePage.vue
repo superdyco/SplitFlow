@@ -4,7 +4,15 @@ import { RouterLink, useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
-import { logout, providerLabel } from "@/services/authService";
+import {
+  SignInCancelled,
+  guestIdToken,
+  linkGuest,
+  logout,
+  providerLabel,
+  switchToAccount,
+  type SignInProvider
+} from "@/services/authService";
 import { listQueued } from "@/services/receiptQueue";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
@@ -14,7 +22,11 @@ import { buildDiagnosticsText } from "@/utils/diagnostics";
 import { firebaseErrorMessage, required, textFieldError } from "@/utils/firestore";
 import { isInstalledApp } from "@/utils/platform";
 import { buildDataExport, downloadDataExport } from "@/services/dataExportService";
-import { deleteOwnAccount } from "@/services/accountService";
+import { deleteOwnAccount, mergeGuest } from "@/services/accountService";
+import type { AuthCredential } from "firebase/auth";
+import ProviderButtons from "@/components/auth/ProviderButtons.vue";
+import { updateProviderFields } from "@/services/userService";
+import { isGuest, providerIdOf } from "@/utils/guest";
 import { listUserTasks } from "@/services/taskService";
 import type { Task } from "@/types/task";
 import { deleteAccountPrompt } from "@/utils/accountDeletion";
@@ -34,9 +46,11 @@ const nicknameError = computed(() =>
 const isDirty = computed(() => nickname.value.trim() !== (userStore.profile?.nickname || ""));
 /** 有三種登入方式，記得自己是用哪一個進來的很重要，換一個就是另一個帳號。 */
 const loginMethod = computed(() => {
-  const id = authStore.user?.providerData[0]?.providerId || userStore.profile?.provider;
+  // 訪客的 providerData 是空的，原本那行會落到 profile 裡的舊值。
+  const id = authStore.user ? providerIdOf(authStore.user) : userStore.profile?.provider;
   return id ? providerLabel(id) : "";
 });
+const guest = computed(() => isGuest(authStore.user));
 const canSubmit = computed(() => !!nickname.value.trim() && !nicknameError.value && isDirty.value);
 const exporting = ref(false);
 const exportProgress = ref("");
@@ -185,6 +199,85 @@ async function exportData() {
     exporting.value = false;
   }
 }
+
+const linking = ref<SignInProvider | null>(null);
+const linkError = ref<string | null>(null);
+/** 那個帳號已經有資料時，等使用者決定要不要合併。 */
+const takenCredential = ref<AuthCredential | null>(null);
+/**
+ * 已經換到正式帳號、但合併還沒完成時留著的訪客證明。一小時內有效。
+ * 這時使用者已經不是訪客了，所以重試區塊不能放在「只有訪客看得到」的卡片裡。
+ */
+const pendingGuestToken = ref<string | null>(null);
+const merging = ref(false);
+
+const mergeMessage = computed(
+  () =>
+    `要把訪客的 ${tasks.value.length} 個任務合併進去嗎？合併後這台裝置會改用那個帳號，訪客身分會消失。` +
+    "如果那個帳號也在同一個任務裡，訪客記的帳會變成一位「（訪客）」成員，金額不變。"
+);
+
+async function bind(provider: SignInProvider) {
+  linking.value = provider;
+  linkError.value = null;
+  try {
+    const result = await linkGuest(provider);
+    if (result.kind === "taken") {
+      takenCredential.value = result.credential;
+      return;
+    }
+    await updateProviderFields(result.user);
+    authStore.refresh(result.user);
+    await userStore.load(result.user.uid);
+  } catch (err) {
+    if (!(err instanceof SignInCancelled)) linkError.value = firebaseErrorMessage(err);
+  } finally {
+    linking.value = null;
+  }
+}
+
+async function finishMerge() {
+  const token = pendingGuestToken.value;
+  if (!token) return;
+  try {
+    await mergeGuest(token);
+    pendingGuestToken.value = null;
+    userStore.clear();
+    await router.push("/tasks");
+  } catch (err) {
+    linkError.value = `合併沒有完成：${firebaseErrorMessage(err)}`;
+  }
+}
+
+async function mergeIntoTaken() {
+  const credential = takenCredential.value;
+  takenCredential.value = null;
+  if (!credential) return;
+  merging.value = true;
+  linkError.value = null;
+  try {
+    // 順序不能換：換到正式帳號之後就再也拿不到訪客的證明了。
+    const token = await guestIdToken();
+    await switchToAccount(credential);
+    // 換成功才留著 —— 換失敗時他還是訪客，拿這串 token 重試會被函式拒絕。
+    pendingGuestToken.value = token;
+    await finishMerge();
+  } catch (err) {
+    linkError.value = firebaseErrorMessage(err);
+  } finally {
+    merging.value = false;
+  }
+}
+
+async function retryMerge() {
+  merging.value = true;
+  linkError.value = null;
+  try {
+    await finishMerge();
+  } finally {
+    merging.value = false;
+  }
+}
 </script>
 
 <template>
@@ -200,7 +293,7 @@ async function exportData() {
             <span v-if="nicknameError" class="tiny warn">{{ nicknameError }}</span>
           </div>
         </div>
-        <div class="spread">
+        <div v-if="!guest" class="spread">
           <span class="muted">電子郵件</span>
           <strong>{{ authStore.user?.email || "未提供" }}</strong>
         </div>
@@ -209,6 +302,28 @@ async function exportData() {
           <strong>{{ loginMethod }}</strong>
         </div>
       </div>
+
+      <!--
+        綁定放在帳號卡片正下方：對訪客來說這是這一頁最重要的事，比改暱稱還重要 ——
+        忘了做的後果是資料永久遺失。
+      -->
+      <div v-if="guest" class="card flat stack">
+        <h2 class="card-head">綁定帳號</h2>
+        <p class="tiny">
+          你目前是訪客，資料只存在這台裝置 —— 清除瀏覽器資料就找不回來。綁定之後，任務都會留著。
+        </p>
+        <ProviderButtons :pending="linking" action="綁定" @select="bind" />
+      </div>
+
+      <div v-if="pendingGuestToken" class="card flat stack">
+        <h2 class="card-head">合併沒有完成</h2>
+        <p class="tiny">你已經換到正式帳號了，但訪客的任務還沒搬過來。一小時內都可以重試。</p>
+        <button class="btn btn-primary btn-block" :disabled="merging" @click="retryMerge">
+          {{ merging ? "合併中..." : "重試合併" }}
+        </button>
+      </div>
+
+      <ErrorState v-if="guest || pendingGuestToken" :message="linkError" />
 
       <!--
         儲存緊跟在暱稱卡下面。原本它排在「旅程」與「資料匯出」兩張卡之後 ——
@@ -297,6 +412,15 @@ async function exportData() {
         :require-text="deletePrompt.requireText"
         @confirm="deleteAccount"
         @cancel="confirmingDelete = false"
+      />
+
+      <ConfirmDialog
+        :open="takenCredential !== null"
+        title="這個帳號已經有資料"
+        :message="mergeMessage"
+        confirm-label="合併"
+        @confirm="mergeIntoTaken"
+        @cancel="takenCredential = null"
       />
     </div>
   </AppLayout>

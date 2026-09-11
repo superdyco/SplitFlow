@@ -15,6 +15,14 @@ export const useAuthStore = defineStore("auth", {
         this.user = user;
         this.initialized = true;
       });
+    },
+    /**
+     * 綁定帳號之後 uid 不變，onAuthStateChanged 不會再響 —— 但 isAnonymous 與
+     * providerData 已經變了。先放 null 再放回去，讓看著它的畫面重算一次。
+     */
+    refresh(user: User | null) {
+      this.user = null;
+      this.user = user;
     }
   }
 });

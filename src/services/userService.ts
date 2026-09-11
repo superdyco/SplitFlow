@@ -50,3 +50,16 @@ export async function updateNickname(uid: string, nickname: string): Promise<voi
     updatedAt: serverTimestamp()
   });
 }
+
+/**
+ * 訪客綁定帳號之後，把登入方式、email、頭像補上。暱稱不動 —— 那是使用者自己取的。
+ * 這四個欄位都在 rules 的 users update 允許清單裡。
+ */
+export async function updateProviderFields(user: User): Promise<void> {
+  await updateDoc(doc(db, "users", user.uid), {
+    email: user.email || "",
+    photoURL: user.photoURL || null,
+    provider: providerIdOf(user),
+    updatedAt: serverTimestamp()
+  });
+}

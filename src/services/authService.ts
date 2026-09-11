@@ -4,10 +4,13 @@ import {
   GoogleAuthProvider,
   OAuthProvider,
   fetchSignInMethodsForEmail,
+  linkWithPopup,
   onAuthStateChanged,
   signInAnonymously,
+  signInWithCredential,
   signInWithPopup,
   signOut,
+  type AuthCredential,
   type AuthProvider,
   type User
 } from "firebase/auth";
@@ -98,6 +101,50 @@ export async function signInAsGuest(): Promise<User> {
     }
     throw err;
   }
+}
+
+export type LinkResult =
+  | { kind: "linked"; user: User }
+  | { kind: "taken"; credential: AuthCredential };
+
+function credentialFromError(name: SignInProvider, err: FirebaseError): AuthCredential | null {
+  if (name === "google") return GoogleAuthProvider.credentialFromError(err);
+  if (name === "facebook") return FacebookAuthProvider.credentialFromError(err);
+  return OAuthProvider.credentialFromError(err);
+}
+
+/**
+ * 訪客綁定正式帳號。成功的話 **uid 不變**，所有任務原封不動。
+ *
+ * 那個帳號以前就登入過（`credential-already-in-use`）時，把它的 credential
+ * 交回去，由畫面問使用者要不要合併 —— 兩個 uid 沒辦法在用戶端合在一起。
+ */
+export async function linkGuest(name: SignInProvider): Promise<LinkResult> {
+  const user = auth.currentUser;
+  if (!user?.isAnonymous) throw new Error("只有訪客需要綁定帳號");
+  try {
+    const result = await linkWithPopup(user, buildProvider(name));
+    return { kind: "linked", user: result.user };
+  } catch (err) {
+    if (err instanceof FirebaseError && err.code === "auth/credential-already-in-use") {
+      const credential = credentialFromError(name, err);
+      if (credential) return { kind: "taken", credential };
+    }
+    throw await toSignInError(err, name);
+  }
+}
+
+/** 訪客的證明。**要在 switchToAccount 之前拿** —— 換過去之後就拿不到了。 */
+export async function guestIdToken(): Promise<string> {
+  const user = auth.currentUser;
+  if (!user?.isAnonymous) throw new Error("目前不是訪客");
+  return user.getIdToken();
+}
+
+/** 換成那個已經存在的帳號。 */
+export async function switchToAccount(credential: AuthCredential): Promise<User> {
+  const result = await signInWithCredential(auth, credential);
+  return result.user;
 }
 
 export function logout(): Promise<void> {

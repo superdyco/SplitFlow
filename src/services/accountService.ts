@@ -30,3 +30,21 @@ export async function deleteOwnAccount(): Promise<void> {
 
   await signOut(auth);
 }
+
+export interface MergeResult {
+  mergedTasks: number;
+  virtualizedTasks: number;
+}
+
+/**
+ * 把訪客合併進目前登入的正式帳號。真正的改寫在雲端函式（`functions/src/index.ts`）。
+ *
+ * 函式可以重跑：失敗時畫面留著 token 讓使用者重試，一小時內有效。
+ */
+export async function mergeGuest(guestToken: string): Promise<MergeResult> {
+  const call = httpsCallable<{ guestToken: string }, MergeResult>(
+    getFunctions(app, "asia-east1"),
+    "mergeGuest"
+  );
+  return (await call({ guestToken })).data;
+}
