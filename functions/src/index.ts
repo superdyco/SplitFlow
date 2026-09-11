@@ -39,6 +39,13 @@ import {
   type MergeIds
 } from "./guestMerge.js";
 import { recordGuestEvent } from "./admin.js";
+import { dayKeyOf } from "./admin/range.js";
+import { ledgerFree, ledgerResult, ledgerUse, planUse, type FinalResult } from "./ai/credits.js";
+import { cleanReceipt, decodeImage, parseOutput, type ReceiptFields } from "./ai/receipt.js";
+import { statIncrements } from "./ai/usage.js";
+import { resolveModel } from "./ai/models.js";
+import { classifyAiError, readReceiptImage } from "./ai/openai.js";
+import { loadAiConfig } from "./ai/config.js";
 
 initializeApp();
 
@@ -198,6 +205,102 @@ export const lookupWeather = onCall({ region: REGION }, async request => {
 });
 
 /**
+ * 記一次 AI 用量。**不會丟例外** —— 這是旁支，記不上只是少一筆統計，
+ * 不該讓使用者拿不到辨識結果。
+ */
+async function recordAiUsage(increments: Record<string, number>): Promise<void> {
+  const day = dayKeyOf(new Date());
+  const data: Record<string, unknown> = { date: day };
+  for (const [key, value] of Object.entries(increments)) data[key] = FieldValue.increment(value);
+  try {
+    await db.collection("stats").doc("ai").collection("days").doc(day).set(data, { merge: true });
+  } catch (err) {
+    logger.warn("AI 用量沒記上", { day, err: String(err) });
+  }
+}
+
+/**
+ * 讀一張收據。**呼叫 AI 就扣 1 點**，不管讀不讀得出來（見 `ai/credits.ts`）。
+ *
+ * 呼叫 AI 之前被擋下的（沒登入、訪客、照片不對、還沒設定、沒點數）不扣 ——
+ * 那些沒有花到錢。
+ *
+ * maxInstances 限的是同時跑幾個，不是總量；總量靠每人只有 3 點，最後一道防線
+ * 是 OpenAI 那邊設的用量上限。
+ */
+export const readReceipt = onCall(
+  { region: REGION, timeoutSeconds: 60, maxInstances: 10 },
+  async request => {
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError("unauthenticated", "請先登入");
+    if (request.auth?.token.firebase?.sign_in_provider === "anonymous") {
+      throw new HttpsError("failed-precondition", "綁定帳號就能用 AI 辨識");
+    }
+
+    const image = decodeImage((request.data as { image?: unknown } | undefined)?.image);
+    if (!image.ok) throw new HttpsError("invalid-argument", "照片格式不對，請重新拍一張");
+
+    const config = await loadAiConfig(db);
+    if (!config) throw new HttpsError("failed-precondition", "AI 辨識還沒有設定好");
+    const model = resolveModel(config.model);
+
+    const creditsRef = db.collection("aiCredits").doc(uid);
+    const useRef = creditsRef.collection("aiLedger").doc();
+
+    // 扣點與寫 use 在同一個 transaction：只剩 1 點時同時按兩次，第二次會看到 0。
+    const balanceAfter = await db.runTransaction(async tx => {
+      const snap = await tx.get(creditsRef);
+      const plan = planUse(snap.exists ? (snap.data() ?? {}) : null);
+      if (!plan.ok) throw new HttpsError("resource-exhausted", "AI 辨識點數用完了");
+
+      const now = Date.now();
+      if (plan.grantFree) {
+        tx.set(creditsRef.collection("aiLedger").doc(), ledgerFree({ uid, at: new Date(now) }));
+      }
+      // use 晚 1 毫秒：跟 free 同一毫秒的話，由新到舊的列表裡兩筆的順序是亂的。
+      tx.set(useRef, ledgerUse({ uid, at: new Date(now + 1), balanceAfter: plan.balanceAfter, model }));
+      tx.set(
+        creditsRef,
+        { balance: plan.balanceAfter, freeGranted: true, updatedAt: FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+      return plan.balanceAfter;
+    });
+
+    let readResult: FinalResult;
+    let fields: ReceiptFields | null = null;
+    let inputTokens: number | undefined;
+    let outputTokens: number | undefined;
+
+    try {
+      const output = await readReceiptImage({ apiKey: config.apiKey, model, base64: image.base64, mime: image.mime });
+      inputTokens = output.inputTokens;
+      outputTokens = output.outputTokens;
+      const cleaned = cleanReceipt(parseOutput(output.text));
+      readResult = cleaned.readResult;
+      fields = cleaned.fields;
+    } catch (err) {
+      readResult = classifyAiError(err);
+      logger.warn("AI 辨識失敗", { uid, model, readResult, err: String(err) });
+    }
+
+    try {
+      await useRef.update(ledgerResult({ readResult, inputTokens, outputTokens }));
+    } catch (err) {
+      // 補不上的話那一筆會停在 pending，後台會顯示「沒有回來」—— 申訴時看得出來。
+      logger.error("點數紀錄沒補上結果", { uid, entry: useRef.path, err: String(err) });
+    }
+    await recordAiUsage(statIncrements({ readResult, inputTokens, outputTokens }) as Record<string, number>);
+
+    if (readResult === "ai_error" || readResult === "timeout" || !fields) {
+      throw new HttpsError("unavailable", "AI 辨識暫時無法使用。");
+    }
+
+    return { readResult, fields, creditsLeft: balanceAfter };
+  }
+);
+
+/**
  * 刪除自己的帳號。App Store 指引 5.1.1(v) 要求 App 內就能發起。
  *
  * **帳目留下，身分標記為已刪除。** 一個人的支出不只是他自己的資料，也是同行者
@@ -279,6 +382,8 @@ export const deleteAccount = onCall({ region: REGION }, async request => {
 
   await db.recursiveDelete(db.collection("users").doc(uid).collection("tokens"));
   await db.recursiveDelete(db.collection("users").doc(uid).collection("favorites"));
+  // 點數與點數紀錄是這個人的資料，跟收藏、推播 token 同一類。
+  await db.recursiveDelete(db.collection("aiCredits").doc(uid));
   await db.collection("users").doc(uid).delete();
 
   // Auth 放最後。反過來的話中途失敗使用者已經登不進來，永遠無法重試，資料就
