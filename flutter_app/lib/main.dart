@@ -16,6 +16,7 @@ import 'ui/onboarding_page.dart';
 import 'ui/sign_in_page.dart';
 import 'ui/task_list_page.dart';
 import 'ui/theme.dart';
+import 'data/error_text.dart';
 
 /// SplitFlow 原生版的進入點。
 ///
@@ -175,7 +176,7 @@ class _RootState extends ConsumerState<_Root> {
 
     return auth.when(
       loading: () => const _Waiting(),
-      error: (err, _) => _FatalPage(message: '登入狀態讀取失敗：$err'),
+      error: (err, _) => _FatalPage(message: '登入狀態讀取失敗：${errorText(err)}'),
       data: (user) {
         if (user == null) return const SignInPage();
 

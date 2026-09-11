@@ -8,6 +8,7 @@ import '../domain/models.dart';
 import '../state/providers.dart';
 import 'remote_receipt.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 使用者對這一格做過什麼。表單存檔時要靠它決定要不要動 Storage
 /// 與 `receipt` 欄位。
@@ -97,7 +98,7 @@ class _ReceiptFieldState extends ConsumerState<ReceiptField> {
       });
       _emit();
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -10,6 +10,7 @@ import '../domain/place_search.dart';
 import '../state/providers.dart';
 import 'place_map.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 地點欄位。`ExpenseFormPage.vue` 裡地點那一段的 Flutter 版。
 ///
@@ -127,7 +128,7 @@ class _PlaceFieldState extends ConsumerState<PlaceField> {
       if (mounted) {
         setState(() {
           _suggestions = const [];
-          _error = err.toString();
+          _error = errorText(err);
         });
       }
     } finally {
@@ -156,7 +157,7 @@ class _PlaceFieldState extends ConsumerState<PlaceField> {
       _emit();
       await ref.read(biasStoreProvider).remember(widget.taskId, detail);
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -194,7 +195,7 @@ class _PlaceFieldState extends ConsumerState<PlaceField> {
       });
       _emit();
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _locating = false);
     }

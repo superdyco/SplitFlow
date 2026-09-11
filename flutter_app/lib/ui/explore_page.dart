@@ -8,6 +8,7 @@ import 'report_card.dart';
 import 'report_page.dart';
 import 'ledger.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 探索：別人願意公開的旅程。`src/pages/ExplorePage.vue` 的 Flutter 版。
 ///
@@ -42,7 +43,7 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
       ref.invalidate(favoritedIdsProvider);
       ref.invalidate(favoritesProvider);
     } catch (err) {
-      if (mounted) setState(() => _error = '$err');
+      if (mounted) setState(() => _error = errorText(err));
     }
   }
 
@@ -57,7 +58,7 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
       body: reports.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => _Retry(
-          message: '讀取公開旅程失敗：$err',
+          message: '讀取公開旅程失敗：${errorText(err)}',
           onRetry: () => ref.invalidate(publicReportsProvider),
         ),
         data: (list) {

@@ -25,6 +25,7 @@ import 'rename_dialog.dart';
 import 'report_share_page.dart';
 import 'settlement_page.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 任務詳情。`src/pages/TaskPage.vue` 的 Flutter 版。
 ///
@@ -106,7 +107,7 @@ class _TaskPageState extends ConsumerState<TaskPage> {
       ),
       error: (err, _) => Scaffold(
         appBar: AppBar(),
-        body: _Centered('讀取任務失敗：$err'),
+        body: _Centered('讀取任務失敗：${errorText(err)}'),
       ),
       data: (value) {
         if (value == null) return _missing('找不到這個分帳任務');
@@ -309,7 +310,7 @@ Future<void> _renameTask(
   } catch (err) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('改名失敗：$err')),
+      SnackBar(content: Text('改名失敗：${errorText(err)}')),
     );
   }
 }
@@ -545,7 +546,7 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
             ),
       body: expenses.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => _Centered('讀取支出失敗：$err'),
+        error: (err, _) => _Centered('讀取支出失敗：${errorText(err)}'),
         data: (list) {
           if (list.isEmpty) return const _Centered('這個任務還沒有支出。');
 

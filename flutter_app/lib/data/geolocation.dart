@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 
 import '../domain/place_bias.dart';
+import 'error_text.dart';
 
 /// 取得裝置目前的座標。`src/services/geolocation.ts` 的 Dart 版。
 ///
@@ -60,7 +61,7 @@ class Geolocation {
       );
     } catch (err) {
       // 這裡剩下的是沒預期到的錯誤，原文留著才查得出是什麼。
-      throw LocationFailure('定位失敗：$err');
+      throw LocationFailure('定位失敗：${errorText(err)}');
     }
   }
 }

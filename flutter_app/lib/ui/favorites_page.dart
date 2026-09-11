@@ -8,6 +8,7 @@ import 'report_card.dart';
 import 'report_page.dart';
 import 'ledger.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 我的收藏。`src/pages/FavoritesPage.vue` 的 Flutter 版。
 ///
@@ -45,7 +46,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
       ref.invalidate(favoritesProvider);
       ref.invalidate(favoritedIdsProvider);
     } catch (err) {
-      if (mounted) setState(() => _error = '$err');
+      if (mounted) setState(() => _error = errorText(err));
     }
   }
 
@@ -59,7 +60,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
       body: favorites.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => _Retry(
-          message: '讀取收藏失敗：$err',
+          message: '讀取收藏失敗：${errorText(err)}',
           onRetry: () => ref.invalidate(favoritesProvider),
         ),
         data: (list) {

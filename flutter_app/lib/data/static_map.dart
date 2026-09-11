@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../domain/place_totals.dart';
+import 'error_text.dart';
 
 /// 旅費報告的靜態地圖。`src/services/staticMap.ts` 的 Dart 版。
 ///
@@ -99,7 +100,7 @@ Future<StaticMapResult> fetchStaticMap(
     }
     return StaticMapResult(bytes: response.bodyBytes);
   } catch (err) {
-    return StaticMapResult(reason: _shorten('連不上地圖服務：$err'));
+    return StaticMapResult(reason: _shorten('連不上地圖服務：${errorText(err)}'));
   } finally {
     // 自己開的才自己關 —— 呼叫端傳進來的 client 可能還要繼續用。
     if (client == null) httpClient.close();

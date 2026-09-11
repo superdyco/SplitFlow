@@ -16,6 +16,7 @@ import 'diagnostics_section.dart';
 import 'system_share.dart';
 import 'ledger.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 個人設定。`src/pages/ProfilePage.vue` 的 Flutter 版。
 ///
@@ -40,7 +41,7 @@ class ProfilePage extends ConsumerWidget {
         error: (err, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
-            child: Text('讀取個人資料失敗：$err', textAlign: TextAlign.center),
+            child: Text('讀取個人資料失敗：${errorText(err)}', textAlign: TextAlign.center),
           ),
         ),
         data: (value) => value == null
@@ -107,7 +108,7 @@ class _FormState extends ConsumerState<_Form> {
     } on SignInCancelled {
       // 重新驗證時自己取消，不是錯誤。
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _deleting = false);
     }
@@ -136,7 +137,7 @@ class _FormState extends ConsumerState<_Form> {
     } on SignInCancelled {
       // 自己取消不是錯誤。
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _linking = null);
     }
@@ -169,7 +170,7 @@ class _FormState extends ConsumerState<_Form> {
         navigator.popUntil((route) => route.isFirst);
       }
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _merging = false);
     }
@@ -206,7 +207,7 @@ class _FormState extends ConsumerState<_Form> {
       await ref.read(authRepositoryProvider).deleteAccount();
       navigator.pop();
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     }
   }
 
@@ -255,7 +256,7 @@ class _FormState extends ConsumerState<_Form> {
     } catch (err) {
       if (mounted) {
         setState(() {
-          _error = err.toString();
+          _error = errorText(err);
           _saving = false;
         });
       }
@@ -287,7 +288,7 @@ class _FormState extends ConsumerState<_Form> {
       );
       if (mounted) setState(() => _exportProgress = '匯出完成');
     } catch (err) {
-      if (mounted) setState(() => _error = '匯出失敗：$err');
+      if (mounted) setState(() => _error = '匯出失敗：${errorText(err)}');
     } finally {
       if (mounted) setState(() => _exporting = false);
     }

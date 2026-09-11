@@ -21,6 +21,7 @@ import 'confirm_dialog.dart';
 import 'task_card.dart';
 import 'task_page.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 我的分帳。`src/pages/TaskListPage.vue` 的 Flutter 版。
 ///
@@ -185,7 +186,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
 
       if (mounted) setState(() => _costs = result);
     } catch (err) {
-      if (mounted) setState(() => _costsError = err.toString());
+      if (mounted) setState(() => _costsError = errorText(err));
     } finally {
       if (mounted) setState(() => _costsBusy = false);
     }
@@ -216,7 +217,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     } catch (err) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('沒有成功：$err')),
+        SnackBar(content: Text('沒有成功：${errorText(err)}')),
       );
     }
   }
@@ -304,7 +305,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
       body: tasks.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => _Retry(
-          message: '讀取任務列表失敗：$err',
+          message: '讀取任務列表失敗：${errorText(err)}',
           onRetry: () => ref.invalidate(tasksProvider),
         ),
         data: (all) {

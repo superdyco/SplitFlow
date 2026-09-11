@@ -7,6 +7,7 @@ import '../domain/guest.dart';
 import '../domain/validation.dart' as validate;
 import '../state/providers.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 第一次登入時取暱稱。`src/pages/OnboardingPage.vue` 的 Flutter 版。
 ///
@@ -72,7 +73,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     } catch (err) {
       if (mounted) {
         setState(() {
-          _error = err.toString();
+          _error = errorText(err);
           _saving = false;
         });
       }
@@ -96,7 +97,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         );
       }
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     }
   }
 

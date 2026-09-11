@@ -10,6 +10,7 @@ import 'ledger.dart';
 import 'remove_member_dialog.dart';
 import 'rename_dialog.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 任務的成員分頁。`src/components/member/MemberRow.vue` 與 TaskPage 的
 /// 成員區塊合起來的 Flutter 版。
@@ -57,7 +58,7 @@ class _MembersTabState extends ConsumerState<MembersTab> {
       ref.invalidate(membersProvider(widget.task.id));
       ref.invalidate(taskProvider(widget.task.id));
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _busyUid = null);
     }
@@ -85,7 +86,7 @@ class _MembersTabState extends ConsumerState<MembersTab> {
       ref.invalidate(membersProvider(widget.task.id));
       ref.invalidate(taskProvider(widget.task.id));
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _addingVirtual = false);
     }
@@ -196,7 +197,7 @@ class _MembersTabState extends ConsumerState<MembersTab> {
       error: (err, _) => Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Text('讀取成員失敗：$err', textAlign: TextAlign.center),
+          child: Text('讀取成員失敗：${errorText(err)}', textAlign: TextAlign.center),
         ),
       ),
       data: (list) => ListView(

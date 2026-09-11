@@ -15,6 +15,7 @@ import 'payment_sheet.dart';
 import 'settlement_history.dart';
 import 'system_share.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 結算分頁。`src/components/settlement/SettlementPanel.vue` 的 Flutter 版。
 ///
@@ -54,7 +55,7 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
       ref.invalidate(paymentsProvider(task.id));
       ref.invalidate(settlementProvider(task.id));
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -184,7 +185,7 @@ class _SettlementTabState extends ConsumerState<SettlementTab> {
       error: (err, _) => Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Text('算不出結算：$err', textAlign: TextAlign.center),
+          child: Text('算不出結算：${errorText(err)}', textAlign: TextAlign.center),
         ),
       ),
       data: (result) {

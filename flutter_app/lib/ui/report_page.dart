@@ -11,6 +11,7 @@ import '../state/providers.dart';
 import 'report_card.dart';
 import 'theme.dart';
 import 'weather_chip.dart';
+import '../data/error_text.dart';
 
 /// 一份公開的旅費報告。`src/pages/ReportPage.vue` 的 Flutter 版。
 ///
@@ -108,7 +109,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
       if (mounted) {
         setState(() {
           _saved = wasSaved;
-          _favoriteError = '$err';
+          _favoriteError = errorText(err);
         });
       }
     } finally {

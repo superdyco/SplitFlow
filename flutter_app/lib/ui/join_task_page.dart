@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/providers.dart';
 import 'task_page.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 原生邀請加入頁。資料與網頁版 `/join/:inviteCode` 讀的是同一份 invite 文件。
 class JoinTaskPage extends ConsumerStatefulWidget {
@@ -64,7 +65,7 @@ class _JoinTaskPageState extends ConsumerState<JoinTaskPage> {
         });
       }
     } catch (err) {
-      if (mounted) setState(() => _error = '讀取邀請失敗：$err');
+      if (mounted) setState(() => _error = '讀取邀請失敗：${errorText(err)}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -98,7 +99,7 @@ class _JoinTaskPageState extends ConsumerState<JoinTaskPage> {
       if (!mounted) return;
       setState(() => _error = '加入失敗：${err.message ?? err.code}');
     } catch (err) {
-      if (mounted) setState(() => _error = '加入失敗：$err');
+      if (mounted) setState(() => _error = '加入失敗：${errorText(err)}');
     } finally {
       if (mounted) setState(() => _joining = false);
     }

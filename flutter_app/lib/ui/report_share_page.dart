@@ -14,6 +14,7 @@ import 'confirm_dialog.dart';
 import 'report_page.dart';
 import 'system_share.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 產生與管理公開的旅費報告。`src/pages/TaskPage.vue` 的分享那一區的
 /// Flutter 版，在手機上獨立成一頁 —— 那一區有五個開關與一段長連結，
@@ -82,7 +83,7 @@ class _ReportSharePageState extends ConsumerState<ReportSharePage> {
           try {
             mapPath = await repo.uploadMap(_taskId, reportId, bytes);
           } catch (err) {
-            warning = '地圖上傳失敗：$err';
+            warning = '地圖上傳失敗：${errorText(err)}';
             logError('map', err);
           }
         }
@@ -104,7 +105,7 @@ class _ReportSharePageState extends ConsumerState<ReportSharePage> {
       ref.invalidate(taskReportProvider(_taskId));
       ref.invalidate(publicReportsProvider);
     } catch (err) {
-      if (mounted) setState(() => _error = '$err');
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -146,7 +147,7 @@ class _ReportSharePageState extends ConsumerState<ReportSharePage> {
       ref.invalidate(taskReportProvider(_taskId));
       ref.invalidate(publicReportsProvider);
     } catch (err) {
-      if (mounted) setState(() => _error = '$err');
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -161,7 +162,7 @@ class _ReportSharePageState extends ConsumerState<ReportSharePage> {
       appBar: AppBar(title: const Text('旅費報告')),
       body: report.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => _Centered('讀取報告失敗：$err'),
+        error: (err, _) => _Centered('讀取報告失敗：${errorText(err)}'),
         data: (current) => ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
           children: [

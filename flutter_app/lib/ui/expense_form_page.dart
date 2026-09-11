@@ -19,6 +19,7 @@ import 'place_field.dart';
 import 'receipt_field.dart';
 import 'theme.dart';
 import 'weather_chip.dart';
+import '../data/error_text.dart';
 
 /// 新增／編輯支出。`src/pages/ExpenseFormPage.vue` 的 Flutter 版。
 ///
@@ -286,7 +287,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         _rateUpdatedAt = quote.updatedAt;
       });
     } catch (err) {
-      if (mounted) setState(() => _rateError = err.toString());
+      if (mounted) setState(() => _rateError = errorText(err));
     } finally {
       if (mounted) setState(() => _rateLoading = false);
     }
@@ -401,7 +402,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     } on FormatException catch (err) {
       if (mounted) setState(() => _error = err.message);
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -483,7 +484,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     } catch (err) {
       if (mounted) {
         setState(() {
-          _error = err.toString();
+          _error = errorText(err);
           _saving = false;
         });
       }

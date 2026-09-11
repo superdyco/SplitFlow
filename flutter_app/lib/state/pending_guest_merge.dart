@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/auth_repository.dart';
+import '../data/error_text.dart';
 
 /// 已經換到正式帳號、但合併還沒完成的訪客證明。一小時內有效。
 ///
@@ -34,7 +35,7 @@ Future<bool> runGuestMerge(
     pending.state = null;
     return true;
   } catch (err) {
-    pending.state = PendingGuestMerge(guestToken, error: '合併沒有完成：$err');
+    pending.state = PendingGuestMerge(guestToken, error: '合併沒有完成：${errorText(err)}');
     return false;
   }
 }

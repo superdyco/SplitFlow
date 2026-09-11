@@ -8,6 +8,7 @@ import '../data/auth_repository.dart';
 import '../domain/auth_error.dart';
 import '../state/providers.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 登入頁。`src/pages/LoginPage.vue` 的 Flutter 版。
 ///
@@ -52,7 +53,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     } on SignInCancelled {
       // 自己取消不是錯誤，安靜收掉就好。
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -67,7 +68,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       await ref.read(authRepositoryProvider).signInAsGuest();
       // 不必導頁：_Root 看到登入狀態變了，會自己換成取暱稱頁。
     } catch (err) {
-      if (mounted) setState(() => _error = err.toString());
+      if (mounted) setState(() => _error = errorText(err));
     } finally {
       if (mounted) setState(() => _guestBusy = false);
     }

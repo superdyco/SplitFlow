@@ -9,6 +9,7 @@ import '../state/providers.dart';
 import 'currency_picker.dart';
 import 'system_share.dart';
 import 'theme.dart';
+import '../data/error_text.dart';
 
 /// 建立分帳任務。`src/pages/CreateTaskPage.vue` 的 Flutter 版。
 ///
@@ -88,7 +89,7 @@ class _CreateTaskPageState extends ConsumerState<CreateTaskPage> {
     } catch (err) {
       if (mounted) {
         setState(() {
-          _error = err.toString();
+          _error = errorText(err);
           _saving = false;
         });
       }
