@@ -4,6 +4,7 @@ import { fetchOverview, type AdminOverview, type AdminRange } from "@/services/a
 import LoadingState from "@/components/common/LoadingState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
+import DauChart from "@/pages/admin/DauChart.vue";
 
 const RANGES: Array<{ value: AdminRange; label: string }> = [
   { value: "7d", label: "7 天" },
@@ -69,44 +70,6 @@ const retention = computed(() => {
  * 那幾天會讓這裡以為有資料，然後畫出一張空的圖表框。
  */
 const hasSeries = computed(() => (data.value?.dau ?? []).some(point => point.value !== null));
-
-const PLOT = { w: 640, h: 160 };
-
-/**
- * 折線的各段。
- *
- * 缺的那天是 null，而 null 要讓線**斷開**，不是連過去也不是畫成 0 ——
- * 把缺漏畫成 0 會在圖上出現一個插到底的 V 型，看起來像一次事故。
- */
-const segments = computed(() => {
-  const points = data.value?.dau ?? [];
-  if (points.length === 0) return [];
-
-  const values = points.map(p => p.value).filter((v): v is number => v !== null);
-  if (values.length === 0) return [];
-  const max = Math.max(...values, 1);
-
-  const x = (i: number) => (i / Math.max(points.length - 1, 1)) * PLOT.w;
-  const y = (v: number) => PLOT.h - (v / max) * PLOT.h;
-
-  const out: string[] = [];
-  let run: string[] = [];
-  points.forEach((point, i) => {
-    if (point.value === null) {
-      if (run.length > 1) out.push(run.join(" "));
-      run = [];
-      return;
-    }
-    run.push(`${x(i).toFixed(1)},${y(point.value).toFixed(1)}`);
-  });
-  if (run.length > 1) out.push(run.join(" "));
-  return out;
-});
-
-const peak = computed(() => {
-  const values = (data.value?.dau ?? []).map(p => p.value).filter((v): v is number => v !== null);
-  return values.length ? Math.max(...values) : null;
-});
 </script>
 
 <template>
@@ -185,16 +148,7 @@ const peak = computed(() => {
             </p>
           </div>
 
-          <svg
-            v-else
-            class="chart"
-            :viewBox="`0 0 ${PLOT.w} ${PLOT.h + 24}`"
-            role="img"
-            :aria-label="`每日活躍使用者，最高 ${peak}`"
-          >
-            <line :x1="0" :y1="PLOT.h" :x2="PLOT.w" :y2="PLOT.h" class="axis" />
-            <polyline v-for="(points, i) in segments" :key="i" :points="points" class="line" />
-          </svg>
+          <DauChart v-else :points="data.dau" :dimmed="loading" />
 
           <p v-if="hasSeries && data.coverage.present < data.coverage.expected" class="tiny gap">
             這段期間有
@@ -397,26 +351,6 @@ const peak = computed(() => {
 
 .accruing {
   margin-top: var(--space-4);
-}
-
-.chart {
-  display: block;
-  width: 100%;
-  height: auto;
-  margin-top: var(--space-4);
-}
-
-.axis {
-  stroke: var(--color-line-strong);
-  stroke-width: 1;
-}
-
-.line {
-  fill: none;
-  stroke: var(--color-primary-dark);
-  stroke-width: 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
 }
 
 .gap {
