@@ -46,6 +46,16 @@ export interface AdminOverview {
     updatedAt: string | null;
   }>;
   coverage: { expected: number; present: number };
+  /**
+   * 訪客的來去。**當下記的**，所以算到今天，跟上面到昨天為止的序列不同。
+   *
+   * 標成可能不存在：前端與 functions 分開部署，舊版的 adminOverview 不會回這個欄位。
+   */
+  guests?: {
+    totals: { started: number; bound: number; merged: number; left: number };
+    /** 區間內有紀錄的天數。0 代表還沒開始記，不是「沒有訪客」。 */
+    recordedDays: number;
+  };
 }
 
 /**

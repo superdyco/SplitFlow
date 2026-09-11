@@ -38,6 +38,7 @@ import {
   type Data,
   type MergeIds
 } from "./guestMerge.js";
+import { recordGuestEvent } from "./admin.js";
 
 initializeApp();
 
@@ -288,6 +289,11 @@ export const deleteAccount = onCall({ region: REGION }, async request => {
     // 已經刪掉了就是成功 —— 這是重試會走到的路。
     const code = (error as { code?: string }).code;
     if (code !== "auth/user-not-found") throw error;
+  }
+
+  // 訪客的登出就是走這裡。記一筆「離開」—— 刪完之後任何事後統計都數不到他了。
+  if (request.auth?.token.firebase?.sign_in_provider === "anonymous") {
+    await recordGuestEvent("left");
   }
 
   logger.info("帳號已刪除", { uid, deletedTasks, transferredTasks, leftTasks });
@@ -671,6 +677,9 @@ export const mergeGuest = onCall({ region: REGION }, async request => {
     if (code !== "auth/user-not-found") throw error;
   }
 
+  // 放在最後、全部成功之後：重試時走上面 user-not-found 的早退，不會重複算。
+  await recordGuestEvent("merged");
+
   logger.info("訪客已合併", { guest, account, mergedTasks, virtualizedTasks });
   return { mergedTasks, virtualizedTasks };
 });
@@ -693,5 +702,7 @@ export {
   adminDisableUser,
   adminArchiveTask,
   aggregateDaily,
-  adminBackfill
+  adminBackfill,
+  onGuestCreated,
+  onGuestBound
 } from "./admin.js";

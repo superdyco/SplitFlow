@@ -13,6 +13,8 @@ import LoadingState from "@/components/common/LoadingState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import AdminActionDialog from "@/pages/admin/AdminActionDialog.vue";
+import { providerLabel } from "@/utils/authError";
+import { GUEST_PROVIDER_ID } from "@/utils/guest";
 
 const FILTERS: Array<{ value: UserFilter; label: string }> = [
   { value: "all", label: "全部" },
@@ -249,7 +251,14 @@ function whenSeen(row: AdminUserRow): string {
                       </div>
                     </div>
                   </td>
-                  <td class="tiny">{{ row.provider }}</td>
+                  <td class="tiny">
+                    <!--
+                      訪客給一個標籤而不是一行字：列表一頁二十幾列，要一眼掃得出來。
+                      訪客沒有 email，名字底下那格也會是「—」，兩個訊號對得上。
+                    -->
+                    <span v-if="row.provider === GUEST_PROVIDER_ID" class="pill sm">訪客</span>
+                    <template v-else>{{ providerLabel(row.provider) }}</template>
+                  </td>
                   <td class="tiny num">{{ day(row.createdAt) }}</td>
                   <td class="tiny num">{{ whenSeen(row) }}</td>
                 </tr>
@@ -286,12 +295,13 @@ function whenSeen(row: AdminUserRow): string {
                 <div class="section-title">{{ detail.profile.nickname || "（沒有暱稱）" }}</div>
                 <div class="tiny">{{ detail.profile.email || "—" }}</div>
               </div>
+              <span v-if="detail.profile.provider === GUEST_PROVIDER_ID" class="pill sm">訪客</span>
               <span v-if="detail.disabled" class="pill danger">已停用</span>
             </div>
 
             <dl class="meta">
               <div><dt>UID</dt><dd class="mono">{{ detail.profile.uid }}</dd></div>
-              <div><dt>登入方式</dt><dd>{{ detail.profile.provider }}</dd></div>
+              <div><dt>登入方式</dt><dd>{{ providerLabel(detail.profile.provider) }}</dd></div>
               <div><dt>註冊日</dt><dd class="num">{{ day(detail.profile.createdAt) }}</dd></div>
               <div><dt>最後開啟</dt><dd class="num">{{ whenSeen(detail.profile) }}</dd></div>
             </dl>
@@ -546,6 +556,11 @@ function whenSeen(row: AdminUserRow): string {
   color: var(--color-ink);
   font-size: var(--text-tiny);
   font-weight: 700;
+}
+
+/* 跟任務頁「虛擬成員」那個標籤同一個尺寸。 */
+.pill.sm {
+  padding: 3px 8px;
 }
 
 .pill.danger {

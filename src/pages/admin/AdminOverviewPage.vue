@@ -50,6 +50,9 @@ const hasWeekly = computed(() => (data.value?.coverage?.present ?? 0) > 0);
  */
 const topTasks = computed(() => data.value?.topTasks ?? []);
 
+/** 同上：舊版的 adminOverview 沒有這個欄位。 */
+const guests = computed(() => data.value?.guests ?? null);
+
 const retention = computed(() => {
   const cohort = data.value?.cohort;
   // matured 是 0 的時候回 null 不回 0%：那天只是沒有任務滿七天，不是留存率是零。
@@ -198,6 +201,33 @@ const peak = computed(() => {
             {{ data.coverage.expected - data.coverage.present }}
             天沒有彙總資料，線在那裡是斷的。
           </p>
+        </div>
+
+        <div class="card">
+          <div class="spread">
+            <h2 class="card-head">訪客</h2>
+            <p class="tiny">免登入試用的人後來怎麼了 · 當下記的，算到今天</p>
+          </div>
+          <!--
+            沒有紀錄時不顯示四個 0：那會被讀成「沒有人試用」，而實際上可能只是
+            這個統計還沒部署、或這段期間之前還沒開始記。
+          -->
+          <div v-if="!guests || guests.recordedDays === 0" class="empty accruing">
+            <p class="tiny">
+              還沒有訪客紀錄。這個統計從部署那天才開始記，之前來過又走掉的訪客補不回來。
+            </p>
+          </div>
+          <template v-else>
+            <ul class="platforms">
+              <li><span>按了試用</span><strong>{{ number(guests.totals.started) }}</strong></li>
+              <li><span>綁定帳號</span><strong>{{ number(guests.totals.bound) }}</strong></li>
+              <li><span>合併進既有帳號</span><strong>{{ number(guests.totals.merged) }}</strong></li>
+              <li><span>登出離開</span><strong>{{ number(guests.totals.left) }}</strong></li>
+            </ul>
+            <p class="tiny plat-note">
+              「按了試用」包含還沒取暱稱就走掉的人 —— 他們在使用者列表裡看不到。
+            </p>
+          </template>
         </div>
 
         <div class="card">

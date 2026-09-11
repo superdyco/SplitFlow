@@ -15,6 +15,7 @@
 import {
   AggregateField,
   FieldPath,
+  FieldValue,
   getFirestore,
   Timestamp,
   type Firestore
@@ -23,10 +24,17 @@ import { getAuth } from "firebase-admin/auth";
 import { getMessaging } from "firebase-admin/messaging";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+/*
+  v1 只為了一件事：「帳號被建立」的觸發器。v2 對應的是 blocking function
+  （beforeUserCreated），那要把專案升級到 Identity Platform —— 為了數人頭
+  不值得。v1 的 onCreate 在建立之後才跑，擋不到任何東西，正好是這裡要的。
+*/
+import * as functionsV1 from "firebase-functions/v1";
 import { logger } from "firebase-functions";
 
 import { DENIED_CODE, DENIED_MESSAGE, isAdmin } from "./admin/guard.js";
-import { dayBounds, dayKeys, latestCompletedDay, parseRange, TIME_ZONE } from "./admin/range.js";
+import { dayBounds, dayKeyOf, dayKeys, latestCompletedDay, parseRange, TIME_ZONE } from "./admin/range.js";
 import {
   auditEntry,
   disableEffectiveAt,
@@ -63,6 +71,14 @@ import {
   type DailyCounts,
   type DailyDoc
 } from "./admin/aggregate.js";
+import {
+  guestKeys,
+  isAnonymousRecord,
+  isBinding,
+  sumGuests,
+  type GuestDayDoc,
+  type GuestEvent
+} from "./admin/guests.js";
 
 const REGION = "asia-east1";
 
@@ -197,6 +213,76 @@ async function readDaily(keys: string[]): Promise<DailyDoc[]> {
   return snap.docs.map(doc => doc.data() as DailyDoc);
 }
 
+/* ------------------------------------------------------------------ 訪客 */
+
+/**
+ * 訪客的來去，一天一份 `stats/guests/days/{YYYY-MM-DD}`。
+ *
+ * **為什麼不放進每日彙總那份文件**：`aggregateDaily` 是整份 `set()` 覆寫，
+ * 同一份文件裡當天記的次數會在凌晨四點被洗掉。
+ *
+ * **為什麼是當下記而不是事後數**：訪客登出就刪文件（見 `deleteAccount`），
+ * 凌晨的排程掃 users 的時候他已經不在了 —— 當天來、當天走的人在任何事後統計
+ * 裡都像沒來過。只記次數，不記是誰。
+ */
+async function readGuests(keys: string[]): Promise<GuestDayDoc[]> {
+  const snap = await db()
+    .collection("stats")
+    .doc("guests")
+    .collection("days")
+    .where("date", ">=", keys[0])
+    .where("date", "<=", keys[keys.length - 1])
+    .get();
+
+  return snap.docs.map(doc => doc.data() as GuestDayDoc);
+}
+
+/**
+ * 記一次訪客事件。**不會丟例外** —— 這是旁支，記不上只是少一筆統計，
+ * 不該讓使用者的刪除或合併因此失敗。
+ */
+export async function recordGuestEvent(event: GuestEvent, at: Date = new Date()): Promise<void> {
+  const day = dayKeyOf(at);
+  try {
+    await db()
+      .collection("stats")
+      .doc("guests")
+      .collection("days")
+      .doc(day)
+      .set({ date: day, [event]: FieldValue.increment(1) }, { merge: true });
+  } catch (err) {
+    logger.warn("訪客統計沒記上", { event, day, err: String(err) });
+  }
+}
+
+/**
+ * 有人按了「免登入立即試用」。
+ *
+ * 用 Auth 的觸發器而不是 users 文件：還沒取暱稱就走掉的人沒有 users 文件，
+ * 而那正是最想知道有多少的一群。匿名帳號沒有任何供應商。
+ */
+export const onGuestCreated = functionsV1
+  .region(REGION)
+  .auth.user()
+  .onCreate(async user => {
+    if (!isAnonymousRecord(user.providerData.map(info => info.providerId))) return;
+    await recordGuestEvent("started", new Date(user.metadata.creationTime));
+  });
+
+/**
+ * 訪客綁定了正式帳號：前端綁定成功後會把 provider 從 anonymous 改掉。
+ *
+ * 每一次 users 更新都會叫醒它（包括一天一次的 lastSeenAt 戳記），所以第一行
+ * 就要判斷完走人。合併不走這裡 —— 合併掉的訪客文件是被刪掉的。
+ */
+export const onGuestBound = onDocumentUpdated(
+  { document: "users/{uid}", region: REGION },
+  async event => {
+    if (!isBinding(event.data?.before.get("provider"), event.data?.after.get("provider"))) return;
+    await recordGuestEvent("bound");
+  }
+);
+
 /**
  * 儀表板的總覽。
  *
@@ -211,9 +297,11 @@ export const adminOverview = onCall({ region: REGION }, async request => {
   if (!range) throw new HttpsError("invalid-argument", "不認得的時間區間");
 
   const keys = dayKeys(range, new Date());
+  // 訪客是當下記的，所以同樣長度、但算到今天 —— 不然今天來的人要等明天才看得到。
+  const guestDays = guestKeys(keys.length, new Date());
   const tasks = db().collection("tasks");
 
-  const [users, active, archived, deleted, expenses, daily, busiest] = await Promise.all([
+  const [users, active, archived, deleted, expenses, daily, busiest, guestDocs] = await Promise.all([
     countOf(db().collection("users")),
     countOf(tasks.where("status", "==", "active")),
     countOf(tasks.where("status", "==", "archived")),
@@ -231,7 +319,8 @@ export const adminOverview = onCall({ region: REGION }, async request => {
       .where("status", "in", ["active", "archived"])
       .orderBy("expenseCount", "desc")
       .limit(5)
-      .get()
+      .get(),
+    readGuests(guestDays)
   ]);
 
   const week = keys.slice(-7);
@@ -271,7 +360,8 @@ export const adminOverview = onCall({ region: REGION }, async request => {
       有幾天真的有資料。畫面拿它決定要不要畫那條線 —— 排程還沒上線時
       這裡是 0，那時候該說「累積中」，而不是畫一條貼在底部的直線。
     */
-    coverage: { expected: keys.length, present: daily.length }
+    coverage: { expected: keys.length, present: daily.length },
+    guests: sumGuests(guestDocs, guestDays)
   };
 });
 
