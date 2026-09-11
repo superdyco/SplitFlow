@@ -370,9 +370,12 @@ owner 的成員文件在同一個 batch，`get()` 那當下讀不到任務，會
 資料是朋友的消費紀錄，PII 要另外處理。使用者少到「請他按一下複製貼給你」不會比較慢。
 等使用者不再是認識的人再說。
 
-**已知缺口**：`firebaseErrorMessage` 目前把 Firebase 的原始英文訊息直接顯示給使用者
-（`authError.ts` 對登入錯誤有完整中文對應，Firestore 這條沒有）。該修，但修好之後
-畫面上就看不到 code 了 —— 所以錯誤清單要先有，順序是對的。
+**~~已知缺口~~ 已補上（2026-09-11）**：`firebaseErrorMessage` 原本把 Firebase 的
+原始英文訊息直接顯示給使用者。現在認得的 code 一律翻成中文（Firestore、Storage、
+雲端函式共用一張表），訊息本身已經是中文的照原樣（我們自己寫的理由），
+不認得的才照原文。Flutter 的 46 處 `err.toString()` 也改走同一套規則
+（`data/error_text.dart`），順手拿掉 Dart 自己加的「Exception: 」「Bad state: 」前綴。
+原文照樣進錯誤清單，診斷資訊撈得到。
 
 ## 已完成：虛擬成員（沒有帳號的人）
 
@@ -722,8 +725,8 @@ GitHub 的 runner 內建 JDK，不用自己裝。
 - 兩把 Google API key 的 HTTP referrer 限制已設定（正式網域、`firebaseapp.com`、
   本機 5173／4173）。referrer header 可以偽造，配額上限與預算警示還沒設。
 - `.env` 已 `git rm --cached` 停止追蹤，`.env.example` 的真實值換成佔位字串。
-  **但兩把 Google key 仍留在 `ed28be9`、`b702a22` 的歷史紀錄裡，而 repo 是 public，
-  所以它們必須視為已外洩，得在 Cloud Console 換新的再刪掉舊的。**
+  兩把 Google key 曾留在 `ed28be9`、`b702a22` 的歷史紀錄裡（repo 是 public），
+  **已經在 Cloud Console 換新、舊的刪除**，歷史裡那兩把已經失效。
 - Google Maps／Places key 沒有 Firestore rules 那種第二道防線，它們是用量計費的，
   被撿去用直接算帳單，所以配額上限比 referrer 限制更重要。
 - 評估把 Firebase config 改回只透過部署環境變數管理。
