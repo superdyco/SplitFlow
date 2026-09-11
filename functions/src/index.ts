@@ -809,5 +809,10 @@ export {
   aggregateDaily,
   adminBackfill,
   onGuestCreated,
-  onGuestBound
+  onGuestBound,
+  adminAiConfig,
+  adminSetAiConfig,
+  adminTestAiConfig,
+  adminAiUsage,
+  adminAdjustCredits
 } from "./admin.js";

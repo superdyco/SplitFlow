@@ -1865,15 +1865,22 @@ export const adminAdjustCredits = onCall({ region: REGION }, async request => {
     }
 ```
 
-- [ ] **Step 11: 型別檢查與全部 functions 測試**
+- [ ] **Step 11: 從 `index.ts` 匯出新的五支**
+
+**實作時補上**：`index.ts` 最後面用一份明列的 `export { … } from "./admin.js"` 決定哪些後台函式會被部署。
+沒列進去的話 build 與測試都會過，但 `firebase deploy` 根本不會建立那幾支函式 —— 第一次部署就踩到了。
+把 `adminAiConfig`、`adminSetAiConfig`、`adminTestAiConfig`、`adminAiUsage`、`adminAdjustCredits` 加進那份清單。
+部署後用 `npx firebase functions:list` 確認五支都在。
+
+- [ ] **Step 12: 型別檢查與全部 functions 測試**
 
 Run: `cd functions && npm run build && npm test`
 Expected: build 沒有錯誤；測試全部 PASS。
 
-- [ ] **Step 12: Commit**
+- [ ] **Step 13: Commit**
 
 ```bash
-git add functions/src/admin/audit.ts functions/src/admin/audit.test.ts functions/src/admin.ts
+git add functions/src/admin/audit.ts functions/src/admin/audit.test.ts functions/src/admin.ts functions/src/index.ts
 git commit -F <msg>   # "Add admin callables for AI config, usage, credit adjustments"
 ```
 
