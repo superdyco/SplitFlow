@@ -2344,6 +2344,73 @@ async function main() {
     );
   });
 
+  // ---------------------------------------------------------------- AI 點數
+
+  async function seedCredits(uid = MEMBER) {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "aiCredits", uid), { balance: 2, freeGranted: true });
+      await setDoc(doc(db, "aiCredits", uid, "aiLedger", "l1"), { type: "free", uid, delta: 3, balanceAfter: 3 });
+      await setDoc(doc(db, "config", "ai"), { apiKey: "sk-test-1234", model: "gpt-5.6-luna" });
+    });
+  }
+
+  await test("本人讀得到自己的 AI 點數", async () => {
+    await seedCredits();
+    await assertSucceeds(getDoc(doc(as(MEMBER), "aiCredits", MEMBER)));
+  });
+
+  await test("別人讀不到我的 AI 點數", async () => {
+    await seedCredits();
+    await assertFails(getDoc(doc(as(OTHER), "aiCredits", MEMBER)));
+  });
+
+  await test("本人也改不了自己的點數 —— 只有函式能動", async () => {
+    await seedCredits();
+    await assertFails(setDoc(doc(as(MEMBER), "aiCredits", MEMBER), { balance: 9999, freeGranted: true }));
+  });
+
+  await test("沒有點數文件的人也建不出一份", async () => {
+    await testEnv.clearFirestore();
+    await assertFails(setDoc(doc(as(MEMBER), "aiCredits", MEMBER), { balance: 3, freeGranted: true }));
+  });
+
+  await test("本人讀得到自己的點數紀錄，別人讀不到", async () => {
+    await seedCredits();
+    await assertSucceeds(getDoc(doc(as(MEMBER), "aiCredits", MEMBER, "aiLedger", "l1")));
+    await assertFails(getDoc(doc(as(OTHER), "aiCredits", MEMBER, "aiLedger", "l1")));
+  });
+
+  await test("點數紀錄誰都寫不進去", async () => {
+    await seedCredits();
+    await assertFails(
+      setDoc(doc(as(MEMBER), "aiCredits", MEMBER, "aiLedger", "l2"), { type: "adjust", uid: MEMBER, delta: 100 })
+    );
+  });
+
+  await test("AI 設定（含金鑰）誰都讀不到、寫不進去", async () => {
+    await seedCredits();
+    await assertFails(getDoc(doc(as(MEMBER), "config", "ai")));
+    await assertFails(setDoc(doc(as(MEMBER), "config", "ai"), { apiKey: "sk-mine" }));
+  });
+
+  // users/{uid} 的 create 沒有限制欄位 —— 點數不放在那裡正是為了這個。
+  await test("個人檔案多帶 aiCredits 也不會變成點數", async () => {
+    await testEnv.clearFirestore();
+    await setDoc(doc(as(MEMBER), "users", MEMBER), {
+      uid: MEMBER,
+      nickname: "小明",
+      aiCredits: 9999,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      const snap = await getDoc(doc(ctx.firestore(), "aiCredits", MEMBER));
+      if (snap.exists()) throw new Error("aiCredits 不該因為個人檔案而出現");
+    });
+  });
+
   await testEnv.cleanup();
 
   console.log(`\n${passed} passed, ${failed} failed`);

@@ -566,6 +566,32 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    /*
+      AI 辨識點數與點數紀錄。**本人只能讀，任何人都不能寫** —— 包含本人。
+
+      點數會花掉真的錢。它刻意不放在 users/{uid}：那份文件的 create 沒有限制
+      欄位，取暱稱那一步就能寫進 aiCredits: 9999。放在這裡、寫入全擋，就只有
+      雲端函式（Admin SDK 繞過規則）動得了。
+    */
+    match /aiCredits/{uid} {
+      allow read: if isSelf(uid);
+      allow write: if false;
+
+      match /aiLedger/{entryId} {
+        allow read: if isSelf(uid);
+        allow write: if false;
+      }
+    }
+
+    /*
+      系統設定，目前只有 config/ai（OpenAI 金鑰）。沒有任何登入身分讀得到，
+      包含管理者 —— 後台讀寫一律走 callable，回給畫面的只有金鑰末四碼。
+      沒有這一段也是預設全擋，寫出來是為了讓下一個人不必猜。
+    */
+    match /config/{document=**} {
+      allow read, write: if false;
+    }
+
     match /perf/{sampleId} {
       allow read: if false;
       allow create: if signedIn()

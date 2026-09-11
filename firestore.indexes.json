@@ -153,6 +153,21 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "//": "後台 AI 使用報告的「只看某一種類型」：跨所有使用者的點數紀錄，type 等值加上時間由新到舊。",
+      "collectionGroup": "aiLedger",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "at",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -198,6 +213,25 @@
       "//": "公開報告的「全部」那一頁，跨所有任務照最後更新排序。collection group 範圍的單欄位索引要自己開。",
       "collectionGroup": "reports",
       "fieldPath": "updatedAt",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "//": "後台 AI 使用報告的「全部」：跨所有使用者照時間由新到舊。collection group 範圍的單欄位索引要自己開；使用者詳情只查自己那一份，collection 範圍的兩個照舊留著。",
+      "collectionGroup": "aiLedger",
+      "fieldPath": "at",
       "indexes": [
         {
           "order": "ASCENDING",
