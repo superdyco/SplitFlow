@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 import 'package:splitflow/domain/auth_error.dart';
+import 'package:splitflow/domain/guest.dart';
 import 'package:splitflow/domain/account_deletion.dart';
 import 'package:splitflow/domain/member_name.dart';
 import 'package:splitflow/domain/models.dart';
@@ -209,6 +210,47 @@ void main() {
         enabledProvidersFor(isApplePlatform: false),
         contains(SignInProvider.google),
       );
+    });
+  });
+
+  group('訪客', () {
+    test('訪客寫 anonymous，不是 unknown —— 訪客的 providerData 是空的', () {
+      expect(
+        providerIdOf(isAnonymous: true, providerIds: const []),
+        guestProviderId,
+      );
+    });
+
+    test('正式帳號取第一個供應商', () {
+      expect(
+        providerIdOf(isAnonymous: false, providerIds: const ['google.com']),
+        'google.com',
+      );
+    });
+
+    test('什麼都沒有時是 unknown，跟原本的行為一樣', () {
+      expect(
+        providerIdOf(isAnonymous: false, providerIds: const []),
+        'unknown',
+      );
+    });
+
+    test('訪客顯示成「訪客」', () {
+      expect(providerLabel('anonymous'), '訪客');
+    });
+
+    test('signedInAs 照實際的登入方式講，不是一律 Google', () {
+      expect(signedInAs('apple.com', 'a@b.c'), '已用 Apple 登入 · a@b.c');
+      expect(signedInAs('google.com', 'a@b.c'), '已用 Google 登入 · a@b.c');
+    });
+
+    test('signedInAs 沒有 email 就不要留一個空的點', () {
+      expect(signedInAs('apple.com', ''), '已用 Apple 登入');
+      expect(signedInAs('apple.com', null), '已用 Apple 登入');
+    });
+
+    test('signedInAs 對訪客講清楚是訪客，也告訴他之後可以綁定', () {
+      expect(signedInAs('anonymous', null), '訪客模式 · 之後可以在個人設定綁定帳號');
     });
   });
 

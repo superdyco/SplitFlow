@@ -5,6 +5,8 @@
 
 library;
 
+import 'guest.dart';
+
 enum SignInProvider { google, apple, facebook }
 
 const Map<SignInProvider, String> providerLabels = {
@@ -38,11 +40,24 @@ const Map<String, String> providerIdLabels = {
   'google.com': 'Google',
   'apple.com': 'Apple',
   'facebook.com': 'Facebook',
+  'anonymous': '訪客',
   'password': '電子郵件與密碼',
 };
 
 String providerLabel(String providerId) =>
     providerIdLabels[providerId] ?? providerId;
+
+/// 取暱稱頁那一行「你是用什麼登入的」。
+///
+/// 原本寫死「已用 Google 登入」，用 Apple 登入的人也看到 Google。訪客沒有
+/// email，也不該假裝用了任何一家。
+String signedInAs(String providerId, String? email) {
+  if (providerId == guestProviderId) return '訪客模式 · 之後可以在個人設定綁定帳號';
+  final label = providerLabel(providerId);
+  return (email == null || email.isEmpty)
+      ? '已用 $label 登入'
+      : '已用 $label 登入 · $email';
+}
 
 /// 使用者自己關掉彈窗、或連點兩次造成前一個彈窗被取消，都不算錯誤。
 const Set<String> _cancelledCodes = {
