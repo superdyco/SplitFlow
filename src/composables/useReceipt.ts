@@ -24,7 +24,10 @@ import type { ExpenseReceipt } from "@/types/expense";
 export function useReceipt() {
   /** 已存在文件裡的收據（編輯模式載入時帶進來）。 */
   const receipt = ref<ExpenseReceipt | null>(null);
-  /** 使用者這次新選的照片，還沒送出。 */
+  /**
+   * 使用者這次新選的照片，還沒送出。AI 讀收據也用這一張 —— 已存好的照片在
+   * 雲端，不在這台裝置上。
+   */
   const pending = ref<Blob | null>(null);
   const previewUrl = ref<string | null>(null);
   const busy = ref(false);
@@ -219,5 +222,5 @@ export function useReceipt() {
     return receipt.value;
   }
 
-  return { receipt, previewUrl, state, busy, error, pickFile, clear, loadExisting, retry, commit };
+  return { receipt, pending, previewUrl, state, busy, error, pickFile, clear, loadExisting, retry, commit };
 }

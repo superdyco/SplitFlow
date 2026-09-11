@@ -41,6 +41,9 @@ import { useDictation } from "@/composables/useDictation";
 import { deleteReceipt, flushReceipts } from "@/services/receiptService";
 import { removeQueued } from "@/services/receiptQueue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
+import AiReceiptButton from "@/components/expense/AiReceiptButton.vue";
+import { aiMessage, aiPatch, splitAfterAi, type AiReadResult } from "@/utils/aiReceipt";
+import { isGuest } from "@/utils/guest";
 
 const route = useRoute();
 const router = useRouter();
@@ -55,6 +58,11 @@ const repeatFromId = String(route.query.from || "");
 const taskState = useTask(taskId, uid);
 const memberState = useTaskMembers(taskId);
 const receiptState = useReceipt();
+
+/** AI 讀完之後那一行，以及幣別不支援的警告。換一張照片就清掉。 */
+const aiNote = ref<string | null>(null);
+const aiWarning = ref<string | null>(null);
+const guest = isGuest(authStore.user);
 
 /**
  * 走到這裡的人一定有管理權：load() 對沒權限的人會設 loadError，
@@ -413,6 +421,49 @@ function setSplitMode(mode: SplitMode) {
   splitMode.value = mode;
 }
 
+/**
+ * 把 AI 讀到的套進表單。讀到的全部蓋掉，沒讀到的不動。
+ *
+ * 幣別換了的話 `watch(currency)` 會自己查匯率；日期、時間換了的話天氣的
+ * watch 會自己重查 —— 跟使用者手動改是同一條路。
+ */
+function applyAi(result: AiReadResult) {
+  const patch = aiPatch(result.fields, { baseCurrency: baseCurrency.value, currentCurrency: currency.value });
+  const changed =
+    (patch.amount !== undefined && patch.amount !== amount.value) ||
+    (patch.currency !== undefined && patch.currency !== currency.value);
+  const split = splitAfterAi({ mode: splitMode.value, customAmounts: customAmounts.value, changed });
+
+  if (patch.title !== undefined) title.value = patch.title;
+  if (patch.category !== undefined) category.value = patch.category as ExpenseCategory;
+  if (patch.date !== undefined) date.value = patch.date;
+  if (patch.time !== undefined) time.value = patch.time;
+  if (patch.currency !== undefined) currency.value = patch.currency;
+  if (patch.amount !== undefined) amount.value = patch.amount;
+
+  if (split) {
+    splitMode.value = "even";
+    if (split.memberIds) {
+      const keep = new Set(split.memberIds);
+      splitMemberIds.value = selectableMembers.value.map(member => member.uid).filter(id => keep.has(id));
+    }
+    customAmounts.value = {};
+  }
+
+  aiNote.value = aiMessage({
+    readResult: result.readResult,
+    filled: patch.filled,
+    creditsLeft: result.creditsLeft,
+    splitReset: split !== null
+  });
+  aiWarning.value = patch.warning;
+}
+
+watch(receiptState.pending, () => {
+  aiNote.value = null;
+  aiWarning.value = null;
+});
+
 function fillRemainder(memberUid: string) {
   const current = safeParse((customAmounts.value[memberUid] ?? "").trim(), currency.value) ?? 0;
   const target = current + customDiff.value;
@@ -687,6 +738,20 @@ onMounted(load);
             @clear="receiptState.clear"
             @retry="receiptState.retry"
             @view="viewerOpen = true"
+          />
+
+          <!--
+            只在剛拍或剛選了一張照片時出現。已經存好的收據在雲端、不在這台裝置上，
+            要辨識就重新拍一張（spec 的決定）。
+          -->
+          <AiReceiptButton
+            v-if="receiptState.pending.value"
+            :blob="receiptState.pending.value"
+            :uid="uid"
+            :guest="guest"
+            :note="aiNote"
+            :warning="aiWarning"
+            @result="applyAi"
           />
 
           <label class="field">

@@ -30,6 +30,8 @@ import { isGuest, providerIdOf } from "@/utils/guest";
 import { listUserTasks } from "@/services/taskService";
 import type { Task } from "@/types/task";
 import { deleteAccountPrompt } from "@/utils/accountDeletion";
+import { getAiCredits } from "@/services/aiService";
+import { FREE_CREDITS } from "@/utils/aiReceipt";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -51,6 +53,8 @@ const loginMethod = computed(() => {
   return id ? providerLabel(id) : "";
 });
 const guest = computed(() => isGuest(authStore.user));
+/** AI 辨識點數。null 是還沒讀到；讀到「還沒用過」時顯示第一次會拿到的 3 點。 */
+const aiCredits = ref<number | null>(null);
 const canSubmit = computed(() => !!nickname.value.trim() && !nicknameError.value && isDirty.value);
 const exporting = ref(false);
 const exportProgress = ref("");
@@ -173,6 +177,12 @@ const confirmingDelete = ref(false);
 onMounted(async () => {
   const id = authStore.user?.uid;
   if (!id) return;
+  // 不 await：點數是旁邊的一行，不該讓下面的任務清單等它。讀不到就不顯示那一行。
+  if (!guest.value) {
+    getAiCredits(id)
+      .then(value => (aiCredits.value = value ?? FREE_CREDITS))
+      .catch(() => {});
+  }
   try {
     tasks.value = await listUserTasks(id);
   } catch {
@@ -328,6 +338,10 @@ async function retryMerge() {
         <div v-if="loginMethod" class="spread">
           <span class="muted">登入方式</span>
           <strong>{{ loginMethod }}</strong>
+        </div>
+        <div v-if="!guest && aiCredits !== null" class="spread">
+          <span class="muted">AI 辨識點數</span>
+          <strong>{{ aiCredits }}</strong>
         </div>
       </div>
 
