@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/auth_repository.dart';
 import '../domain/account_deletion.dart';
+import '../domain/ai_receipt.dart';
 import '../domain/auth_error.dart' as auth;
 import '../domain/models.dart';
 import '../domain/validation.dart' as validate;
@@ -354,6 +355,21 @@ class _FormState extends ConsumerState<_Form> {
                 style: text.bodyMedium,
               ),
             ),
+            if (!guest) ...[
+              const LedgerDivider(),
+              LedgerRow(
+                title: 'AI 辨識點數',
+                trailing: Text(
+                  ref.watch(aiCreditsProvider).when(
+                        // null 是還沒用過：第一次辨識時會拿到 3 點。
+                        data: (value) => '${value ?? freeCredits}',
+                        loading: () => '…',
+                        error: (_, __) => '—',
+                      ),
+                  style: text.bodyMedium,
+                ),
+              ),
+            ],
           ],
         ),
         if (!guest) ...[

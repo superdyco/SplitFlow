@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/dictation_service.dart';
 import '../data/rate_service.dart';
+import '../domain/ai_receipt.dart';
 import '../domain/currency.dart';
 import '../domain/expense_actions.dart';
 import '../domain/expense_date.dart';
@@ -94,6 +95,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   String? _error;
   String? _rateError;
   String _rateUpdatedAt = '';
+
+  /// AI 讀收據。換一張照片就全部清掉。
+  bool _aiBusy = false;
+  String? _aiNote;
+  String? _aiWarning;
+  String? _aiError;
+  bool _aiGuestNotice = false;
 
   bool get _isEdit => widget.existing != null;
 
@@ -273,6 +281,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   // ------------------------------------------------------------ 動作
 
+  /// 換幣別。選單與 AI 共用 —— 兩條路要做的事一樣：清掉「更新於」、
+  /// 換回主要幣別時匯率設 1。
+  void _setCurrency(Task task, String value) {
+    setState(() {
+      _currency = value;
+      _rateUpdatedAt = '';
+      if (value == task.defaultCurrency) _rate.text = '1';
+    });
+  }
+
   Future<void> _lookupRate(Task? task) async {
     setState(() {
       _rateLoading = true;
@@ -291,6 +309,82 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     } finally {
       if (mounted) setState(() => _rateLoading = false);
     }
+  }
+
+  Future<void> _runAi(Task task) async {
+    final user = ref.read(authStateProvider).value;
+    if (user == null || user.isAnonymous) {
+      setState(() => _aiGuestNotice = true);
+      return;
+    }
+    final file = _receipt.file;
+    if (file == null) return;
+
+    setState(() {
+      _aiBusy = true;
+      _aiError = null;
+    });
+    try {
+      final result = await ref.read(aiRepositoryProvider).readReceipt(file);
+      if (!mounted) return;
+      _applyAi(task, result);
+    } catch (err) {
+      if (mounted) setState(() => _aiError = errorText(err));
+    } finally {
+      // 成功或失敗都扣了點，餘額要重讀。
+      ref.invalidate(aiCreditsProvider);
+      if (mounted) setState(() => _aiBusy = false);
+    }
+  }
+
+  /// 讀到的全部蓋掉，沒讀到的不動。幣別換了要主動查匯率 ——
+  /// 這一頁原本只有按鈕會觸發 `_lookupRate`。
+  void _applyAi(Task task, AiReadResult result) {
+    final patch = aiPatch(
+      result.fields,
+      baseCurrency: task.defaultCurrency,
+      currentCurrency: _currency,
+    );
+    final changed = (patch.amount != null && patch.amount != _amount.text) ||
+        (patch.currency != null && patch.currency != _currency);
+    final split = splitAfterAi(
+      custom: _splitMode == SplitMode.custom,
+      customAmounts: {for (final e in _custom.entries) e.key: e.value.text},
+      changed: changed,
+    );
+
+    setState(() {
+      if (patch.title != null) _title.text = patch.title!;
+      if (patch.category != null) _category = categoryFrom(patch.category);
+      if (patch.date != null) _date = patch.date!;
+      if (patch.time != null) _time = patch.time!;
+      if (patch.amount != null) _amount.text = patch.amount!;
+      if (split != null) {
+        _splitMode = SplitMode.even;
+        if (split.memberIds != null) {
+          _splitWith
+            ..clear()
+            ..addAll(split.memberIds!);
+        }
+        for (final controller in _custom.values) {
+          controller.clear();
+        }
+      }
+      _aiNote = aiMessage(
+        readResult: result.readResult,
+        filled: patch.filled,
+        creditsLeft: result.creditsLeft,
+        splitReset: split != null,
+      );
+      _aiWarning = patch.warning;
+    });
+
+    final currency = patch.currency;
+    if (currency != null && currency != _currency) {
+      _setCurrency(task, currency);
+      if (currency != task.defaultCurrency) _lookupRate(task);
+    }
+    if (patch.date != null || patch.time != null) _refreshWeather();
   }
 
   Future<void> _submit(Task task, List<TaskMember> members) async {
@@ -500,6 +594,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
     // 一律取一次，不要包在條件裡 —— 有條件的 watch 會讓訂閱時有時無。
     final uid = ref.watch(authStateProvider).value?.uid ?? '';
+    final guest = ref.watch(authStateProvider).value?.isAnonymous ?? false;
+    final aiCredits = ref.watch(aiCreditsProvider).value;
 
     // 第二道防線。列表已經依權限分流了，但這一頁自己也要擋 —— 少了它，
     // 之後任何一個新的入口導進來，使用者都會整張表單填完才被規則打回票。
@@ -632,15 +728,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               pinned: task.defaultCurrency,
                               compact: true,
                               width: 150,
-                              onChanged: (value) {
-                                setState(() {
-                                  _currency = value;
-                                  _rateUpdatedAt = '';
-                                  if (value == task.defaultCurrency) {
-                                    _rate.text = '1';
-                                  }
-                                });
-                              },
+                              onChanged: (value) => _setCurrency(task, value),
                             ),
                           ],
                         ),
@@ -793,9 +881,59 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           taskId: widget.taskId,
                           expenseId: widget.existing?.id,
                           canManage: true,
-                          onChanged: (value) => setState(() => _receipt = value),
+                          // 換一張照片就清掉上一張的 AI 結果。
+                          onChanged: (value) => setState(() {
+                            _receipt = value;
+                            _aiNote = null;
+                            _aiWarning = null;
+                            _aiError = null;
+                            _aiGuestNotice = false;
+                          }),
                         ),
                       ),
+                      // 只在剛拍或剛選了一張照片時出現。已存好的收據在雲端，
+                      // 要辨識就重新拍一張（spec 的決定）。
+                      //
+                      // 沒有「沒網路」這個狀態（見計畫的「與 spec 的差異」）：
+                      // 離線時呼叫到不了函式，不會扣點，錯誤訊息會講清楚。
+                      if (_receipt.change == ReceiptChange.replaced &&
+                          _receipt.file != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpace.x4),
+                          child: Builder(builder: (context) {
+                            final button = aiButtonState(
+                              guest: guest,
+                              online: true,
+                              balance: aiCredits,
+                              busy: _aiBusy,
+                            );
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed:
+                                      button.disabled ? null : () => _runAi(task),
+                                  icon: const Icon(Icons.auto_awesome_outlined,
+                                      size: 18),
+                                  label: Text(button.label),
+                                ),
+                                if (_aiGuestNotice)
+                                  Text('$guestAiNotice，到個人設定綁定。',
+                                      style: text.bodySmall)
+                                else if (_aiError != null)
+                                  Text(_aiError!,
+                                      style: text.bodySmall
+                                          ?.copyWith(color: AppColors.danger))
+                                else if (_aiNote != null)
+                                  Text(_aiNote!, style: text.bodySmall),
+                                if (_aiWarning != null)
+                                  Text(_aiWarning!,
+                                      style: text.bodySmall
+                                          ?.copyWith(color: AppColors.danger)),
+                              ],
+                            );
+                          }),
+                        ),
                       _Field(
                         label: '備註（選填）',
                         child: TextField(controller: _note, maxLines: 3),

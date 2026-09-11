@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/ai_repository.dart';
 import '../data/auth_repository.dart';
 import '../data/bias_store.dart';
 import '../data/data_export_repository.dart';
@@ -62,6 +63,9 @@ final favoriteRepositoryProvider = Provider((ref) => FavoriteRepository());
 final pushRepositoryProvider = Provider((ref) => PushRepository());
 final dataExportRepositoryProvider = Provider((ref) => DataExportRepository());
 
+/// AI 讀收據與點數。
+final aiRepositoryProvider = Provider((ref) => AiRepository());
+
 /// 一張收據的下載網址。
 ///
 /// 用 provider 而不是在 widget 裡 `FutureBuilder`，是為了讓同一個路徑在
@@ -104,6 +108,14 @@ final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
   }
 
   return profile;
+});
+
+/// 我的 AI 辨識點數。null：沒登入、訪客、或還沒用過（畫面把最後一種當 3 點）。
+/// 辨識完要 `ref.invalidate` 它 —— 失敗也扣了點。
+final aiCreditsProvider = FutureProvider<int?>((ref) async {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null || user.isAnonymous) return null;
+  return ref.watch(aiRepositoryProvider).credits(user.uid);
 });
 
 /// 這個任務存過的結算紀錄。
