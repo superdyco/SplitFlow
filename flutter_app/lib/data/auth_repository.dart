@@ -12,6 +12,7 @@ library;
 import 'package:flutter/foundation.dart';
 
 import '../domain/auth_error.dart' as domain;
+import '../domain/guest.dart';
 import '../domain/models.dart';
 import 'firestore_refs.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -23,6 +24,30 @@ import 'package:google_sign_in/google_sign_in.dart';
 class SignInCancelled implements Exception {
   const SignInCancelled();
 }
+
+/// 訪客綁定帳號的結果。
+///
+/// 那個帳號以前就登入過時不是錯誤，而是另一種結果：畫面要問使用者要不要合併。
+sealed class LinkOutcome {
+  const LinkOutcome();
+}
+
+/// 綁定成功，uid 不變。
+class Linked extends LinkOutcome {
+  final User user;
+  const Linked(this.user);
+}
+
+/// 那個帳號已經有資料。拿著它的 credential，由畫面決定要不要合併過去。
+class AccountTaken extends LinkOutcome {
+  final AuthCredential credential;
+  const AccountTaken(this.credential);
+}
+
+String _providerIdOfUser(User user) => providerIdOf(
+      isAnonymous: user.isAnonymous,
+      providerIds: user.providerData.map((info) => info.providerId).toList(),
+    );
 
 /// Google 登入用的 **web** OAuth client id。
 ///
@@ -131,6 +156,112 @@ class AuthRepository {
     }
   }
 
+  /// 免登入試用。拿到的是一個真的匿名帳號 —— 建任務、記帳、加入別人的任務
+  /// 都跟正式帳號一樣，rules 不必為它開任何例外。
+  Future<User> signInAsGuest() async {
+    try {
+      final result = await _auth.signInAnonymously();
+      final user = result.user;
+      if (user == null) throw Exception('登入成功但沒有拿到使用者資料');
+      return user;
+    } on FirebaseAuthException catch (err) {
+      if (err.code == 'operation-not-allowed') {
+        throw Exception('免登入試用還沒有在 Firebase Console 啟用。');
+      }
+      rethrow;
+    }
+  }
+
+  User _requireGuest() {
+    final user = _auth.currentUser;
+    if (user == null || !user.isAnonymous) throw Exception('只有訪客需要綁定帳號');
+    return user;
+  }
+
+  /// 綁定失敗時的訊息。同一個 email 已經用別的方式註冊過，跟登入時是同一句話。
+  Exception _linkError(FirebaseAuthException err, domain.SignInProvider provider) {
+    if (domain.isCancelledSignIn(err.code)) return const SignInCancelled();
+    if (err.code == 'email-already-in-use' ||
+        err.code == 'account-exists-with-different-credential') {
+      return Exception(domain.existingAccountMessage(err.email ?? '', const []));
+    }
+    final message =
+        domain.describeSignInError(err.code, provider, err.message ?? err.code);
+    return Exception(message ?? err.code);
+  }
+
+  /// 訪客綁定 Google。成功的話 **uid 不變**，所有任務原封不動。
+  ///
+  /// Google 的 credential 是自己用帳號選擇器拿到的，撞到已存在的帳號時手上
+  /// 本來就有，不必靠錯誤物件帶回來（有帶就用帶回來的）。
+  Future<LinkOutcome> linkWithGoogle() async {
+    final user = _requireGuest();
+    try {
+      await _ensureInitialized();
+      final account = await GoogleSignIn.instance.authenticate();
+      final credential = GoogleAuthProvider.credential(
+        idToken: account.authentication.idToken,
+      );
+      try {
+        final result = await user.linkWithCredential(credential);
+        return Linked(result.user ?? user);
+      } on FirebaseAuthException catch (err) {
+        if (err.code == 'credential-already-in-use') {
+          return AccountTaken(err.credential ?? credential);
+        }
+        rethrow;
+      }
+    } on GoogleSignInException catch (err) {
+      if (err.code == GoogleSignInExceptionCode.canceled) {
+        throw const SignInCancelled();
+      }
+      rethrow;
+    } on FirebaseAuthException catch (err) {
+      throw _linkError(err, domain.SignInProvider.google);
+    }
+  }
+
+  /// 訪客綁定 Apple。撞到已存在的帳號時，credential 只能從錯誤物件拿。
+  Future<LinkOutcome> linkWithApple() async {
+    final user = _requireGuest();
+    try {
+      final provider = AppleAuthProvider()
+        ..addScope('email')
+        ..addScope('name');
+      final result = await user.linkWithProvider(provider);
+      return Linked(result.user ?? user);
+    } on FirebaseAuthException catch (err) {
+      final credential = err.credential;
+      if (err.code == 'credential-already-in-use' && credential != null) {
+        return AccountTaken(credential);
+      }
+      throw _linkError(err, domain.SignInProvider.apple);
+    }
+  }
+
+  /// 訪客的證明。**要在 switchToAccount 之前拿** —— 換過去之後就拿不到了。
+  Future<String> guestIdToken() async {
+    final token = await _requireGuest().getIdToken();
+    if (token == null) throw Exception('拿不到訪客憑證');
+    return token;
+  }
+
+  /// 換成那個已經存在的帳號。
+  Future<User> switchToAccount(AuthCredential credential) async {
+    final result = await _auth.signInWithCredential(credential);
+    final user = result.user;
+    if (user == null) throw Exception('登入成功但沒有拿到使用者資料');
+    return user;
+  }
+
+  /// 把訪客合併進目前登入的正式帳號。真正的改寫在雲端函式裡，可以重跑。
+  Future<void> mergeGuest(String guestToken) async {
+    // region 要跟函式一致，不然會打到 us-central1 然後找不到函式。
+    await FirebaseFunctions.instanceFor(region: 'asia-east1')
+        .httpsCallable('mergeGuest')
+        .call<void>({'guestToken': guestToken});
+  }
+
   /// 刪除自己的帳號。App Store 指引 5.1.1(v) 要求 App 內就能發起。
   ///
   /// 真正的刪除全在雲端函式裡（`functions/src/index.ts`）。現行規則下成員刪不掉
@@ -144,6 +275,23 @@ class AuthRepository {
     final user = _auth.currentUser;
     if (user == null) throw Exception('請先登入');
 
+    // 訪客跳過重新驗證：他沒有任何憑證可以驗，他的「帳號」就是這台手機上的這份
+    // 登入狀態。不擋的話 providerData 是空的，會落到 Google，跳出一個跟他無關的
+    // 帳號選擇器。訪客的登出也走這裡（見個人頁）。
+    final guest = user.isAnonymous;
+    if (!guest) await _reauthenticate(user);
+
+    // region 要跟函式一致，不然會打到 us-central1 然後找不到函式。
+    await FirebaseFunctions.instanceFor(region: 'asia-east1')
+        .httpsCallable('deleteAccount')
+        .call<void>();
+
+    // 訪客從沒碰過 GoogleSignIn，沒有東西要登出。
+    if (!guest) await GoogleSignIn.instance.signOut();
+    await _auth.signOut();
+  }
+
+  Future<void> _reauthenticate(User user) async {
     final providerId = user.providerData.isEmpty
         ? 'google.com'
         : user.providerData.first.providerId;
@@ -167,14 +315,6 @@ class AuthRepository {
       if (domain.isCancelledSignIn(err.code)) throw const SignInCancelled();
       rethrow;
     }
-
-    // region 要跟函式一致，不然會打到 us-central1 然後找不到函式。
-    await FirebaseFunctions.instanceFor(region: 'asia-east1')
-        .httpsCallable('deleteAccount')
-        .call<void>();
-
-    await GoogleSignIn.instance.signOut();
-    await _auth.signOut();
   }
 
   /// 登出。
@@ -235,9 +375,7 @@ class UserRepository {
       'nickname': nickname,
       'email': user.email ?? '',
       'photoURL': user.photoURL,
-      'provider': user.providerData.isEmpty
-          ? 'unknown'
-          : user.providerData.first.providerId,
+      'provider': _providerIdOfUser(user),
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
@@ -252,6 +390,17 @@ class UserRepository {
   Future<void> updateNickname(String uid, String nickname) {
     return usersRef.doc(uid).update({
       'nickname': nickname,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// 訪客綁定帳號之後，把登入方式、email、頭像補上。暱稱不動 —— 那是使用者
+  /// 自己取的。這四個欄位都在 rules 的 users update 允許清單裡。
+  Future<void> updateProviderFields(User user) {
+    return usersRef.doc(user.uid).update({
+      'email': user.email ?? '',
+      'photoURL': user.photoURL,
+      'provider': _providerIdOfUser(user),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
