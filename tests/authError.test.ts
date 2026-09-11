@@ -4,7 +4,8 @@ import {
   describeSignInError,
   existingAccountMessage,
   isCancelledSignIn,
-  providerLabel
+  providerLabel,
+  signedInAs
 } from "@/utils/authError";
 
 describe("isCancelledSignIn", () => {
@@ -29,6 +30,10 @@ describe("providerLabel", () => {
 
   it("不認得的原樣回傳，不會變成空字串", () => {
     expect(providerLabel("github.com")).toBe("github.com");
+  });
+
+  it("訪客顯示成「訪客」", () => {
+    expect(providerLabel("anonymous")).toBe("訪客");
   });
 });
 
@@ -86,5 +91,20 @@ describe("existingAccountMessage", () => {
 describe("ENABLED_PROVIDERS", () => {
   it("登入頁只放真的登得進去的方式 —— Apple 要付費會員才設定得起來，先不顯示", () => {
     expect(ENABLED_PROVIDERS).toEqual(["google"]);
+  });
+});
+
+describe("signedInAs", () => {
+  it("照實際的登入方式講，不是一律 Google", () => {
+    expect(signedInAs("apple.com", "a@b.c")).toBe("已用 Apple 登入 · a@b.c");
+    expect(signedInAs("google.com", "a@b.c")).toBe("已用 Google 登入 · a@b.c");
+  });
+
+  it("沒有 email 就不要留一個空的點", () => {
+    expect(signedInAs("apple.com", "")).toBe("已用 Apple 登入");
+  });
+
+  it("訪客講清楚是訪客，也告訴他之後可以綁定", () => {
+    expect(signedInAs("anonymous", null)).toBe("訪客模式 · 之後可以在個人設定綁定帳號");
   });
 });

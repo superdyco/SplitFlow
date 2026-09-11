@@ -2,6 +2,8 @@
  * 登入錯誤訊息的對應。刻意不 import firebase，
  * 這樣測試可以直接跑，不用初始化整個 Firebase App。
  */
+import { GUEST_PROVIDER_ID } from "@/utils/guest";
+
 export type SignInProvider = "google" | "apple" | "facebook";
 
 export const PROVIDER_LABELS: Record<SignInProvider, string> = {
@@ -30,11 +32,24 @@ export const PROVIDER_ID_LABELS: Record<string, string> = {
   "google.com": "Google",
   "apple.com": "Apple",
   "facebook.com": "Facebook",
+  anonymous: "訪客",
   password: "電子郵件與密碼"
 };
 
 export function providerLabel(providerId: string): string {
   return PROVIDER_ID_LABELS[providerId] || providerId;
+}
+
+/**
+ * 取暱稱頁那一行「你是用什麼登入的」。
+ *
+ * 原本寫死「已用 Google 登入」，用 Apple 登入的人也看到 Google。訪客沒有 email，
+ * 也不該假裝用了任何一家。
+ */
+export function signedInAs(providerId: string, email: string | null | undefined): string {
+  if (providerId === GUEST_PROVIDER_ID) return "訪客模式 · 之後可以在個人設定綁定帳號";
+  const label = providerLabel(providerId);
+  return email ? `已用 ${label} 登入 · ${email}` : `已用 ${label} 登入`;
 }
 
 /** 使用者自己關掉彈窗、或連點兩次造成前一個彈窗被取消，都不算錯誤。 */
