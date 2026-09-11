@@ -18,11 +18,14 @@ export async function deleteOwnAccount(): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error("請先登入");
 
-  const providerId = user.providerData[0]?.providerId ?? "google.com";
-  const provider =
-    providerId === "apple.com" ? new OAuthProvider("apple.com") : new GoogleAuthProvider();
-
-  await reauthenticateWithPopup(user, provider);
+  // 訪客沒有任何憑證可以重新驗證 —— 他的「帳號」就是這台裝置上的這份登入狀態。
+  // 不擋的話 providerData 是空的，會落到 Google，跳出一個跟他無關的 Google 視窗。
+  if (!user.isAnonymous) {
+    const providerId = user.providerData[0]?.providerId ?? "google.com";
+    const provider =
+      providerId === "apple.com" ? new OAuthProvider("apple.com") : new GoogleAuthProvider();
+    await reauthenticateWithPopup(user, provider);
+  }
 
   // region 要跟函式一致，不然會打到 us-central1 然後找不到函式。
   const call = httpsCallable(getFunctions(app, "asia-east1"), "deleteAccount");

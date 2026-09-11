@@ -136,6 +136,34 @@ async function signOut() {
   await router.push("/login");
 }
 
+const confirmingGuestSignOut = ref(false);
+
+/** 訪客登出就是永久離開，所以先問一次；正式帳號照舊直接登出。 */
+function askSignOut() {
+  if (guest.value) confirmingGuestSignOut.value = true;
+  else void signOut();
+}
+
+/**
+ * 訪客的登出＝刪除訪客帳號。他沒有任何方式能再登入回來，與其留一個再也不會
+ * 出現的成員掛在別人的任務裡，不如走 deleteAccount：owner 身分移交、只有他
+ * 一個真人的任務刪掉、別人的任務裡標成已刪除。
+ *
+ * 錯誤放在儲存鈕旁邊的 error，不放 advancedError —— 進階區可能是收著的，
+ * 使用者會按了登出、什麼都沒發生、也不知道為什麼。
+ */
+async function guestSignOut() {
+  confirmingGuestSignOut.value = false;
+  error.value = null;
+  try {
+    await deleteOwnAccount();
+    userStore.clear();
+    await router.push("/login");
+  } catch (err) {
+    error.value = firebaseErrorMessage(err);
+  }
+}
+
 // 刪除帳號的確認要講出「幾個任務」「幾個是你的」，所以這一頁需要任務清單。
 // 只讀一次就好 —— 這裡要的是數量，不是即時狀態。
 const tasks = ref<Task[]>([]);
@@ -337,6 +365,11 @@ async function retryMerge() {
         {{ loading ? "儲存中..." : saved ? "已儲存" : "儲存變更" }}
       </button>
       <!--
+        commit 5857a86 整理這一頁時把這顆按鈕弄丟了 —— signOut() 還在，按鈕沒了，
+        而同一次改動的註解說的是「讓上面的暱稱與登出有重量」。
+      -->
+      <button class="btn btn-danger btn-block" @click="askSignOut">登出</button>
+      <!--
         收藏與探索自成一張卡，不混進上面的帳號表單。
 
         這兩個是「去別的地方」而不是「改這一頁的東西」——
@@ -421,6 +454,16 @@ async function retryMerge() {
         confirm-label="合併"
         @confirm="mergeIntoTaken"
         @cancel="takenCredential = null"
+      />
+
+      <ConfirmDialog
+        :open="confirmingGuestSignOut"
+        title="訪客登出後就回不來了"
+        message="訪客沒有帳號可以再登入回來。登出會刪除這個訪客身分：只有你一個人的任務會一起刪掉，別人的任務裡你會顯示為已刪除。想留著資料，請先在上面綁定帳號。"
+        confirm-label="仍要登出"
+        danger
+        @confirm="guestSignOut"
+        @cancel="confirmingGuestSignOut = false"
       />
     </div>
   </AppLayout>
