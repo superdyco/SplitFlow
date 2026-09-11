@@ -35,6 +35,9 @@ const MINOR_UNITS: Record<string, number> = {
   IDR: 0
 };
 
+/** 支援的 20 種幣別。AI 讀到清單外的幣別時，畫面要改用任務的主要幣別。 */
+export const SUPPORTED_CURRENCIES: readonly string[] = Object.keys(MINOR_UNITS);
+
 export function minorUnits(currency: string): number {
   return MINOR_UNITS[currency] ?? 2;
 }
