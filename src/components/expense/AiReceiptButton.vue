@@ -5,11 +5,12 @@
  * 只在剛拍或剛選了一張照片時出現（由母元件決定）。讀到的結果交給母元件套進
  * 表單 —— 這個元件不知道表單長什麼樣，它只負責「讀」與「講結果」。
  */
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { getAiCredits, readReceipt } from "@/services/aiService";
 import { aiButtonState, GUEST_AI_NOTICE, type AiReadResult } from "@/utils/aiReceipt";
 import { firebaseErrorMessage } from "@/utils/firestore";
+import { nudgeSticky } from "@/utils/stickyNudge";
 
 const props = defineProps<{
   blob: Blob;
@@ -70,6 +71,10 @@ async function run() {
     balance.value = await getAiCredits(props.uid).catch(() => balance.value);
   } finally {
     busy.value = false;
+    // 結果或錯誤那一行會把版面撐高，而 iOS 不一定重算 sticky 的位置 ——
+    // 送出列會停在畫面中間。見 `nudgeSticky` 的說明。
+    await nextTick();
+    nudgeSticky();
   }
 }
 </script>

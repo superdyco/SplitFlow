@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import CurrencyPicker from "@/components/common/CurrencyPicker.vue";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import { memberDisplayName } from "@/utils/memberName";
@@ -34,6 +34,7 @@ import { firebaseErrorMessage, required } from "@/utils/firestore";
 import { expenseDate, expenseTime, nowTimeInput, todayInput } from "@/utils/expenseDate";
 import { repeatFieldsOf } from "@/utils/repeatExpense";
 import { settleWrite } from "@/utils/offlineWrite";
+import { nudgeSticky } from "@/utils/stickyNudge";
 import ReceiptField from "@/components/expense/ReceiptField.vue";
 import ReceiptViewer from "@/components/expense/ReceiptViewer.vue";
 import { useReceipt } from "@/composables/useReceipt";
@@ -462,6 +463,16 @@ function applyAi(result: AiReadResult) {
 watch(receiptState.pending, () => {
   aiNote.value = null;
   aiWarning.value = null;
+});
+
+/*
+  選了照片、AI 填完之後版面會變高（縮圖、AI 按鈕、提示那一行），而 iOS 在
+  standalone 模式下不一定會重算 sticky 的位置 —— 送出列會停在畫面中間。
+  等 DOM 更新完再逼它重算一次。見 `nudgeSticky` 的說明。
+*/
+watch([receiptState.pending, aiNote, aiWarning], async () => {
+  await nextTick();
+  nudgeSticky();
 });
 
 function fillRemainder(memberUid: string) {
