@@ -185,6 +185,57 @@ class _MembersTabState extends ConsumerState<MembersTab> {
     }
   }
 
+  /// 自己退出任務。**帳目全部留著。**
+  ///
+  /// 成功之後一定要離開這一頁：退出的那一刻規則就不再讓他讀這個任務，留在
+  /// 原地只會看到讀取失敗，像是 App 壞了。
+  ///
+  /// 沒有走 `_run`：那支成功後會重讀成員，而那個請求一定會被規則擋下來。
+  Future<void> _leave(TaskMember member) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('退出這個任務？'),
+        content: const Text(
+          '你會從成員列表上變成「已退出」，之後看不到這個任務的帳。'
+          '你記過的支出、分攤與付款全部留著，其他人的帳不受影響 —— '
+          '想回來的話，請還在裡面的人給你邀請連結。',
+        ),
+        actions: [
+          // 取消刻意用灰的：兩顆都是主色的話，紅的那顆就不顯眼了。
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.muted),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('退出任務'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() {
+      _busyUid = member.uid;
+      _error = null;
+    });
+    try {
+      await ref.read(taskRepositoryProvider).leaveTask(widget.task.id);
+      if (!mounted) return;
+      // 這個任務已經不屬於他了，列表要重讀。
+      ref.invalidate(tasksProvider);
+      Navigator.of(context).pop();
+    } catch (err) {
+      // 擁有者不能退出、任務已封存都走這裡，訊息是函式給的中文。
+      if (mounted) setState(() => _error = errorText(err));
+    } finally {
+      if (mounted) setState(() => _busyUid = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final members = ref.watch(membersProvider(widget.task.id));
@@ -233,6 +284,12 @@ class _MembersTabState extends ConsumerState<MembersTab> {
                   ),
                   onRemove: () => _remove(list[i]),
                   onRename: () => _rename(list[i]),
+                  // 管理員不必先降級：退出時角色會一起降回成員。
+                  canLeave: list[i].uid == uid &&
+                      list[i].role != 'owner' &&
+                      list[i].active &&
+                      !widget.archived,
+                  onLeave: () => _leave(list[i]),
                 ),
               ],
             ],
@@ -305,6 +362,10 @@ class _MemberCard extends StatelessWidget {
   final VoidCallback onRemove;
   final VoidCallback onRename;
 
+  /// 只有自己能退出，擁有者不行 —— 判斷在母元件（它才知道任務有沒有封存）。
+  final bool canLeave;
+  final VoidCallback onLeave;
+
   const _MemberCard({
     required this.member,
     required this.isSelf,
@@ -314,6 +375,8 @@ class _MemberCard extends StatelessWidget {
     required this.onDemote,
     required this.onRemove,
     required this.onRename,
+    required this.canLeave,
+    required this.onLeave,
   });
 
   @override
@@ -391,6 +454,13 @@ class _MemberCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (canLeave) ...[
+              const SizedBox(height: 10),
+              OutlinedButton(
+                onPressed: busy ? null : onLeave,
+                child: const Text('退出任務'),
+              ),
+            ],
             if (showActions) ...[
               const SizedBox(height: 10),
               Wrap(

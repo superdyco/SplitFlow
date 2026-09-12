@@ -244,5 +244,6 @@ TaskMember memberFromMap(Map<String, dynamic> data) {
     // 用 == true 而不是 as bool：舊文件沒有這個欄位，讀到的是 null，
     // 強制轉型會直接丟例外。
     deleted: data['deleted'] == true,
+    left: data['left'] == true,
   );
 }

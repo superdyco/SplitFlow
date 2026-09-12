@@ -14,6 +14,9 @@ String memberDisplayName(TaskMember member) {
   final name = member.nickname.isEmpty ? '（沒有暱稱）' : member.nickname;
 
   if (member.deleted) return '$name（已刪除）';
+  // 「已退出」壓過「已離開」：兩者都是 active: false，但一個是他自己走的、
+  // 一個是被管理員移除的。對留下來的人意義不同。
+  if (member.left) return '$name（已退出）';
   if (!member.active) return '$name（已離開）';
   return name;
 }

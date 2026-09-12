@@ -313,6 +313,18 @@ class TaskRepository {
     await batch.commit();
   }
 
+  /// 自己退出任務。**帳目全部留著**，成員列之後顯示「（已退出）」。
+  ///
+  /// 走 callable 而不是在這裡寫：退出要把自己從 `task.memberIds` 拿掉，而那個
+  /// 陣列同時是權限清單，規則不會讓成員自己改它
+  /// （理由見 `functions/src/leave.ts`）。
+  Future<void> leaveTask(String taskId) async {
+    // region 要跟函式一致，不然會打到 us-central1 然後找不到函式。
+    final call = FirebaseFunctions.instanceFor(region: 'asia-east1')
+        .httpsCallable('leaveTask');
+    await call.call<Map<String, dynamic>>({'taskId': taskId});
+  }
+
   /// 用邀請碼加入任務。
   ///
   /// **只送邀請碼，taskId 由伺服器從邀請文件推出來。** 這裡以前是一個
