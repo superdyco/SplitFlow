@@ -26,6 +26,7 @@ import { readWeather, weatherUrl, type WeatherResult } from "./weather.js";
 import { pickSuccessor, type SuccessorCandidate } from "./successor.js";
 import { joinDecision } from "./join.js";
 import { canDeleteReceipt } from "./receipt.js";
+import { canLeaveTask } from "./leave.js";
 import {
   accountRoleAfterMerge,
   checkMergeCaller,
@@ -403,6 +404,75 @@ export const deleteAccount = onCall({ region: REGION }, async request => {
 
   logger.info("帳號已刪除", { uid, deletedTasks, transferredTasks, leftTasks });
   return { deletedTasks, transferredTasks, leftTasks };
+});
+
+/**
+ * 自己退出任務。
+ *
+ * **帳目全部留著。** 他付過的錢、別人欠他的錢都還算得出來 —— 抽掉的話，
+ * 其他人已經算好的帳會突然對不上。成員文件標成 `left: true` 並從
+ * `task.memberIds` 拿掉，之後成員列顯示「（已退出）」，而規則不再讓他讀這個任務。
+ *
+ * 為什麼在伺服器端做：退出要改 `task.memberIds`，而那個陣列同時是權限清單。
+ * 詳細理由見 `leave.ts` 的說明。
+ *
+ * 判斷本身在 `canLeaveTask`，這裡只負責讀兩份文件、照答案寫回去。
+ */
+export const leaveTask = onCall({ region: REGION }, async request => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "請先登入");
+
+  const taskId = (request.data as { taskId?: unknown } | undefined)?.taskId;
+  if (typeof taskId !== "string" || !taskId) {
+    throw new HttpsError("invalid-argument", "缺少 taskId");
+  }
+
+  const taskRef = db.collection("tasks").doc(taskId);
+  const memberRef = taskRef.collection("members").doc(uid);
+
+  /*
+    用 transaction 而不是 batch：memberCount 要算得準，而那得先讀到現在的
+    memberIds。兩次讀之間有人加入或被移除的話，算出來的人數就是錯的。
+  */
+  const verdict = await db.runTransaction(async tx => {
+    const [taskSnap, memberSnap] = await Promise.all([tx.get(taskRef), tx.get(memberRef)]);
+    const task = taskSnap.exists ? (taskSnap.data() ?? null) : null;
+    const member = memberSnap.exists ? (memberSnap.data() ?? null) : null;
+
+    const decision = canLeaveTask({ task, member, uid });
+    if (decision.kind !== "allow") return decision;
+
+    const memberIds: string[] = Array.isArray(task?.memberIds) ? (task!.memberIds as string[]) : [];
+
+    // 角色一起降回 member：之後用邀請連結回來時，不會拿著 admin 角色卻不在 adminIds 裡。
+    tx.set(memberRef, { active: false, left: true, role: "member" }, { merge: true });
+    tx.update(taskRef, {
+      memberIds: FieldValue.arrayRemove(uid),
+      adminIds: FieldValue.arrayRemove(uid),
+      memberCount: Math.max(0, memberIds.length - 1),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    return decision;
+  });
+
+  if (verdict.kind === "not-member") {
+    // 不說任務存不存在。跟 requireAdmin 丟 not-found 同一個原則。
+    throw new HttpsError("not-found", "找不到這個任務");
+  }
+  if (verdict.kind === "owner") {
+    throw new HttpsError(
+      "failed-precondition",
+      "你是這個任務的擁有者，不能退出 —— 退出之後就沒有人管得了它。可以改成封存或刪除整個任務。"
+    );
+  }
+  if (verdict.kind === "inactive-task") {
+    throw new HttpsError("failed-precondition", "這個任務已封存，成員不能變動。要退出的話先解除封存。");
+  }
+
+  // already-left 當成成功：重按一次不該變成錯誤。
+  logger.info("成員退出任務", { taskId, uid, verdict: verdict.kind });
+  return { ok: true };
 });
 
 /** 邀請碼是 16 個隨機位元組的十六進位字串（見 `createInviteCode`）。 */

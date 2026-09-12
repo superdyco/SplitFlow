@@ -2344,6 +2344,24 @@ async function main() {
     );
   });
 
+  // ---------------------------------------------------------------- 退出任務
+
+  /*
+    退出任務改走 `leaveTask` callable，正是因為規則不該讓成員自己動這兩份文件。
+    memberIds 同時是權限清單：能改它就能把別人移出去、或把自己塞進別的任務。
+  */
+  await test("一般成員不能把自己從 memberIds 拿掉 —— 退出走雲端函式", async () => {
+    await seed();
+    await assertFails(updateDoc(doc(as(MEMBER), "tasks", TASK), { memberIds: arrayRemove(MEMBER) }));
+  });
+
+  await test("一般成員不能自己把成員文件標成已退出", async () => {
+    await seed();
+    await assertFails(
+      updateDoc(doc(as(MEMBER), "tasks", TASK, "members", MEMBER), { active: false, left: true })
+    );
+  });
+
   // ---------------------------------------------------------------- AI 點數
 
   async function seedCredits(uid = MEMBER) {
