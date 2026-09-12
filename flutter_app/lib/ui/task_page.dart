@@ -37,7 +37,18 @@ import '../data/error_text.dart';
 class TaskPage extends ConsumerStatefulWidget {
   final String taskId;
 
-  const TaskPage({super.key, required this.taskId});
+  /// 從任務列表點進來時，列表手上已經有這一份 Task 了。
+  ///
+  /// 帶著它走，這一頁就能立刻畫出來。沒有它的話，進任務要先等一趟
+  /// `taskProvider` 的讀取才有東西看，中間是一張整頁的轉圈 —— 那就是
+  /// 「進任務會卡一下」。理由跟支出詳情頁不重讀同一筆支出一樣：App 的
+  /// 導航本來就帶著物件走，重讀只是多一趟網路、多一個載入狀態。
+  ///
+  /// 讀取還是照發，回來之後以伺服器為準（列表那份可能已經過期）。
+  /// 點通知進來、剛用邀請碼加入那兩條路沒有物件可帶，照舊等讀取。
+  final Task? initial;
+
+  const TaskPage({super.key, required this.taskId, this.initial});
 
   @override
   ConsumerState<TaskPage> createState() => _TaskPageState();
@@ -99,35 +110,41 @@ class _TaskPageState extends ConsumerState<TaskPage> {
 
   @override
   Widget build(BuildContext context) {
-    final task = ref.watch(taskProvider(widget.taskId));
+    final async = ref.watch(taskProvider(widget.taskId));
 
-    return task.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
-      error: (err, _) => Scaffold(
+    /*
+      錯誤不拿舊資料硬撐。被移出任務、或自己退出之後，這一頁的讀取會是
+      permission-denied —— 那時候畫出列表帶進來的舊資料，等於給他一個
+      點什麼都失敗的幽靈任務。
+    */
+    if (async.hasError) {
+      return Scaffold(
         appBar: AppBar(),
-        body: _Centered('讀取任務失敗：${errorText(err)}'),
-      ),
-      data: (value) {
-        if (value == null) return _missing('找不到這個分帳任務');
+        body: _Centered('讀取任務失敗：${errorText(async.error)}'),
+      );
+    }
 
-        final status = taskStatusFrom(value.status);
-        // 軟刪除只是一個欄位，規則仍允許成員讀取，所以要自己擋掉這個幽靈任務。
-        if (status == TaskStatus.deleted) return _missing('這個任務已被刪除。');
+    // 讀完就以伺服器為準；還沒讀完就先畫列表帶進來的那一份。
+    final task = async.hasValue ? async.value : widget.initial;
 
-        return _Loaded(
-          task: value,
-          archived: status == TaskStatus.archived,
-          collapsed: _collapsed,
-          onToggleDay: (date) => setState(() {
-            _collapsed.contains(date)
-                ? _collapsed.remove(date)
-                : _collapsed.add(date);
-          }),
-          onReload: _reload,
-        );
-      },
+    if (task == null) {
+      // 讀完了才說找不到 —— 還沒讀完、也沒有帶東西進來，那是在載入。
+      if (async.hasValue) return _missing('找不到這個分帳任務');
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final status = taskStatusFrom(task.status);
+    // 軟刪除只是一個欄位，規則仍允許成員讀取，所以要自己擋掉這個幽靈任務。
+    if (status == TaskStatus.deleted) return _missing('這個任務已被刪除。');
+
+    return _Loaded(
+      task: task,
+      archived: status == TaskStatus.archived,
+      collapsed: _collapsed,
+      onToggleDay: (date) => setState(() {
+        _collapsed.contains(date) ? _collapsed.remove(date) : _collapsed.add(date);
+      }),
+      onReload: _reload,
     );
   }
 

@@ -147,7 +147,8 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
   /// 而且不知道為什麼。
   Future<void> _openTask(Task task) async {
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => TaskPage(taskId: task.id)),
+      // 手上這份 Task 一起帶過去：任務頁就能立刻畫出來，不必先等一趟讀取。
+      MaterialPageRoute<void>(builder: (_) => TaskPage(taskId: task.id, initial: task)),
     );
     if (!mounted) return;
     ref.invalidate(tasksProvider);
