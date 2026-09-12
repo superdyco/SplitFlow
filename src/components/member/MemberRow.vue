@@ -16,12 +16,20 @@ const emit = defineEmits<{
   (e: "demote", uid: string): void;
   (e: "remove", uid: string): void;
   (e: "rename", uid: string): void;
+  (e: "leave"): void;
 }>();
 
 const isSelf = computed(() => props.member.uid === props.currentUid);
 const isVirtual = computed(() => props.member.virtual === true);
 // owner 不能被降級或移除，自己也不能對自己動作。
 const showActions = computed(() => props.canManage && !isSelf.value && props.member.role !== "owner");
+
+/**
+ * 只有自己能退出，而擁有者不行 —— 退了就沒有人管得了這個任務（函式也擋著）。
+ *
+ * 管理員不必先降級：退出時角色會一起降回成員。
+ */
+const canLeave = computed(() => isSelf.value && props.member.role !== "owner");
 </script>
 
 <template>
@@ -32,6 +40,9 @@ const showActions = computed(() => props.canManage && !isSelf.value && props.mem
       <p class="tiny">
         {{ ROLE_LABELS[member.role] }}<span v-if="isSelf"> · 你</span><span v-if="isVirtual"> · 無帳號</span>
       </p>
+    </div>
+    <div v-if="canLeave" class="actions">
+      <button class="btn btn-sm" :disabled="busy" @click="emit('leave')">退出任務</button>
     </div>
     <div v-if="showActions" class="actions">
       <!-- 虛擬成員沒有帳號，升成 admin 不會讓任何人拿到權限，規則也擋著。

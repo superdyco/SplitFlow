@@ -143,6 +143,20 @@ export async function removeMember(taskId: string, uid: string): Promise<void> {
   await batch.commit();
 }
 
+/**
+ * 自己退出任務。**帳目全部留著**，成員列之後顯示「（已退出）」。
+ *
+ * 走 callable 而不是在這裡寫：退出要把自己從 `task.memberIds` 拿掉，而那個
+ * 陣列同時是權限清單，規則不會讓成員自己改它（理由見 `functions/src/leave.ts`）。
+ *
+ * 錯誤原樣往外丟：函式的訊息都是中文（擁有者不能退出、任務已封存），
+ * 交給 `firebaseErrorMessage` 顯示。
+ */
+export async function leaveTask(taskId: string): Promise<void> {
+  const call = httpsCallable(getFunctions(app, "asia-east1"), "leaveTask");
+  await call({ taskId });
+}
+
 /** 一個 writeBatch 上限 500 筆寫入，留 50 筆餘裕給同批的計數器更新。 */
 const BATCH_LIMIT = 450;
 

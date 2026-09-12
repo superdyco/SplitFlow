@@ -36,6 +36,7 @@ import { useTripReport } from "@/composables/useTripReport";
 import {
   createVirtualMember,
   hardDeleteMember,
+  leaveTask,
   removeMember,
   renameMember,
   setMemberRole
@@ -486,6 +487,34 @@ async function confirmHardRemove() {
   await Promise.all([expenseState.load(), paymentState.load()]);
 }
 
+const confirmingLeave = ref(false);
+const leaving = ref(false);
+
+/**
+ * 自己退出任務。
+ *
+ * 成功之後一定要離開這一頁：退出的那一刻規則就不再讓他讀這個任務，留在原地
+ * 只會看到「讀取失敗」，像是 app 壞了。
+ *
+ * 沒有走 runMemberAction：那支成功後會重載任務與成員，而這裡那兩個請求一定
+ * 會被規則擋下來。
+ */
+async function confirmLeave() {
+  leaving.value = true;
+  actionError.value = null;
+  try {
+    await leaveTask(taskId.value);
+    confirmingLeave.value = false;
+    await router.push("/tasks");
+  } catch (err) {
+    // 擁有者不能退出、任務已封存都走這裡，訊息是函式給的中文。
+    actionError.value = firebaseErrorMessage(err);
+    confirmingLeave.value = false;
+  } finally {
+    leaving.value = false;
+  }
+}
+
 /**
  * 點標題觸發的重新載入。
  *
@@ -824,6 +853,7 @@ onMounted(async () => {
               @demote="changeRole($event, 'member')"
               @remove="removeTaskMember"
               @rename="(memberUid: string) => (renaming = memberUid)"
+              @leave="confirmingLeave = true"
             />
 
             <div v-if="taskState.isAdmin.value" class="card stack">
@@ -848,6 +878,16 @@ onMounted(async () => {
               </button>
             </div>
           </template>
+
+          <ConfirmDialog
+            :open="confirmingLeave"
+            title="退出這個任務？"
+            message="你會從成員列表上變成「已退出」，之後看不到這個任務的帳。你記過的支出、分攤與付款全部留著，其他人的帳不受影響 —— 想回來的話，請還在裡面的人給你邀請連結。"
+            :confirm-label="leaving ? '退出中...' : '退出任務'"
+            danger
+            @confirm="confirmLeave"
+            @cancel="confirmingLeave = false"
+          />
 
           <RemoveMemberDialog
             v-if="removing"

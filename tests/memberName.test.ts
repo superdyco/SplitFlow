@@ -22,6 +22,17 @@ describe("memberDisplayName", () => {
     expect(memberDisplayName({ nickname: "小美", active: true })).toBe("小美");
   });
 
+  it("自己退出的人標成已退出，不是已離開", () => {
+    // 兩者都是 active: false，但一個是他自己走的、一個是被管理員移除的。
+    expect(memberDisplayName({ nickname: "小美", active: false, left: true })).toBe("小美（已退出）");
+  });
+
+  it("刪掉帳號壓過退出 —— 退出過的人之後刪帳號，顯示的是已刪除", () => {
+    expect(
+      memberDisplayName({ nickname: "小美", active: false, left: true, deleted: true })
+    ).toBe("小美（已刪除）");
+  });
+
   it("沒有暱稱時不要只留下一個括號", () => {
     expect(memberDisplayName({ nickname: "", active: false })).toBe("（沒有暱稱）（已離開）");
   });
