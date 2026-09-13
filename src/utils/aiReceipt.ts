@@ -19,7 +19,20 @@ export interface AiReceiptFields {
   date: string | null;
   time: string | null;
   title: string | null;
+  /** 收據上印的地址。不是表單欄位，只用來搜地點候選。 */
+  address: string | null;
   category: string | null;
+}
+
+/**
+ * AI 讀完之後拿來搜地點候選的字串：店名＋地址。
+ *
+ * 地址讓「すき家」這種到處都有的店名縮到那一家。兩個都沒有就回 null ——
+ * 那時不查，查了也只是花一次錢拿到跟這張收據無關的結果。
+ */
+export function placeQueryFrom(fields: Pick<AiReceiptFields, "title" | "address">): string | null {
+  const parts = [fields.title, fields.address].map(part => part?.trim() ?? "").filter(Boolean);
+  return parts.length ? parts.join(" ") : null;
 }
 
 export interface AiReadResult {

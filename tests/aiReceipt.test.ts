@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { aiButtonState, aiMessage, aiPatch, splitAfterAi, type AiReceiptFields } from "@/utils/aiReceipt";
+import {
+  aiButtonState,
+  aiMessage,
+  aiPatch,
+  placeQueryFrom,
+  splitAfterAi,
+  type AiReceiptFields
+} from "@/utils/aiReceipt";
 
 function fields(overrides: Partial<AiReceiptFields> = {}): AiReceiptFields {
   return {
@@ -9,10 +16,27 @@ function fields(overrides: Partial<AiReceiptFields> = {}): AiReceiptFields {
     date: "2026-09-10",
     time: "19:05",
     title: "すき家",
+    address: "東京都渋谷区道玄坂2-1-1",
     category: "food",
     ...overrides
   };
 }
+
+describe("placeQueryFrom", () => {
+  it("店名＋地址", () => {
+    expect(placeQueryFrom(fields())).toBe("すき家 東京都渋谷区道玄坂2-1-1");
+  });
+
+  it("只有其中一個也查", () => {
+    expect(placeQueryFrom(fields({ address: null }))).toBe("すき家");
+    expect(placeQueryFrom(fields({ title: null }))).toBe("東京都渋谷区道玄坂2-1-1");
+  });
+
+  it("兩個都沒有（或只有空白）就不查", () => {
+    expect(placeQueryFrom(fields({ title: null, address: null }))).toBeNull();
+    expect(placeQueryFrom(fields({ title: "  ", address: "" }))).toBeNull();
+  });
+});
 
 describe("aiButtonState", () => {
   const base = { guest: false, online: true, balance: 2, busy: false };

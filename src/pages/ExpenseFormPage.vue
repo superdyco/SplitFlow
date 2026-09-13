@@ -43,7 +43,8 @@ import { deleteReceipt, flushReceipts } from "@/services/receiptService";
 import { removeQueued } from "@/services/receiptQueue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import AiReceiptButton from "@/components/expense/AiReceiptButton.vue";
-import { aiMessage, aiPatch, splitAfterAi, type AiReadResult } from "@/utils/aiReceipt";
+import AiPlaceSuggestions from "@/components/expense/AiPlaceSuggestions.vue";
+import { aiMessage, aiPatch, placeQueryFrom, splitAfterAi, type AiReadResult } from "@/utils/aiReceipt";
 import { isGuest } from "@/utils/guest";
 
 const route = useRoute();
@@ -63,6 +64,13 @@ const receiptState = useReceipt();
 /** AI 讀完之後那一行，以及幣別不支援的警告。換一張照片就清掉。 */
 const aiNote = ref<string | null>(null);
 const aiWarning = ref<string | null>(null);
+/** AI 讀到店名或地址時，拿來搜地點候選的字串。選了或按「都不是」就清掉。 */
+const aiPlaceQuery = ref<string | null>(null);
+/**
+ * 地點欄位的 key。PlaceField 的初始值只讀一次（見它的註解），所以從候選選了
+ * 地點之後，換 key 讓它用新的地點重建 —— 不然欄位上還是舊的字。
+ */
+const placeFieldKey = ref(0);
 const guest = isGuest(authStore.user);
 
 /**
@@ -458,11 +466,23 @@ function applyAi(result: AiReadResult) {
     splitReset: split !== null
   });
   aiWarning.value = patch.warning;
+  aiPlaceQuery.value = placeQueryFrom(result.fields);
+}
+
+/**
+ * 從 AI 的地點候選選了一家：填進地點、讓地點欄位用新的值重建。
+ * 地點換了，天氣的 watch 會自己重查。
+ */
+function pickAiPlace(picked: ExpensePlace) {
+  place.value = picked;
+  placeFieldKey.value += 1;
+  aiPlaceQuery.value = null;
 }
 
 watch(receiptState.pending, () => {
   aiNote.value = null;
   aiWarning.value = null;
+  aiPlaceQuery.value = null;
 });
 
 /*
@@ -470,7 +490,7 @@ watch(receiptState.pending, () => {
   standalone 模式下不一定會重算 sticky 的位置 —— 送出列會停在畫面中間。
   等 DOM 更新完再逼它重算一次。見 `nudgeSticky` 的說明。
 */
-watch([receiptState.pending, aiNote, aiWarning], async () => {
+watch([receiptState.pending, aiNote, aiWarning, aiPlaceQuery], async () => {
   await nextTick();
   nudgeSticky();
 });
@@ -726,7 +746,7 @@ onMounted(load);
             查不到就整格不出現，沒有錯誤訊息：使用者正在記一筆帳，
             那才是他來這一頁的目的。
           -->
-          <PlaceField :task-id="taskId" v-model="place" @locate="locatedAt = $event">
+          <PlaceField :key="placeFieldKey" :task-id="taskId" v-model="place" @locate="locatedAt = $event">
             <template #trailing>
               <span v-if="weatherLoading" class="weather-wait tiny">查天氣</span>
               <WeatherChip v-else-if="weather" :weather="weather" variant="chip" show-label />
@@ -763,6 +783,15 @@ onMounted(load);
             :note="aiNote"
             :warning="aiWarning"
             @result="applyAi"
+          />
+
+          <!-- AI 讀到店名或地址時列出地點候選，點了才填進上面的地點欄位。 -->
+          <AiPlaceSuggestions
+            v-if="aiPlaceQuery"
+            :query="aiPlaceQuery"
+            :task-id="taskId"
+            @pick="pickAiPlace"
+            @dismiss="aiPlaceQuery = null"
           />
 
           <label class="field">
