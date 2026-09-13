@@ -9,6 +9,7 @@ AiReceiptFields fields({
   String? date = '2026-09-10',
   String? time = '19:05',
   String? title = 'すき家',
+  String? address = '東京都渋谷区道玄坂2-1-1',
   String? category = 'food',
 }) =>
     AiReceiptFields(
@@ -18,10 +19,27 @@ AiReceiptFields fields({
       date: date,
       time: time,
       title: title,
+      address: address,
       category: category,
     );
 
 void main() {
+  group('placeQueryFrom', () {
+    test('店名＋地址', () {
+      expect(placeQueryFrom(fields()), 'すき家 東京都渋谷区道玄坂2-1-1');
+    });
+
+    test('只有其中一個也查', () {
+      expect(placeQueryFrom(fields(address: null)), 'すき家');
+      expect(placeQueryFrom(fields(title: null)), '東京都渋谷区道玄坂2-1-1');
+    });
+
+    test('兩個都沒有（或只有空白）就不查', () {
+      expect(placeQueryFrom(fields(title: null, address: null)), isNull);
+      expect(placeQueryFrom(fields(title: '  ', address: '')), isNull);
+    });
+  });
+
   group('aiButtonState', () {
     test('正常：顯示剩幾點', () {
       final b = aiButtonState(guest: false, online: true, balance: 2, busy: false);
@@ -195,9 +213,11 @@ void main() {
           'date': null,
           'time': null,
           'title': 'すき家',
+          'address': '東京都渋谷区道玄坂2-1-1',
           'category': 'food',
         },
       });
+      expect(r.fields.address, '東京都渋谷区道玄坂2-1-1');
       expect(r.readResult, 'read');
       expect(r.creditsLeft, 2);
       expect(r.fields.amount, '1280');

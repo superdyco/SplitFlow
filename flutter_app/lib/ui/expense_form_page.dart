@@ -15,6 +15,7 @@ import '../domain/task_status.dart';
 import '../domain/validation.dart' as validate;
 import '../data/place_service.dart';
 import '../state/providers.dart';
+import 'ai_place_suggestions.dart';
 import 'currency_picker.dart';
 import 'place_field.dart';
 import 'receipt_field.dart';
@@ -102,6 +103,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   String? _aiWarning;
   String? _aiError;
   bool _aiGuestNotice = false;
+
+  /// AI 讀到店名或地址時，拿來搜地點候選的字串。選了或按「都不是」就清掉。
+  String? _aiPlaceQuery;
+
+  /// 地點欄位的 key。`PlaceField` 的初始值只讀一次，所以從候選選了地點之後，
+  /// 換 key 讓它用新的地點重建 —— 不然欄位上還是舊的字。
+  int _placeFieldVersion = 0;
 
   bool get _isEdit => widget.existing != null;
 
@@ -377,6 +385,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         splitReset: split != null,
       );
       _aiWarning = patch.warning;
+      _aiPlaceQuery = placeQueryFrom(result.fields);
     });
 
     final currency = patch.currency;
@@ -844,8 +853,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             ? '選建議的地點會一起記下座標，報告的地圖才標得出來'
                             : '沒有設定地點金鑰，目前只能打名字',
                         child: PlaceField(
+                          // 從 AI 的地點候選選了一家之後換 key，讓它用新的地點重建。
+                          key: ValueKey(_placeFieldVersion),
                           taskId: widget.taskId,
-                          initial: widget.existing?.place,
+                          // 用表單現在的值，不是 widget.existing：重建時要拿到剛選的
+                          // 那一家。第一次建立時兩者一樣（initState 就是從那裡填的）。
+                          initial: _place,
                           // 這一格自己管輸入，父層只要知道最後算出來是什麼。
                           onChanged: (value) {
                             _place = value;
@@ -888,6 +901,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             _aiWarning = null;
                             _aiError = null;
                             _aiGuestNotice = false;
+                            _aiPlaceQuery = null;
                           }),
                         ),
                       ),
@@ -933,6 +947,24 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               ],
                             );
                           }),
+                        ),
+                      // AI 讀到店名或地址時列出地點候選，點了才填進上面的地點欄位。
+                      if (_aiPlaceQuery != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpace.x4),
+                          child: AiPlaceSuggestions(
+                            query: _aiPlaceQuery!,
+                            taskId: widget.taskId,
+                            onPick: (picked) {
+                              setState(() {
+                                _place = picked;
+                                _aiPlaceQuery = null;
+                                _placeFieldVersion += 1;
+                              });
+                              _refreshWeather();
+                            },
+                            onDismiss: () => setState(() => _aiPlaceQuery = null),
+                          ),
                         ),
                       _Field(
                         label: '備註（選填）',

@@ -16,6 +16,9 @@ class AiReceiptFields {
   final String? date;
   final String? time;
   final String? title;
+
+  /// 收據上印的地址。不是表單欄位，只用來搜地點候選。
+  final String? address;
   final String? category;
 
   const AiReceiptFields({
@@ -25,6 +28,7 @@ class AiReceiptFields {
     required this.date,
     required this.time,
     required this.title,
+    required this.address,
     required this.category,
   });
 
@@ -37,9 +41,22 @@ class AiReceiptFields {
       date: text('date'),
       time: text('time'),
       title: text('title'),
+      address: text('address'),
       category: text('category'),
     );
   }
+}
+
+/// AI 讀完之後拿來搜地點候選的字串：店名＋地址。
+///
+/// 地址讓「すき家」這種到處都有的店名縮到那一家。兩個都沒有就回 null ——
+/// 那時不查，查了也只是花一次錢拿到跟這張收據無關的結果。
+String? placeQueryFrom(AiReceiptFields fields) {
+  final parts = [fields.title, fields.address]
+      .map((part) => part?.trim() ?? '')
+      .where((part) => part.isNotEmpty)
+      .toList();
+  return parts.isEmpty ? null : parts.join(' ');
 }
 
 class AiReadResult {
