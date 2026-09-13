@@ -103,9 +103,10 @@ async function select(row: AdminUserRow) {
   detail.value = null;
   detailError.value = null;
   // 上一個人打到一半的點數與理由不能留給下一個人 —— 理由會原字寫進稽核日誌。
-  adjustAmount.value = null;
+  targetBalance.value = null;
   adjustReason.value = "";
   adjustError.value = null;
+  showAllLedger.value = false;
   detailLoading.value = true;
   try {
     detail.value = await fetchUser(row.uid);
@@ -140,32 +141,52 @@ async function confirmDisable(reason: string) {
   }
 }
 
-const adjustAmount = ref<number | null>(null);
+const targetBalance = ref<number | null>(null);
 const adjustReason = ref("");
 const adjusting = ref(false);
 const adjustError = ref<string | null>(null);
 
+/** 他現在的點數。null 是還沒用過（還沒有點數文件）。 */
+const currentBalance = computed(() => detail.value?.ai?.balance ?? null);
+
+/**
+ * 輸入的是「設成幾點」，不是加減量 —— 管理者要的是他現在該有幾點，自己算加減
+ * 容易算錯。後端會算出實際變動量寫進紀錄。
+ */
 const canAdjust = computed(() => {
-  const value = adjustAmount.value;
+  const value = targetBalance.value;
   return (
     !adjusting.value &&
     !!adjustReason.value.trim() &&
     typeof value === "number" &&
     Number.isInteger(value) &&
-    value !== 0 &&
-    Math.abs(value) <= 100
+    value >= 0 &&
+    value <= 1000 &&
+    // 跟現在一樣就沒有東西可調（後端也會擋）。還沒用過的人設成幾點都算數。
+    (currentBalance.value === null || value !== currentBalance.value)
   );
+});
+
+/**
+ * 點數紀錄預設只列最近 5 筆。紀錄一多，詳情會長到看不到下面的東西，
+ * 而申訴時要看的通常就是最近那幾次。
+ */
+const LEDGER_PREVIEW = 5;
+const showAllLedger = ref(false);
+const visibleLedger = computed(() => {
+  const ledger = detail.value?.ai?.ledger ?? [];
+  return showAllLedger.value ? ledger : ledger.slice(0, LEDGER_PREVIEW);
 });
 
 /** 調整點數。申訴的補償就是走這裡；後端寫稽核日誌與點數紀錄。 */
 async function confirmAdjust() {
   const uid = detail.value?.profile.uid;
-  if (!uid || adjustAmount.value === null) return;
+  if (!uid || targetBalance.value === null) return;
   adjusting.value = true;
   adjustError.value = null;
   try {
-    await adjustCredits(uid, adjustAmount.value, adjustReason.value.trim());
-    adjustAmount.value = null;
+    await adjustCredits(uid, targetBalance.value, adjustReason.value.trim());
+    targetBalance.value = null;
     adjustReason.value = "";
     await fetchUser(uid).then(next => (detail.value = next));
   } catch (err) {
@@ -365,13 +386,13 @@ function whenSeen(row: AdminUserRow): string {
 
               <div v-if="detail.profile.provider !== GUEST_PROVIDER_ID" class="adjust">
                 <input
-                  v-model.number="adjustAmount"
+                  v-model.number="targetBalance"
                   class="input"
                   type="number"
-                  min="-100"
-                  max="100"
+                  min="0"
+                  max="1000"
                   step="1"
-                  placeholder="例如 3 或 -1"
+                  :placeholder="currentBalance === null ? '設成幾點' : `現在 ${currentBalance} 點，設成幾點`"
                 />
                 <input
                   v-model="adjustReason"
@@ -380,20 +401,32 @@ function whenSeen(row: AdminUserRow): string {
                   placeholder="理由（必填，會寫進稽核日誌）"
                 />
                 <button type="button" class="btn btn-sm" :disabled="!canAdjust" @click="confirmAdjust">
-                  {{ adjusting ? "調整中..." : "調整點數" }}
+                  {{ adjusting ? "設定中..." : "設定點數" }}
                 </button>
               </div>
               <p v-else class="tiny">訪客不能用 AI 辨識，也不能調整點數。</p>
               <p v-if="adjustError" class="tiny ai-error">{{ adjustError }}</p>
 
-              <ul v-if="detail.ai.ledger.length">
-                <li v-for="row in detail.ai.ledger" :key="row.id">
+              <ul v-if="visibleLedger.length">
+                <li v-for="row in visibleLedger" :key="row.id">
                   <span class="tiny num">{{ row.at ? row.at.slice(0, 16).replace("T", " ") : "—" }}</span>
                   <span class="pill">{{ ledgerTypeLabel(row.type) }}</span>
                   <span class="num">{{ row.delta > 0 ? `+${row.delta}` : row.delta }}</span>
                   <span class="tiny">{{ ledgerResultLabel(row, now) || row.reason || "" }}</span>
                 </li>
               </ul>
+              <button
+                v-if="detail.ai.ledger.length > LEDGER_PREVIEW"
+                type="button"
+                class="btn btn-ghost btn-sm"
+                @click="showAllLedger = !showAllLedger"
+              >
+                {{ showAllLedger ? "收起" : `顯示全部（${detail.ai.ledger.length} 筆）` }}
+              </button>
+              <!-- 伺服器只回最近 20 筆。展開後剛好 20 筆，代表可能還有更舊的。 -->
+              <p v-if="showAllLedger && detail.ai.ledger.length >= 20" class="tiny">
+                只列最近 20 筆，更早的到「AI 設定」的使用報告查。
+              </p>
             </div>
 
             <div v-if="detail.tasks.length" class="tasks">

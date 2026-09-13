@@ -458,13 +458,17 @@ export async function fetchAiUsage(params: {
   return (await callable<typeof params, AdminAiUsage>("adminAiUsage")(params)).data;
 }
 
+/**
+ * 把某個人的點數**設成** `balance` 點（不是加減）。後端會算出實際變動量寫進紀錄；
+ * 跟現在一樣的話會丟「沒有變動」。
+ */
 export async function adjustCredits(
   uid: string,
-  delta: number,
+  balance: number,
   reason: string
 ): Promise<{ balance: number; delta: number }> {
-  const result = await callable<{ uid: string; delta: number; reason: string }, { balance: number; delta: number }>(
+  const result = await callable<{ uid: string; balance: number; reason: string }, { balance: number; delta: number }>(
     "adminAdjustCredits"
-  )({ uid, delta, reason });
+  )({ uid, balance, reason });
   return result.data;
 }
