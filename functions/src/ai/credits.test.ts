@@ -4,7 +4,9 @@ import {
   isFailure,
   ledgerAdjust,
   ledgerFree,
+  ledgerPurchase,
   ledgerResult,
+  ledgerRevoke,
   ledgerUse,
   parseTargetBalance,
   planSetBalance,
@@ -145,6 +147,40 @@ describe("點數紀錄", () => {
       readResult: "timeout",
       inputTokens: null,
       outputTokens: null
+    });
+  });
+});
+
+describe("儲值與退款的紀錄", () => {
+  it("purchase 帶著購買紀錄與商品", () => {
+    expect(
+      ledgerPurchase({
+        uid: "u1",
+        at: AT,
+        delta: 66,
+        balanceAfter: 68,
+        purchaseId: "ios_1",
+        productId: "ai_credits_60"
+      })
+    ).toEqual({
+      type: "purchase",
+      uid: "u1",
+      delta: 66,
+      balanceAfter: 68,
+      at: AT,
+      purchaseId: "ios_1",
+      productId: "ai_credits_60"
+    });
+  });
+
+  it("revoke 的變動是負的", () => {
+    expect(ledgerRevoke({ uid: "u1", at: AT, delta: -20, balanceAfter: 0, purchaseId: "android_GPA.1" })).toEqual({
+      type: "revoke",
+      uid: "u1",
+      delta: -20,
+      balanceAfter: 0,
+      at: AT,
+      purchaseId: "android_GPA.1"
     });
   });
 });

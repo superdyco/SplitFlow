@@ -20,7 +20,7 @@ export interface CreditsDoc {
 }
 
 /** 壞掉的餘額當作 0。反過來當成很多，就是一個無限點數的洞。 */
-function balanceOf(doc: CreditsDoc | null): number {
+export function balanceOf(doc: CreditsDoc | null): number {
   const value = doc?.balance;
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : 0;
 }
@@ -122,4 +122,42 @@ export function ledgerResult(input: {
 
 export function isFailure(result: unknown): boolean {
   return result !== "read";
+}
+
+/** 儲值加點。帶著購買紀錄的 ID，退款時對得回來。 */
+export function ledgerPurchase(input: {
+  uid: string;
+  at: Date;
+  delta: number;
+  balanceAfter: number;
+  purchaseId: string;
+  productId: string;
+}) {
+  return {
+    type: "purchase",
+    uid: input.uid,
+    delta: input.delta,
+    balanceAfter: input.balanceAfter,
+    at: input.at,
+    purchaseId: input.purchaseId,
+    productId: input.productId
+  };
+}
+
+/** 商店退款扣回。變動是實際扣掉的量（扣到 0 為止）。 */
+export function ledgerRevoke(input: {
+  uid: string;
+  at: Date;
+  delta: number;
+  balanceAfter: number;
+  purchaseId: string;
+}) {
+  return {
+    type: "revoke",
+    uid: input.uid,
+    delta: input.delta,
+    balanceAfter: input.balanceAfter,
+    at: input.at,
+    purchaseId: input.purchaseId
+  };
 }
