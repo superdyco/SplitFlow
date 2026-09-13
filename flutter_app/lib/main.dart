@@ -11,6 +11,7 @@ import 'domain/debug_log.dart';
 import 'domain/invite.dart';
 import 'state/pending_invite.dart';
 import 'state/pending_task.dart';
+import 'state/purchase_listener.dart';
 import 'state/providers.dart';
 import 'ui/onboarding_page.dart';
 import 'ui/sign_in_page.dart';
@@ -87,6 +88,12 @@ Future<void> main() async {
     } catch (_) {
       // 沒有 Google Play 服務的裝置這裡會丟。收不到通知不該讓 App 開不起來。
     }
+  }
+
+  // 購買監聽要在畫面建好之前就開始：上次付款完成但沒加到點的交易，商店會在
+  // 啟動時重送。Firebase 沒初始化成功就不聽 —— 那時也打不到 purchaseCredits。
+  if (error == null) {
+    container.read(purchaseListenerProvider).start();
   }
 
   if (pendingTaskId != null) {

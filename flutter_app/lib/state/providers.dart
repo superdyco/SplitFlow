@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/ai_repository.dart';
+import '../data/credit_purchase_repository.dart';
 import '../data/auth_repository.dart';
 import '../data/bias_store.dart';
 import '../data/data_export_repository.dart';
@@ -65,6 +66,9 @@ final dataExportRepositoryProvider = Provider((ref) => DataExportRepository());
 
 /// AI 讀收據與點數。
 final aiRepositoryProvider = Provider((ref) => AiRepository());
+
+/// 儲值。付款交給商店，加點交給伺服器。監聽在 `state/purchase_listener.dart`。
+final creditPurchaseRepositoryProvider = Provider((ref) => CreditPurchaseRepository());
 
 /// 一張收據的下載網址。
 ///
