@@ -168,6 +168,21 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "//": "後台 AI 設定頁的營收：environment 等值加上 creditedAt 範圍。",
+      "collectionGroup": "aiPurchases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "environment",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "creditedAt",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

@@ -83,7 +83,7 @@ import { GUEST_PROVIDER } from "./guestMerge.js";
 import { ledgerAdjust, MAX_BALANCE, parseTargetBalance, planSetBalance } from "./ai/credits.js";
 import { AI_MODELS, isAllowedModel, keyTail, resolveModel } from "./ai/models.js";
 import { cleanReceipt, parseOutput } from "./ai/receipt.js";
-import { sumAiDays, type AiDayDoc } from "./ai/usage.js";
+import { sumAiDays, sumPurchases, type AiDayDoc, type PurchaseDoc } from "./ai/usage.js";
 import { readReceiptText, SAMPLE_RECEIPT_TEXT, verifyModel } from "./ai/openai.js";
 import { AI_CONFIG_PATH, forgetAiConfig, loadAiConfig } from "./ai/config.js";
 
@@ -1709,10 +1709,12 @@ export const adminTestAiConfig = onCall({ region: REGION, timeoutSeconds: 60 }, 
   }
 });
 
-type AiLedgerFilter = "all" | "use" | "adjust" | "free";
+type AiLedgerFilter = "all" | "use" | "adjust" | "free" | "purchase" | "revoke";
+
+const LEDGER_FILTERS: readonly AiLedgerFilter[] = ["all", "use", "adjust", "free", "purchase", "revoke"];
 
 function parseLedgerFilter(value: unknown): AiLedgerFilter | null {
-  return value === "all" || value === "use" || value === "adjust" || value === "free" ? value : null;
+  return LEDGER_FILTERS.includes(value as AiLedgerFilter) ? (value as AiLedgerFilter) : null;
 }
 
 /**
@@ -1743,6 +1745,17 @@ export const adminAiUsage = onCall({ region: REGION }, async request => {
     .get();
   const summary = sumAiDays(daysSnap.docs.map(doc => doc.data() as AiDayDoc), keys);
 
+  /*
+    區間內的儲值。只算 production：TestFlight、審核人員、授權測試帳號的購買都是
+    sandbox，混進來營收就是假的。creditedAt 用區間第一天的台北時間 00:00 當起點。
+  */
+  const purchasesSnap = await db()
+    .collection("aiPurchases")
+    .where("environment", "==", "production")
+    .where("creditedAt", ">=", dayBounds(keys[0]).start)
+    .get();
+  const purchases = sumPurchases(purchasesSnap.docs.map(doc => doc.data() as PurchaseDoc));
+
   const limit = parseLimit(data.limit);
   let query: FirebaseFirestore.Query = db().collectionGroup("aiLedger");
   if (filter !== "all") query = query.where("type", "==", filter);
@@ -1767,6 +1780,7 @@ export const adminAiUsage = onCall({ region: REGION }, async request => {
     days: { from: keys[0], to: keys[keys.length - 1] },
     totals: summary.totals,
     recordedDays: summary.recordedDays,
+    purchases,
     rows: docs.map(doc => toLedgerRow(doc, names)),
     cursor:
       hasMore && last && lastAt instanceof Timestamp

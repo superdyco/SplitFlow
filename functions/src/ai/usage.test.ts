@@ -1,5 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { statIncrements, sumAiDays } from "./usage.js";
+import { statIncrements, sumAiDays, sumPurchases } from "./usage.js";
+
+describe("sumPurchases", () => {
+  it("退款的不算營收與點數，但算進筆數與退款數；幣別分開加總", () => {
+    expect(
+      sumPurchases([
+        { status: "credited", credits: 66, price: 60, currency: "TWD" },
+        { status: "credited", credits: 120, price: 100, currency: "TWD" },
+        { status: "refunded", credits: 30, price: 30, currency: "TWD" },
+        { status: "credited", credits: 30, price: 0.99, currency: "USD" }
+      ])
+    ).toEqual({ count: 4, refunded: 1, credits: 216, revenue: { TWD: 160, USD: 0.99 } });
+  });
+
+  it("價格或幣別缺漏的照樣算筆數與點數，不進營收", () => {
+    expect(sumPurchases([{ status: "credited", credits: 30, price: null, currency: null }])).toEqual({
+      count: 1,
+      refunded: 0,
+      credits: 30,
+      revenue: {}
+    });
+  });
+});
 
 describe("statIncrements", () => {
   it("讀出：calls 與 reads 各 +1，token 照加", () => {
