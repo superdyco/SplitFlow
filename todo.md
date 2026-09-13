@@ -809,3 +809,28 @@ GitHub 的 runner 內建 JDK，不用自己裝。
 - 隱私政策還有幾處過時：Facebook 登入早就關了、沒寫 Apple 登入、沒寫 Open-Meteo 天氣、
   沒寫免登入試用。
 - 考慮把 `functions/` 的測試加進 `.github/workflows/checks.yml`。
+
+## 已完成（程式碼）：AI 點數儲值
+
+規格與計畫在 `docs/superpowers/`（2026-09-13）。手機 App 用 Apple／Google 的應用程式內購買儲值，
+網頁不賣，點數用完只顯示「可以到手機 App 儲值」。
+
+- 方案：NT$30 = 30 點、NT$60 = 66 點（送 6）、NT$100 = 120 點（送 20）。點數對照只在
+  `functions/src/purchase/products.ts`，App 那份只拿來顯示。
+- **伺服器向商店查過才加點**（`purchaseCredits`）。購買紀錄 `aiPurchases/{ios_|android_}{交易識別}`
+  天生冪等；App 收到回覆之前不結束交易，斷線的話商店下次啟動會重送。購買監聽因此放在
+  `main.dart`，不是只在儲值頁。
+- iOS 的 `buyConsumable` 外掛強制 `autoConsume: true`；iOS 的「消耗」就是 `completePurchase`，
+  所以照樣等伺服器回覆才結束。Android 由伺服器加完點才 `consume`（三天內沒確認會自動退款）。
+- 同一筆交易被另一個帳號送來回 `other-account`（不是錯誤），App 照樣結束交易，不然會永遠重送。
+- 商店退款（App Store Server Notifications V2 的 `REFUND`、Google 即時開發者通知的作廢購買）
+  扣回點數，**扣到 0 為止**；已經用掉的扣不回來，是接受的漏洞。
+- `aiPurchases` 不隨刪帳號刪除（金流紀錄，退款通知要靠它對回來）。
+- 後台營收只算 production；Android 的金額是商品標價，Google 的 API 不回實際價格。
+
+**還沒驗到的：真的在兩個商店各買一次。** 那要先有 Apple Developer Program（加上 Mac 或雲端
+macOS 簽章）與 Play Console（加上正式的上傳金鑰 —— 目前 Android release 用的是 debug 簽章）。
+
+⚠️ **部署注意**：`purchaseCredits`、`appStoreNotifications` 用到 `APPSTORE_*` 四個 secrets，
+設好之前 `npm run deploy:functions`（部署全部函式）會失敗。這段期間部署其他函式要用
+`firebase deploy --only functions:<名稱>` 指定。
