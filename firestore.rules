@@ -592,6 +592,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    /*
+      儲值紀錄。**沒有任何登入身分讀得到、寫得進去，包含買的人自己。**
+
+      它是金流紀錄：App 用不到它（餘額在 aiCredits），能寫的話就能自己造一筆
+      「已加點」的紀錄。寫入只有 purchaseCredits 與退款通知（Admin SDK）。
+    */
+    match /aiPurchases/{purchaseId} {
+      allow read, write: if false;
+    }
+
     match /perf/{sampleId} {
       allow read: if false;
       allow create: if signedIn()

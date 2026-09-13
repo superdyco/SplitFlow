@@ -2429,6 +2429,19 @@ async function main() {
     });
   });
 
+  // ---------------------------------------------------------------- 儲值紀錄
+
+  await test("儲值紀錄誰都讀不到、寫不進去 —— 包含買的人自己", async () => {
+    await testEnv.clearFirestore();
+    await testEnv.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "aiPurchases", "ios_1"), { uid: MEMBER, credits: 30, status: "credited" });
+    });
+    await assertFails(getDoc(doc(as(MEMBER), "aiPurchases", "ios_1")));
+    await assertFails(
+      setDoc(doc(as(MEMBER), "aiPurchases", "ios_2"), { uid: MEMBER, credits: 120, status: "credited" })
+    );
+  });
+
   await testEnv.cleanup();
 
   console.log(`\n${passed} passed, ${failed} failed`);
