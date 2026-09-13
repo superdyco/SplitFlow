@@ -7,7 +7,8 @@
  */
 
 export const FREE_CREDITS = 3;
-export const ADJUST_LIMIT = 100;
+/** 管理者一次最多設到幾點。擋的是手滑多打幾個 0，不是業務上限。 */
+export const MAX_BALANCE = 1000;
 
 export const READ_RESULTS = ["pending", "read", "unreadable", "not_receipt", "ai_error", "timeout"] as const;
 export type ReadResult = (typeof READ_RESULTS)[number];
@@ -39,19 +40,27 @@ export function planUse(
   return { ok: true, grantFree, balanceAfter: before - 1 };
 }
 
-export function parseAdjust(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isInteger(value) || value === 0) return null;
-  return Math.abs(value) <= ADJUST_LIMIT ? value : null;
+/** 管理者要設成的點數：0 到 MAX_BALANCE 的整數。 */
+export function parseTargetBalance(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value)) return null;
+  return value >= 0 && value <= MAX_BALANCE ? value : null;
 }
 
-/** 減到 0 為止。紀錄寫實際變動的量，不是輸入的量 —— 對帳要加得起來。 */
-export function planAdjust(
+/**
+ * 把點數設成 `target`。
+ *
+ * 收目標點數而不是加減量：管理者要的是「他現在該有幾點」，讓他自己算加減容易
+ * 算錯。紀錄寫的是算出來的實際變動量 —— 對帳要加得起來。
+ *
+ * 變動量是在 transaction 裡對著「當下」的餘額算的，所以管理者按下去的同時他剛好
+ * 用掉一點，結果還是管理者設的那個數字。
+ */
+export function planSetBalance(
   doc: CreditsDoc | null,
-  delta: number
+  target: number
 ): { delta: number; balanceAfter: number; created: boolean } {
   const before = balanceOf(doc);
-  const balanceAfter = Math.max(0, before + delta);
-  return { delta: balanceAfter - before, balanceAfter, created: doc === null };
+  return { delta: target - before, balanceAfter: target, created: doc === null };
 }
 
 export function ledgerFree(input: { uid: string; at: Date }) {

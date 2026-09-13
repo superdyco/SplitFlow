@@ -6,8 +6,8 @@ import {
   ledgerFree,
   ledgerResult,
   ledgerUse,
-  parseAdjust,
-  planAdjust,
+  parseTargetBalance,
+  planSetBalance,
   planUse
 } from "./credits.js";
 
@@ -35,37 +35,60 @@ describe("planUse", () => {
   });
 });
 
-describe("parseAdjust", () => {
-  it("−100 到 +100 的非零整數", () => {
-    expect(parseAdjust(5)).toBe(5);
-    expect(parseAdjust(-100)).toBe(-100);
-    expect(parseAdjust(100)).toBe(100);
+describe("parseTargetBalance", () => {
+  it("0 到 1000 的整數", () => {
+    expect(parseTargetBalance(0)).toBe(0);
+    expect(parseTargetBalance(5)).toBe(5);
+    expect(parseTargetBalance(1000)).toBe(1000);
   });
 
-  it("0、超出範圍、小數、字串都不行", () => {
-    expect(parseAdjust(0)).toBeNull();
-    expect(parseAdjust(101)).toBeNull();
-    expect(parseAdjust(-101)).toBeNull();
-    expect(parseAdjust(1.5)).toBeNull();
-    expect(parseAdjust("5")).toBeNull();
+  it("負數、超過上限、小數、字串都不行", () => {
+    expect(parseTargetBalance(-1)).toBeNull();
+    expect(parseTargetBalance(1001)).toBeNull();
+    expect(parseTargetBalance(1.5)).toBeNull();
+    expect(parseTargetBalance("5")).toBeNull();
   });
 });
 
-describe("planAdjust", () => {
-  it("加點", () => {
-    expect(planAdjust({ balance: 2, freeGranted: true }, 3)).toEqual({ delta: 3, balanceAfter: 5, created: false });
+describe("planSetBalance", () => {
+  it("設成比現在多：紀錄寫實際加了多少", () => {
+    expect(planSetBalance({ balance: 2, freeGranted: true }, 5)).toEqual({
+      delta: 3,
+      balanceAfter: 5,
+      created: false
+    });
   });
 
-  it("減到 0 為止，紀錄寫實際扣掉的量", () => {
-    expect(planAdjust({ balance: 2, freeGranted: true }, -5)).toEqual({ delta: -2, balanceAfter: 0, created: false });
+  it("設成比現在少：紀錄寫實際扣了多少", () => {
+    expect(planSetBalance({ balance: 5, freeGranted: true }, 1)).toEqual({
+      delta: -4,
+      balanceAfter: 1,
+      created: false
+    });
   });
 
-  it("文件不存在：輸入幾點就是幾點，不另外送 3 點", () => {
-    expect(planAdjust(null, 5)).toEqual({ delta: 5, balanceAfter: 5, created: true });
+  it("設成跟現在一樣：變動是 0（呼叫端要擋下來，不寫一筆沒意義的紀錄）", () => {
+    expect(planSetBalance({ balance: 3, freeGranted: true }, 3)).toEqual({
+      delta: 0,
+      balanceAfter: 3,
+      created: false
+    });
   });
 
-  it("文件不存在又是減點：當作 0，實際變動 0", () => {
-    expect(planAdjust(null, -3)).toEqual({ delta: 0, balanceAfter: 0, created: true });
+  it("文件不存在：設幾點就是幾點，不另外送 3 點", () => {
+    expect(planSetBalance(null, 5)).toEqual({ delta: 5, balanceAfter: 5, created: true });
+  });
+
+  it("文件不存在設成 0：照樣建立 —— 之後第一次辨識不會再送 3 點", () => {
+    expect(planSetBalance(null, 0)).toEqual({ delta: 0, balanceAfter: 0, created: true });
+  });
+
+  it("餘額欄位壞掉當作 0 算變動量", () => {
+    expect(planSetBalance({ balance: "9999", freeGranted: true }, 2)).toEqual({
+      delta: 2,
+      balanceAfter: 2,
+      created: false
+    });
   });
 });
 

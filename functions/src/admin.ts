@@ -80,7 +80,7 @@ import {
   type GuestEvent
 } from "./admin/guests.js";
 import { GUEST_PROVIDER } from "./guestMerge.js";
-import { ledgerAdjust, parseAdjust, planAdjust } from "./ai/credits.js";
+import { ledgerAdjust, MAX_BALANCE, parseTargetBalance, planSetBalance } from "./ai/credits.js";
 import { AI_MODELS, isAllowedModel, keyTail, resolveModel } from "./ai/models.js";
 import { cleanReceipt, parseOutput } from "./ai/receipt.js";
 import { sumAiDays, type AiDayDoc } from "./ai/usage.js";
@@ -1776,17 +1776,22 @@ export const adminAiUsage = onCall({ region: REGION }, async request => {
 });
 
 /**
- * 調整某個人的點數。申訴的補償就是走這裡。
+ * 把某個人的點數設成幾點。申訴的補償就是走這裡。
  *
- * 減到 0 為止，紀錄寫實際扣掉的量。訪客不能調 —— 訪客本來就不能用，調了只會
- * 讓人以為壞了。還沒用過的人：輸入幾點就是幾點，之後不會再送免費 3 點。
+ * **收的是目標點數，不是加減量**：管理者要的是「他現在該有幾點」，讓他自己
+ * 算加減容易算錯。紀錄照樣寫實際變動了多少，對帳才加得起來。
+ *
+ * 訪客不能調 —— 訪客本來就不能用，調了只會讓人以為壞了。還沒用過的人：設幾點
+ * 就是幾點，之後不會再送免費 3 點。
  */
 export const adminAdjustCredits = onCall({ region: REGION }, async request => {
-  const data = (request.data ?? {}) as { uid?: unknown; delta?: unknown; reason?: unknown };
+  const data = (request.data ?? {}) as { uid?: unknown; balance?: unknown; reason?: unknown };
   const uid = data.uid;
   if (typeof uid !== "string" || !uid) throw new HttpsError("invalid-argument", "缺少 uid");
-  const delta = parseAdjust(data.delta);
-  if (delta === null) throw new HttpsError("invalid-argument", "調整的點數要是 −100 到 +100 之間、不能是 0");
+  const target = parseTargetBalance(data.balance);
+  if (target === null) {
+    throw new HttpsError("invalid-argument", `點數要是 0 到 ${MAX_BALANCE} 之間的整數`);
+  }
 
   return adminAction(request, "act.adjustCredits", "user", uid, async () => {
     const user = await db().collection("users").doc(uid).get();
@@ -1799,7 +1804,14 @@ export const adminAdjustCredits = onCall({ region: REGION }, async request => {
     const reason = typeof data.reason === "string" ? data.reason.trim() : "";
     const result = await db().runTransaction(async tx => {
       const snap = await tx.get(creditsRef);
-      const plan = planAdjust(snap.exists ? (snap.data() ?? {}) : null, delta);
+      const plan = planSetBalance(snap.exists ? (snap.data() ?? {}) : null, target);
+      /*
+        已經是這個點數了就不寫。一筆「變動 0」的調整紀錄只會讓人以為發生過
+        什麼。文件還不存在時例外：設成 0 也要建立，那等於「不要送他免費 3 點」。
+      */
+      if (!plan.created && plan.delta === 0) {
+        throw new HttpsError("failed-precondition", `他現在就是 ${plan.balanceAfter} 點，沒有變動`);
+      }
       tx.set(
         creditsRef,
         { balance: plan.balanceAfter, freeGranted: true, updatedAt: FieldValue.serverTimestamp() },
