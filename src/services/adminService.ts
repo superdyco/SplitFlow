@@ -411,7 +411,7 @@ export interface AiLedgerRow {
   reason: string | null;
 }
 
-export type AiLedgerFilter = "all" | "use" | "adjust" | "free";
+export type AiLedgerFilter = "all" | "use" | "adjust" | "free" | "purchase" | "revoke";
 
 export interface AdminAiUsage {
   range: AdminRange;
@@ -419,6 +419,11 @@ export interface AdminAiUsage {
   totals: { calls: number; reads: number; failures: number; inputTokens: number; outputTokens: number };
   /** 0 代表還沒開始記，不是「沒有人用」。 */
   recordedDays: number;
+  /**
+   * 區間內的儲值，只算正式購買。營收照幣別分開，不換算。
+   * 標成可能不存在：前端與 functions 分開部署，舊版的 adminAiUsage 不會回它。
+   */
+  purchases?: { count: number; refunded: number; credits: number; revenue: Record<string, number> };
   rows: AiLedgerRow[];
   cursor: string | null;
 }

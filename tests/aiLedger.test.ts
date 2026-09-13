@@ -4,14 +4,16 @@ import { ledgerResultLabel, ledgerTypeLabel } from "@/utils/aiLedger";
 const NOW = new Date("2026-09-12T10:00:00Z");
 
 describe("ledgerTypeLabel", () => {
-  it("三種類型", () => {
+  it("五種類型", () => {
     expect(ledgerTypeLabel("use")).toBe("辨識");
     expect(ledgerTypeLabel("adjust")).toBe("調整");
     expect(ledgerTypeLabel("free")).toBe("免費");
+    expect(ledgerTypeLabel("purchase")).toBe("儲值");
+    expect(ledgerTypeLabel("revoke")).toBe("退款扣回");
   });
 
-  it("不認得的照原文 —— 第二階段的 purchase 在畫面更新前也看得到", () => {
-    expect(ledgerTypeLabel("purchase")).toBe("purchase");
+  it("不認得的照原文 —— 之後新增的類型在畫面更新前也看得到", () => {
+    expect(ledgerTypeLabel("gift")).toBe("gift");
   });
 });
 

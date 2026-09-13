@@ -30,6 +30,15 @@ const error = ref<string | null>(null);
 const guestNotice = ref(false);
 const online = ref(navigator.onLine);
 
+/**
+ * 點數用完了。網頁不賣點數（spec 的決定），所以只講去哪裡買，**不放連結** ——
+ * 也不寫商店名稱，那是 App 裡的事。
+ *
+ * 兩種情況：按鈕本來就是「點數用完了」，或按下去才被函式告知沒點數
+ * （另一台裝置剛好用掉最後一點）。
+ */
+const outOfCredits = ref(false);
+
 function syncOnline() {
   online.value = navigator.onLine;
 }
@@ -56,6 +65,7 @@ const button = computed(() =>
 
 async function run() {
   error.value = null;
+  outOfCredits.value = false;
   if (props.guest) {
     guestNotice.value = true;
     return;
@@ -66,6 +76,7 @@ async function run() {
     balance.value = result.creditsLeft;
     emit("result", result);
   } catch (err) {
+    outOfCredits.value = (err as { code?: string }).code === "functions/resource-exhausted";
     error.value = firebaseErrorMessage(err);
     // AI 出錯也扣了 1 點，餘額要重讀。
     balance.value = await getAiCredits(props.uid).catch(() => balance.value);
@@ -90,6 +101,7 @@ async function run() {
     <span v-else-if="error" class="tiny warn">{{ error }}</span>
     <span v-else-if="note" class="tiny">{{ note }}</span>
     <span v-if="warning" class="tiny warn">{{ warning }}</span>
+    <span v-if="button.kind === 'empty' || outOfCredits" class="tiny">點數用完了，可以到手機 App 儲值。</span>
   </div>
 </template>
 

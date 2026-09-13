@@ -31,7 +31,9 @@ const FILTERS: Array<{ value: AiLedgerFilter; label: string }> = [
   { value: "all", label: "全部" },
   { value: "use", label: "辨識" },
   { value: "adjust", label: "調整" },
-  { value: "free", label: "免費" }
+  { value: "free", label: "免費" },
+  { value: "purchase", label: "儲值" },
+  { value: "revoke", label: "退款" }
 ];
 
 const config = ref<AdminAiConfig | null>(null);
@@ -249,6 +251,23 @@ const num = (value: number) => value.toLocaleString("zh-TW");
               <strong>{{ num(usage.totals.inputTokens) }} / {{ num(usage.totals.outputTokens) }}</strong>
             </div>
           </div>
+          <div v-if="usage.purchases" class="counts">
+            <div><span class="label">儲值筆數</span><strong>{{ num(usage.purchases.count) }}</strong></div>
+            <div><span class="label">其中退款</span><strong>{{ num(usage.purchases.refunded) }}</strong></div>
+            <div><span class="label">賣出點數</span><strong>{{ num(usage.purchases.credits) }}</strong></div>
+            <div>
+              <span class="label">營收</span>
+              <strong>
+                <template v-if="Object.keys(usage.purchases.revenue).length">
+                  <span v-for="(amount, code) in usage.purchases.revenue" :key="code">{{ code }} {{ amount }} </span>
+                </template>
+                <template v-else>—</template>
+              </strong>
+            </div>
+          </div>
+          <p v-if="usage.purchases" class="tiny">
+            營收只算正式購買（不含測試帳號）；Android 的金額是商品標價，Google 不回實際價格。
+          </p>
           <p class="tiny">{{ usage.days.from }} 至 {{ usage.days.to }}（算到今天）</p>
         </template>
       </div>

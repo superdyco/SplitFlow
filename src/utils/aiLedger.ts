@@ -1,6 +1,12 @@
 /** 後台點數紀錄的顯示文字。AI 設定頁與使用者詳情共用。 */
 
-const TYPE_LABELS: Record<string, string> = { use: "辨識", adjust: "調整", free: "免費" };
+const TYPE_LABELS: Record<string, string> = {
+  use: "辨識",
+  adjust: "調整",
+  free: "免費",
+  purchase: "儲值",
+  revoke: "退款扣回"
+};
 
 const RESULT_LABELS: Record<string, string> = {
   read: "讀出",
