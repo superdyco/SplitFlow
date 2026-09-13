@@ -12,6 +12,8 @@ export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
 const CATEGORIES = ["food", "transport", "stay", "ticket", "shopping", "other"];
 const TITLE_MAX = 60;
+/** 地址只拿來搜地點，不存進支出。長度擋在這裡是為了不讓一段亂碼變成搜尋字串。 */
+const ADDRESS_MAX = 200;
 
 /**
  * 收 JPEG 與 PNG。網頁版一律轉成 JPEG，但 Flutter 的 image_picker 從相簿選
@@ -42,9 +44,10 @@ export const RECEIPT_SCHEMA = {
     date: nullable("string"),
     time: nullable("string"),
     merchant: nullable("string"),
+    address: nullable("string"),
     category: { type: ["string", "null"], enum: [...CATEGORIES, null] }
   },
-  required: ["is_receipt", "amount", "currency", "date", "time", "merchant", "category"],
+  required: ["is_receipt", "amount", "currency", "date", "time", "merchant", "address", "category"],
   additionalProperties: false
 } as const;
 
@@ -55,6 +58,7 @@ export const RECEIPT_INSTRUCTIONS = [
   "- currency：ISO 4217 三碼大寫代碼。收據上沒寫明時，從貨幣符號、語言、店家所在國家推斷；不確定就回 null。",
   "- date：YYYY-MM-DD。time：HH:MM，24 小時制。",
   "- merchant：店名，照收據上印的寫，不要翻譯。",
+  "- address：收據上印的店家地址，照印的寫、不要翻譯；沒有印就回 null，不要從店名推測。",
   "- category：從 food、transport、stay、ticket、shopping、other 挑最接近的一個。"
 ].join("\n");
 
@@ -65,6 +69,11 @@ export interface ReceiptFields {
   date: string | null;
   time: string | null;
   title: string | null;
+  /**
+   * 收據上印的地址。**不是表單欄位** —— 只用來跟店名一起搜地點候選，
+   * 使用者點了其中一個才會填進地點。
+   */
+  address: string | null;
   category: string | null;
 }
 
@@ -87,12 +96,12 @@ function clock(value: unknown): string | null {
   return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : null;
 }
 
-function title(value: unknown): string | null {
+function clipped(value: unknown, max: number): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
   // 用 Array.from 數字元，不然表情符號會被切成半個。
-  return Array.from(trimmed).slice(0, TITLE_MAX).join("");
+  return Array.from(trimmed).slice(0, max).join("");
 }
 
 /**
@@ -124,7 +133,8 @@ export function cleanReceipt(raw: unknown): {
     currencySupported,
     date: realDate(data.date),
     time: clock(data.time),
-    title: title(data.merchant),
+    title: clipped(data.merchant, TITLE_MAX),
+    address: clipped(data.address, ADDRESS_MAX),
     category: typeof data.category === "string" && CATEGORIES.includes(data.category) ? data.category : null
   };
 

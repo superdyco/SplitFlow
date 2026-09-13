@@ -13,6 +13,7 @@ function raw(overrides: Record<string, unknown> = {}) {
     date: "2026-09-10",
     time: "19:05",
     merchant: "  すき家 渋谷店  ",
+    address: " 東京都渋谷区道玄坂2-1-1 ",
     category: "food",
     ...overrides
   };
@@ -71,9 +72,17 @@ describe("cleanReceipt", () => {
         date: "2026-09-10",
         time: "19:05",
         title: "すき家 渋谷店",
+        address: "東京都渋谷区道玄坂2-1-1",
         category: "food"
       }
     });
+  });
+
+  it("地址去頭尾空白；沒有印就是 null；太長截到 200 字", () => {
+    expect(cleanReceipt(raw({ address: null })).fields.address).toBeNull();
+    expect(cleanReceipt(raw({ address: "   " })).fields.address).toBeNull();
+    expect(cleanReceipt(raw({ address: 123 })).fields.address).toBeNull();
+    expect(cleanReceipt(raw({ address: "字".repeat(250) })).fields.address).toBe("字".repeat(200));
   });
 
   it("有小數的幣別補到兩位", () => {
@@ -149,6 +158,7 @@ describe("cleanReceipt", () => {
         date: null,
         time: null,
         title: null,
+        address: null,
         category: null
       }
     });
