@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/dictation_service.dart';
@@ -16,6 +17,7 @@ import '../domain/validation.dart' as validate;
 import '../data/place_service.dart';
 import '../state/providers.dart';
 import 'ai_place_suggestions.dart';
+import 'credit_store_page.dart';
 import 'currency_picker.dart';
 import 'place_field.dart';
 import 'receipt_field.dart';
@@ -103,6 +105,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   String? _aiWarning;
   String? _aiError;
   bool _aiGuestNotice = false;
+
+  /// 按下去才被函式告知沒點數（另一台裝置剛好用掉最後一點）。
+  bool _aiOutOfCredits = false;
 
   /// AI 讀到店名或地址時，拿來搜地點候選的字串。選了或按「都不是」就清掉。
   String? _aiPlaceQuery;
@@ -337,7 +342,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       if (!mounted) return;
       _applyAi(task, result);
     } catch (err) {
-      if (mounted) setState(() => _aiError = errorText(err));
+      if (mounted) {
+        setState(() {
+          _aiError = errorText(err);
+          _aiOutOfCredits =
+              err is FirebaseFunctionsException && err.code == 'resource-exhausted';
+        });
+      }
     } finally {
       // 成功或失敗都扣了點，餘額要重讀。
       ref.invalidate(aiCreditsProvider);
@@ -902,6 +913,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             _aiError = null;
                             _aiGuestNotice = false;
                             _aiPlaceQuery = null;
+                            _aiOutOfCredits = false;
                           }),
                         ),
                       ),
@@ -931,6 +943,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                       size: 18),
                                   label: Text(button.label),
                                 ),
+                                // App 裡只連到自己的儲值頁，不導去任何外部付款（spec 的決定）。
+                                if (button.kind == AiButtonKind.empty || _aiOutOfCredits)
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                          builder: (_) => const CreditStorePage()),
+                                    ),
+                                    child: const Text('去儲值'),
+                                  ),
                                 if (_aiGuestNotice)
                                   Text('$guestAiNotice，到個人設定綁定。',
                                       style: text.bodySmall)

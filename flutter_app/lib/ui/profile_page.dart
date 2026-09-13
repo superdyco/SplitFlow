@@ -13,6 +13,7 @@ import '../domain/validation.dart' as validate;
 import '../state/pending_guest_merge.dart';
 import '../state/providers.dart';
 import 'confirm_dialog.dart';
+import 'credit_store_page.dart';
 import 'diagnostics_section.dart';
 import 'system_share.dart';
 import 'ledger.dart';
@@ -359,6 +360,9 @@ class _FormState extends ConsumerState<_Form> {
               const LedgerDivider(),
               LedgerRow(
                 title: 'AI 辨識點數',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const CreditStorePage()),
+                ),
                 trailing: Text(
                   ref.watch(aiCreditsProvider).when(
                         // null 是還沒用過：第一次辨識時會拿到 3 點。
