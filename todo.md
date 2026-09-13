@@ -831,6 +831,12 @@ GitHub 的 runner 內建 JDK，不用自己裝。
 **還沒驗到的：真的在兩個商店各買一次。** 那要先有 Apple Developer Program（加上 Mac 或雲端
 macOS 簽章）與 Play Console（加上正式的上傳金鑰 —— 目前 Android release 用的是 debug 簽章）。
 
-⚠️ **部署注意**：`purchaseCredits`、`appStoreNotifications` 用到 `APPSTORE_*` 四個 secrets，
-設好之前 `npm run deploy:functions`（部署全部函式）會失敗。這段期間部署其他函式要用
-`firebase deploy --only functions:<名稱>` 指定。
+⚠️ **儲值的三支函式目前沒有匯出**（`purchaseCredits`、`appStoreNotifications`、
+`onPlayNotification`，程式碼在 `functions/src/purchase/functions.ts`）。它們用到 `APPSTORE_*`
+四個 secrets，而 `defineSecret` 在模組一載入就會登記 —— 只要 `index.ts` import 了它，部署
+**任何一支**函式都會先去查 Secret Manager（連 `--only functions:<名稱>` 也一樣），而這個
+專案還沒啟用它。第一次部署就撞到了，所以先拿掉。
+
+開回來的步驟：辦好 Apple Developer Program 與 Play Console → 啟用 Secret Manager API →
+設好四個 secrets（計畫 Task 11）→ 把 `index.ts` 匯出清單上方註解裡那行 `export … from
+"./purchase/functions.js"` 的註解拿掉 → 部署。
